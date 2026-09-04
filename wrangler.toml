@@ -1,7 +1,0 @@
-name = "polatordsolar"
-compatibility_date = "2024-09-04"
-
-# Questa sezione è CRUCIALE: dice a Cloudflare di servire file statici
-[assets]
-directory = "./dist"
-binding = "ASSETS"
