@@ -1,4 +1,5 @@
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
+import { BarcodeDetectorPolyfill } from '@undecaf/barcode-detector-polyfill';
 
 export interface ScanResult { text: string }
 
@@ -20,6 +21,36 @@ const NATIVE_FORMATS = [
   'qr_code', 'ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128',
   'code_39', 'code_93', 'codabar', 'itf', 'data_matrix',
 ] as const;
+
+const ZBAR_FORMATS = [
+  'code_128', 'code_39', 'code_93', 'codabar', 'itf',
+  'ean_8', 'ean_13', 'upc_a', 'upc_e', 'qr_code',
+];
+
+let zbarDetector: BarcodeDetectorPolyfill | null = null;
+
+function getZbarDetector(): BarcodeDetectorPolyfill {
+  if (!zbarDetector) {
+    zbarDetector = new BarcodeDetectorPolyfill({
+      formats: ZBAR_FORMATS,
+      zbar: { enableCache: true },
+    });
+  }
+  return zbarDetector;
+}
+
+async function scanZbar(source: unknown): Promise<ScanResult | null> {
+  try {
+    const results = await withTimeout(
+      getZbarDetector().detect(source as never),
+      10000
+    );
+    const best = [...results].sort((a, b) => b.quality - a.quality)[0];
+    return best?.rawValue ? { text: best.rawValue.trim() } : null;
+  } catch {
+    return null;
+  }
+}
 
 const SCANNER_OPTIONS = {
   formatsToSupport: FORMATS,
@@ -152,7 +183,14 @@ export async function scanImageFile(file: File): Promise<ScanResult | null> {
     : null;
   let variants: ImageVariant[] = [];
   try {
+    const zbarOriginal = await scanZbar(file);
+    if (zbarOriginal) return zbarOriginal;
+
     variants = await createImageVariants(file).catch(() => []);
+    for (const variant of variants) {
+      const zbarVariant = await scanZbar(variant.file);
+      if (zbarVariant) return zbarVariant;
+    }
     const nativeResult = await scanNative([
       ...(original ? [original] : []),
       ...variants.map((variant) => variant.bitmap),
@@ -171,6 +209,8 @@ export async function scanImageFile(file: File): Promise<ScanResult | null> {
 export class CameraScanner {
   private html5Qrcode: Html5Qrcode | null = null;
   private detected = false;
+  private zbarTimer: number | null = null;
+  private zbarBusy = false;
 
   constructor(private elementId: string) {}
 
@@ -199,9 +239,30 @@ export class CameraScanner {
       },
       () => {}
     );
+
+    const video = document.querySelector<HTMLVideoElement>(`#${this.elementId} video`);
+    if (video) {
+      this.zbarTimer = window.setInterval(async () => {
+        if (this.detected || this.zbarBusy || video.readyState < 2) return;
+        this.zbarBusy = true;
+        try {
+          const result = await scanZbar(video);
+          if (result?.text && !this.detected) {
+            this.detected = true;
+            onDetected(result.text);
+          }
+        } finally {
+          this.zbarBusy = false;
+        }
+      }, 180);
+    }
   }
 
   async stop(): Promise<void> {
+    if (this.zbarTimer !== null) {
+      window.clearInterval(this.zbarTimer);
+      this.zbarTimer = null;
+    }
     if (!this.html5Qrcode) return;
     try {
       await this.html5Qrcode.stop();
@@ -211,5 +272,6 @@ export class CameraScanner {
     }
     this.html5Qrcode = null;
     this.detected = false;
+    this.zbarBusy = false;
   }
 }
