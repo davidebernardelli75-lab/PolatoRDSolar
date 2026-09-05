@@ -1,29 +1,61 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { ArrowLeft, Save } from 'lucide-react';
 import type { PlantInsert, OwnerType } from '@/lib/types';
-import { createPlant } from '@/lib/api';
+import { createPlant, updatePlant, fetchPlant } from '@/lib/api';
 
 interface PlantEditorProps {
+  plantId?: string;
   onSaved: (id: string) => void;
   onCancel: () => void;
 }
 
-export function PlantEditor({ onSaved, onCancel }: PlantEditorProps) {
-  const [form, setForm] = useState<PlantInsert>({
-    owner_type: 'Privato',
-    owner_name: '',
-    fiscal_or_vat: '',
-    address: '',
-    phone: '',
-    email: '',
-    total_power_kw: null,
-    panel_brand_model: '',
-    inverter_brand_model: '',
-    installation_date: null,
-    notes: '',
-  });
+const emptyForm: PlantInsert = {
+  owner_type: 'Privato',
+  owner_name: '',
+  fiscal_or_vat: '',
+  address: '',
+  phone: '',
+  email: '',
+  total_power_kw: null,
+  panel_brand_model: '',
+  inverter_brand_model: '',
+  installation_date: null,
+  notes: '',
+};
+
+export function PlantEditor({ plantId, onSaved, onCancel }: PlantEditorProps) {
+  const [form, setForm] = useState<PlantInsert>(emptyForm);
   const [saving, setSaving] = useState(false);
+  const [loading, setLoading] = useState(!!plantId);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!plantId) return;
+    (async () => {
+      try {
+        const plant = await fetchPlant(plantId);
+        if (plant) {
+          setForm({
+            owner_type: plant.owner_type,
+            owner_name: plant.owner_name,
+            fiscal_or_vat: plant.fiscal_or_vat ?? '',
+            address: plant.address,
+            phone: plant.phone ?? '',
+            email: plant.email ?? '',
+            total_power_kw: plant.total_power_kw,
+            panel_brand_model: plant.panel_brand_model ?? '',
+            inverter_brand_model: plant.inverter_brand_model ?? '',
+            installation_date: plant.installation_date ?? null,
+            notes: plant.notes ?? '',
+          });
+        }
+      } catch {
+        setError('Impossibile caricare i dati dell\'impianto.');
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [plantId]);
 
   const update = <K extends keyof PlantInsert>(key: K, value: PlantInsert[K]) => {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -38,18 +70,36 @@ export function PlantEditor({ onSaved, onCancel }: PlantEditorProps) {
     setSaving(true);
     setError(null);
     try {
-      const created = await createPlant({
+      const payload = {
         ...form,
         owner_name: form.owner_name.trim(),
         address: form.address.trim(),
-      });
-      onSaved(created.id);
+      };
+      if (plantId) {
+        const updated = await updatePlant(plantId, payload);
+        onSaved(updated.id);
+      } else {
+        const created = await createPlant(payload);
+        onSaved(created.id);
+      }
     } catch {
       setError("Impossibile salvare l'impianto. Riprova.");
     } finally {
       setSaving(false);
     }
   };
+
+  if (loading) {
+    return (
+      <div className="p-4 lg:p-8 max-w-3xl mx-auto">
+        <div className="animate-pulse space-y-4">
+          <div className="h-8 bg-slate-200 rounded w-1/3" />
+          <div className="h-40 bg-slate-200 rounded-2xl" />
+          <div className="h-40 bg-slate-200 rounded-2xl" />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-4 lg:p-8 max-w-3xl mx-auto">
@@ -61,7 +111,9 @@ export function PlantEditor({ onSaved, onCancel }: PlantEditorProps) {
         Annulla
       </button>
 
-      <h1 className="text-2xl font-bold text-slate-900 mb-1">Nuovo Impianto</h1>
+      <h1 className="text-2xl font-bold text-slate-900 mb-1">
+        {plantId ? 'Modifica Impianto' : 'Nuovo Impianto'}
+      </h1>
       <p className="text-slate-500 text-sm mb-6">
         Inserisci i dati del proprietario e i dettagli tecnici dell{"'"}impianto.
       </p>
@@ -192,7 +244,7 @@ export function PlantEditor({ onSaved, onCancel }: PlantEditorProps) {
             className="flex-1 flex items-center justify-center gap-2 bg-red-500 hover:bg-red-600 disabled:opacity-50 text-white font-semibold px-4 py-3 rounded-xl transition-colors shadow-sm"
           >
             <Save size={18} />
-            {saving ? 'Salvataggio...' : 'Salva Impianto'}
+            {saving ? 'Salvataggio...' : plantId ? 'Salva Modifiche' : 'Salva Impianto'}
           </button>
           <button
             type="button"

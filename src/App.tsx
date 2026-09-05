@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import type { Plant } from '@/lib/types';
-import { fetchPlants } from '@/lib/api';
+import { fetchPlants, deletePlant } from '@/lib/api';
 import { Sidebar } from '@/components/Sidebar';
 import { Dashboard } from '@/components/Dashboard';
 import { PlantEditor } from '@/components/PlantEditor';
@@ -10,6 +10,7 @@ import { PlantDetail } from '@/components/PlantDetail';
 export type View =
   | { name: 'dashboard' }
   | { name: 'new-plant' }
+  | { name: 'edit-plant'; plantId: string }
   | { name: 'plant'; plantId: string };
 
 export default function App() {
@@ -39,6 +40,15 @@ export default function App() {
   const navigate = (v: View) => {
     setView(v);
     setSidebarOpen(false);
+  };
+
+  const handleDeletePlant = async (id: string) => {
+    try {
+      await deletePlant(id);
+      await loadPlants();
+    } catch {
+      setError('Impossibile eliminare l\'impianto. Riprova.');
+    }
   };
 
   return (
@@ -78,10 +88,22 @@ export default function App() {
               loading={loading}
               onOpenPlant={(id) => navigate({ name: 'plant', plantId: id })}
               onNewPlant={() => navigate({ name: 'new-plant' })}
+              onEditPlant={(id) => navigate({ name: 'edit-plant', plantId: id })}
+              onDeletePlant={handleDeletePlant}
             />
           )}
           {view.name === 'new-plant' && (
             <PlantEditor
+              onSaved={(id) => {
+                loadPlants();
+                navigate({ name: 'plant', plantId: id });
+              }}
+              onCancel={() => navigate({ name: 'dashboard' })}
+            />
+          )}
+          {view.name === 'edit-plant' && (
+            <PlantEditor
+              plantId={view.plantId}
               onSaved={(id) => {
                 loadPlants();
                 navigate({ name: 'plant', plantId: id });
