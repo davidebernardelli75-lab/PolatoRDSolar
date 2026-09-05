@@ -1,0 +1,11 @@
+{
+  "name": "Polato R&D Solar Archive",
+  "short_name": "Solar Archive",
+  "description": "Archivio aziendale degli impianti fotovoltaici Polato R&D",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f1f5f9",
+  "theme_color": "#1e3a8a",
+  "icons": [{ "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }]
+}

@@ -1,4 +1,4 @@
-import { Sun, LayoutGrid, PlusCircle, FileText, X } from 'lucide-react';
+import { Sun, LayoutGrid, PlusCircle, LogOut, X } from 'lucide-react';
 import type { View } from '@/App';
 
 interface SidebarProps {
@@ -6,9 +6,10 @@ interface SidebarProps {
   onClose: () => void;
   onNavigate: (view: View) => void;
   currentView: View;
+  onSignOut: () => void;
 }
 
-export function Sidebar({ open, onClose, onNavigate, currentView }: SidebarProps) {
+export function Sidebar({ open, onClose, onNavigate, currentView, onSignOut }: SidebarProps) {
   const items = [
     { id: 'dashboard' as const, label: 'Dashboard', icon: LayoutGrid },
     { id: 'new-plant' as const, label: 'Nuovo Impianto', icon: PlusCircle },
@@ -74,6 +75,9 @@ export function Sidebar({ open, onClose, onNavigate, currentView }: SidebarProps
         </nav>
 
         <div className="px-5 py-4 border-t border-blue-800">
+          <button onClick={onSignOut} className="mb-4 flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-blue-100 transition hover:bg-blue-800 hover:text-white">
+            <LogOut size={16} />Esci
+          </button>
           <div className="flex items-center gap-2 text-xs text-slate-400">
             <Sun size={14} className="text-red-400" />
             <span>Gestione impianti solari</span>

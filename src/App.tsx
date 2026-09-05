@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import type { Session } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 import type { Plant } from '@/lib/types';
 import { fetchPlants, deletePlant } from '@/lib/api';
@@ -6,6 +7,7 @@ import { Sidebar } from '@/components/Sidebar';
 import { Dashboard } from '@/components/Dashboard';
 import { PlantEditor } from '@/components/PlantEditor';
 import { PlantDetail } from '@/components/PlantDetail';
+import { Login } from '@/components/Login';
 
 export type View =
   | { name: 'dashboard' }
@@ -14,6 +16,8 @@ export type View =
   | { name: 'plant'; plantId: string };
 
 export default function App() {
+  const [session, setSession] = useState<Session | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
   const [view, setView] = useState<View>({ name: 'dashboard' });
   const [plants, setPlants] = useState<Plant[]>([]);
   const [loading, setLoading] = useState(true);
@@ -34,8 +38,24 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    loadPlants();
-  }, [loadPlants]);
+    supabase.auth.getSession().then(({ data }) => {
+      setSession(data.session);
+      setAuthLoading(false);
+    });
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+      setSession(nextSession);
+      setAuthLoading(false);
+    });
+    return () => subscription.unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    if (session) loadPlants();
+    else { setPlants([]); setLoading(false); }
+  }, [loadPlants, session]);
+
+  if (authLoading) return <div className="min-h-screen bg-slate-100 flex items-center justify-center text-sm text-slate-600">Verifica accesso…</div>;
+  if (!session) return <Login />;
 
   const navigate = (v: View) => {
     setView(v);
@@ -58,6 +78,7 @@ export default function App() {
         onClose={() => setSidebarOpen(false)}
         onNavigate={navigate}
         currentView={view}
+        onSignOut={() => supabase.auth.signOut()}
       />
 
       <div className="flex-1 flex flex-col min-w-0">
