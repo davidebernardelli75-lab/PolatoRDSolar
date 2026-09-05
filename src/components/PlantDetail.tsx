@@ -521,11 +521,12 @@ function PanelFormModal({
           setScanSuccess(true);
           stopCamera();
         });
-      } catch {
+      } catch (err) {
+        console.error('Camera start error:', err);
         setScanError('Impossibile accedere alla fotocamera. Verifica i permessi del browser.');
         setCameraActive(false);
       }
-    }, 100);
+    }, 200);
   };
 
   const stopCamera = () => {
@@ -610,15 +611,15 @@ function PanelFormModal({
             </div>
           )}
 
-          {/* Camera viewfinder */}
-          {cameraActive && (
-            <div className="rounded-xl overflow-hidden border-2 border-blue-900">
-              <div id="barcode-reader-camera" className="w-full" />
+          {/* Camera viewfinder — always in DOM, hidden when inactive */}
+          <div className={cameraActive ? 'rounded-xl overflow-hidden border-2 border-blue-900' : 'hidden'}>
+            <div id="barcode-reader-camera" className="w-full" />
+            {cameraActive && (
               <div className="bg-blue-900 text-white text-xs text-center py-1.5">
                 Inquadra il barcode con la fotocamera
               </div>
-            </div>
-          )}
+            )}
+          </div>
 
           {/* Scan error */}
           {scanError && (

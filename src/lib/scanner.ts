@@ -18,19 +18,50 @@ const FORMATS = [
   Html5QrcodeSupportedFormats.DATA_MATRIX,
 ];
 
+let fileScanner: Html5Qrcode | null = null;
+
+function ensureFileScannerElement(): string {
+  const id = 'barcode-reader-file-scan';
+  let el = document.getElementById(id);
+  if (!el) {
+    el = document.createElement('div');
+    el.id = id;
+    el.style.position = 'fixed';
+    el.style.top = '-9999px';
+    el.style.left = '-9999px';
+    el.style.width = '1px';
+    el.style.height = '1px';
+    el.style.overflow = 'hidden';
+    el.style.opacity = '0';
+    document.body.appendChild(el);
+  }
+  return id;
+}
+
 export async function scanImageFile(file: File): Promise<ScanResult | null> {
+  const elementId = ensureFileScannerElement();
   try {
-    const html5Qrcode = new Html5Qrcode('barcode-reader-image-only', {
+    if (fileScanner) {
+      await fileScanner.clear().catch(() => {});
+      fileScanner = null;
+    }
+    fileScanner = new Html5Qrcode(elementId, {
       formatsToSupport: FORMATS,
       verbose: false,
     });
-    const decodedText = await html5Qrcode.scanFile(file, false);
-    await html5Qrcode.clear();
+    const decodedText = await fileScanner.scanFile(file, false);
+    await fileScanner.clear();
+    fileScanner = null;
     if (decodedText) {
       return { text: decodedText };
     }
     return null;
-  } catch {
+  } catch (err) {
+    if (fileScanner) {
+      await fileScanner.clear().catch(() => {});
+      fileScanner = null;
+    }
+    console.error('scanImageFile error:', err);
     return null;
   }
 }
@@ -44,6 +75,11 @@ export class CameraScanner {
   }
 
   async start(onDetected: (text: string) => void): Promise<void> {
+    const el = document.getElementById(this.elementId);
+    if (!el) {
+      throw new Error(`Element #${this.elementId} not found in DOM`);
+    }
+
     this.html5Qrcode = new Html5Qrcode(this.elementId, {
       formatsToSupport: FORMATS,
       verbose: false,

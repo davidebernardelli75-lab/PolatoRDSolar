@@ -147,8 +147,6 @@ export default function App() {
           )}
         </main>
       </div>
-
-      <div id="barcode-reader-image-only" className="hidden" />
     </div>
   );
 }
