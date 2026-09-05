@@ -1,6 +1,8 @@
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
 import { BarcodeDetectorPolyfill } from '@undecaf/barcode-detector-polyfill';
 
+// ZBar/WASM garantisce la lettura dei Code 128 anche sui browser iOS.
+
 export interface ScanResult { text: string }
 
 const FORMATS = [
