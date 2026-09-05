@@ -63,6 +63,7 @@ function ensureFileScannerElement(): string {
 }
 
 async function createImageVariants(file: File): Promise<ImageVariant[]> {
+  if (typeof createImageBitmap !== 'function') return [];
   const source = await createImageBitmap(file);
   const scale = Math.min(1, 2200 / Math.max(source.width, source.height));
   const width = Math.max(1, Math.round(source.width * scale));
@@ -128,24 +129,27 @@ async function scanNative(sources: ImageBitmapSource[]): Promise<ScanResult | nu
 }
 
 async function scanWithHtml5Qrcode(files: File[]): Promise<ScanResult | null> {
-  const scanner = new Html5Qrcode(ensureFileScannerElement(), SCANNER_OPTIONS);
-  try {
-    for (const file of files) {
+  const elementId = ensureFileScannerElement();
+  for (const file of files) {
+    const scanner = new Html5Qrcode(elementId, SCANNER_OPTIONS);
+    try {
       try {
         const text = await withTimeout(scanner.scanFile(file, false), 10000);
         if (text) return { text: text.trim() };
       } catch {
         // Prova la variante successiva senza chiedere un nuovo caricamento.
       }
+    } finally {
+      try { scanner.clear(); } catch { /* scanner già rilasciato */ }
     }
-  } finally {
-    try { scanner.clear(); } catch { /* scanner già rilasciato */ }
   }
   return null;
 }
 
 export async function scanImageFile(file: File): Promise<ScanResult | null> {
-  const original = await createImageBitmap(file).catch(() => null);
+  const original = typeof createImageBitmap === 'function'
+    ? await createImageBitmap(file).catch(() => null)
+    : null;
   let variants: ImageVariant[] = [];
   try {
     variants = await createImageVariants(file).catch(() => []);
@@ -180,20 +184,14 @@ export class CameraScanner {
     await this.html5Qrcode.start(
       { facingMode: 'environment' },
       {
-        fps: 18,
+        fps: 12,
         aspectRatio: 16 / 9,
         disableFlip: false,
         qrbox: (viewfinderWidth: number, viewfinderHeight: number) => ({
           width: Math.max(180, Math.floor(Math.min(viewfinderWidth * 0.92, 640))),
           height: Math.max(100, Math.floor(Math.min(viewfinderHeight * 0.42, 260))),
         }),
-        videoConstraints: {
-          facingMode: { ideal: 'environment' },
-          width: { ideal: 1920 },
-          height: { ideal: 1080 },
-          focusMode: 'continuous',
-        },
-      } as never,
+      },
       (decodedText: string) => {
         if (this.detected) return;
         this.detected = true;
