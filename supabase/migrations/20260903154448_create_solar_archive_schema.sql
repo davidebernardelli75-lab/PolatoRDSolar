@@ -1,24 +1,9 @@
 /*
 # Create Polato R&D Solar Archive schema
 
-1. New tables
-- `plants`: shared plant records, owner contact details, and installation specifications.
-- `panels`: panel serial numbers linked to a plant.
-- `panel_photos`: uploaded photo metadata linked to a plant and optionally a panel.
-
-2. Storage
-- Creates a private `solar-archive` bucket for field photos.
-- Objects are stored under a plant folder and exposed only through the app's scoped policies.
-
-3. Security
-- Enables row level security on all application tables.
-- Adds separate SELECT, INSERT, UPDATE, and DELETE policies for the no-sign-in single-tenant app.
-- Adds separate storage object policies for the archive bucket.
-
-4. Important notes
-- This first version is intentionally single-tenant because the app has no sign-in screen.
-- Plant, panel, and photo data is shared through the configured app workspace.
-- The database validates required relationships and numeric power values.
+Creates the application tables and private photo bucket in a deny-by-default
+state. Access policies are intentionally added only by the following
+secure_shared_workspace migration.
 */
 
 CREATE TABLE IF NOT EXISTS public.plants (
@@ -66,42 +51,11 @@ ALTER TABLE public.plants ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.panels ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.panel_photos ENABLE ROW LEVEL SECURITY;
 
-DROP POLICY IF EXISTS "shared_select_plants" ON public.plants;
-CREATE POLICY "shared_select_plants" ON public.plants FOR SELECT TO anon, authenticated USING (true);
-DROP POLICY IF EXISTS "shared_insert_plants" ON public.plants;
-CREATE POLICY "shared_insert_plants" ON public.plants FOR INSERT TO anon, authenticated WITH CHECK (true);
-DROP POLICY IF EXISTS "shared_update_plants" ON public.plants;
-CREATE POLICY "shared_update_plants" ON public.plants FOR UPDATE TO anon, authenticated USING (true) WITH CHECK (true);
-DROP POLICY IF EXISTS "shared_delete_plants" ON public.plants;
-CREATE POLICY "shared_delete_plants" ON public.plants FOR DELETE TO anon, authenticated USING (true);
-
-DROP POLICY IF EXISTS "shared_select_panels" ON public.panels;
-CREATE POLICY "shared_select_panels" ON public.panels FOR SELECT TO anon, authenticated USING (true);
-DROP POLICY IF EXISTS "shared_insert_panels" ON public.panels;
-CREATE POLICY "shared_insert_panels" ON public.panels FOR INSERT TO anon, authenticated WITH CHECK (true);
-DROP POLICY IF EXISTS "shared_update_panels" ON public.panels;
-CREATE POLICY "shared_update_panels" ON public.panels FOR UPDATE TO anon, authenticated USING (true) WITH CHECK (true);
-DROP POLICY IF EXISTS "shared_delete_panels" ON public.panels;
-CREATE POLICY "shared_delete_panels" ON public.panels FOR DELETE TO anon, authenticated USING (true);
-
-DROP POLICY IF EXISTS "shared_select_panel_photos" ON public.panel_photos;
-CREATE POLICY "shared_select_panel_photos" ON public.panel_photos FOR SELECT TO anon, authenticated USING (true);
-DROP POLICY IF EXISTS "shared_insert_panel_photos" ON public.panel_photos;
-CREATE POLICY "shared_insert_panel_photos" ON public.panel_photos FOR INSERT TO anon, authenticated WITH CHECK (true);
-DROP POLICY IF EXISTS "shared_update_panel_photos" ON public.panel_photos;
-CREATE POLICY "shared_update_panel_photos" ON public.panel_photos FOR UPDATE TO anon, authenticated USING (true) WITH CHECK (true);
-DROP POLICY IF EXISTS "shared_delete_panel_photos" ON public.panel_photos;
-CREATE POLICY "shared_delete_panel_photos" ON public.panel_photos FOR DELETE TO anon, authenticated USING (true);
+REVOKE ALL ON TABLE public.plants, public.panels, public.panel_photos FROM anon;
 
 INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 VALUES ('solar-archive', 'solar-archive', false, 10485760, ARRAY['image/jpeg', 'image/png', 'image/webp', 'image/heic'])
-ON CONFLICT (id) DO UPDATE SET public = false, file_size_limit = 10485760, allowed_mime_types = ARRAY['image/jpeg', 'image/png', 'image/webp', 'image/heic'];
-
-DROP POLICY IF EXISTS "shared_read_solar_archive" ON storage.objects;
-CREATE POLICY "shared_read_solar_archive" ON storage.objects FOR SELECT TO anon, authenticated USING (bucket_id = 'solar-archive');
-DROP POLICY IF EXISTS "shared_upload_solar_archive" ON storage.objects;
-CREATE POLICY "shared_upload_solar_archive" ON storage.objects FOR INSERT TO anon, authenticated WITH CHECK (bucket_id = 'solar-archive' AND (storage.foldername(name))[1] IS NOT NULL);
-DROP POLICY IF EXISTS "shared_update_solar_archive" ON storage.objects;
-CREATE POLICY "shared_update_solar_archive" ON storage.objects FOR UPDATE TO anon, authenticated USING (bucket_id = 'solar-archive') WITH CHECK (bucket_id = 'solar-archive');
-DROP POLICY IF EXISTS "shared_delete_solar_archive" ON storage.objects;
-CREATE POLICY "shared_delete_solar_archive" ON storage.objects FOR DELETE TO anon, authenticated USING (bucket_id = 'solar-archive');
+ON CONFLICT (id) DO UPDATE SET
+  public = false,
+  file_size_limit = 10485760,
+  allowed_mime_types = ARRAY['image/jpeg', 'image/png', 'image/webp', 'image/heic'];
