@@ -611,9 +611,12 @@ function PanelFormModal({
             </div>
           )}
 
-          {/* Camera viewfinder — always in DOM, hidden when inactive */}
-          <div className={cameraActive ? 'rounded-xl overflow-hidden border-2 border-blue-900' : 'hidden'}>
-            <div id="barcode-reader-camera" className="w-full" />
+          {/* Camera viewfinder — always in DOM, visible only when active */}
+          <div
+            className="rounded-xl overflow-hidden border-2 border-blue-900"
+            style={{ display: cameraActive ? 'block' : 'none' }}
+          >
+            <div id="barcode-reader-camera" className="w-full" style={{ minHeight: '300px' }} />
             {cameraActive && (
               <div className="bg-blue-900 text-white text-xs text-center py-1.5">
                 Inquadra il barcode con la fotocamera

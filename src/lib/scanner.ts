@@ -18,7 +18,7 @@ const FORMATS = [
   Html5QrcodeSupportedFormats.DATA_MATRIX,
 ];
 
-let fileScanner: Html5Qrcode | null = null;
+let fileScannerInstance: Html5Qrcode | null = null;
 
 function ensureFileScannerElement(): string {
   const id = 'barcode-reader-file-scan';
@@ -27,12 +27,13 @@ function ensureFileScannerElement(): string {
     el = document.createElement('div');
     el.id = id;
     el.style.position = 'fixed';
-    el.style.top = '-9999px';
-    el.style.left = '-9999px';
-    el.style.width = '1px';
-    el.style.height = '1px';
-    el.style.overflow = 'hidden';
+    el.style.top = '0';
+    el.style.left = '0';
+    el.style.width = '300px';
+    el.style.height = '300px';
     el.style.opacity = '0';
+    el.style.pointerEvents = 'none';
+    el.style.zIndex = '-1';
     document.body.appendChild(el);
   }
   return id;
@@ -40,28 +41,33 @@ function ensureFileScannerElement(): string {
 
 export async function scanImageFile(file: File): Promise<ScanResult | null> {
   const elementId = ensureFileScannerElement();
+
   try {
-    if (fileScanner) {
-      await fileScanner.clear().catch(() => {});
-      fileScanner = null;
+    if (fileScannerInstance) {
+      await fileScannerInstance.clear().catch(() => {});
+      fileScannerInstance = null;
     }
-    fileScanner = new Html5Qrcode(elementId, {
+
+    fileScannerInstance = new Html5Qrcode(elementId, {
       formatsToSupport: FORMATS,
       verbose: false,
     });
-    const decodedText = await fileScanner.scanFile(file, false);
-    await fileScanner.clear();
-    fileScanner = null;
+
+    const decodedText = await fileScannerInstance.scanFile(file, false);
+
+    await fileScannerInstance.clear();
+    fileScannerInstance = null;
+
     if (decodedText) {
       return { text: decodedText };
     }
     return null;
   } catch (err) {
-    if (fileScanner) {
-      await fileScanner.clear().catch(() => {});
-      fileScanner = null;
+    if (fileScannerInstance) {
+      await fileScannerInstance.clear().catch(() => {});
+      fileScannerInstance = null;
     }
-    console.error('scanImageFile error:', err);
+    console.error('Barcode scan error:', err);
     return null;
   }
 }
@@ -85,9 +91,19 @@ export class CameraScanner {
       verbose: false,
     });
 
+    const config = {
+      fps: 15,
+      qrbox: (viewfinderWidth: number, viewfinderHeight: number) => {
+        const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
+        const boxSize = Math.floor(minEdge * 0.7);
+        return { width: Math.max(100, boxSize), height: Math.max(100, boxSize) };
+      },
+      aspectRatio: 1.0,
+    };
+
     await this.html5Qrcode.start(
       { facingMode: 'environment' },
-      { fps: 10, qrbox: { width: 250, height: 250 } },
+      config,
       (decodedText: string) => {
         onDetected(decodedText);
       },
@@ -98,7 +114,10 @@ export class CameraScanner {
   async stop(): Promise<void> {
     if (this.html5Qrcode) {
       try {
-        await this.html5Qrcode.stop();
+        const state = this.html5Qrcode.getState?.();
+        if (state && state !== 'STOPPED' && state !== 'NOT_STARTED') {
+          await this.html5Qrcode.stop();
+        }
         this.html5Qrcode.clear();
       } catch {
         // ignore
