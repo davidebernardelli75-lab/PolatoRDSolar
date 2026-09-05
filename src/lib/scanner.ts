@@ -18,7 +18,68 @@ const FORMATS = [
   Html5QrcodeSupportedFormats.DATA_MATRIX,
 ];
 
-let fileScannerInstance: Html5Qrcode | null = null;
+const NATIVE_FORMATS = [
+  'qr_code',
+  'ean_13',
+  'ean_8',
+  'upc_a',
+  'upc_e',
+  'code_128',
+  'code_39',
+  'code_93',
+  'codabar',
+  'itf',
+  'data_matrix',
+] as const;
+
+type BarcodeDetectorClass = new (opts?: { formats?: string[] }) => {
+  detect: (source: ImageBitmapSource) => Promise<Array<{ rawValue: string }>>;
+};
+
+function getBarcodeDetector(): BarcodeDetectorClass | null {
+  const g = globalThis as Record<string, unknown>;
+  if (typeof g.BarcodeDetector === 'function') {
+    return g.BarcodeDetector as BarcodeDetectorClass;
+  }
+  return null;
+}
+
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) =>
+      setTimeout(() => reject(new Error('Timeout')), ms)
+    ),
+  ]);
+}
+
+export async function scanImageFile(file: File): Promise<ScanResult | null> {
+  try {
+    const bitmap = await createImageBitmap(file);
+    const Detector = getBarcodeDetector();
+
+    if (Detector) {
+      try {
+        const detector = new Detector({ formats: [...NATIVE_FORMATS] });
+        const results = await withTimeout(detector.detect(bitmap), 10000);
+        if (results.length > 0 && results[0].rawValue) {
+          bitmap.close?.();
+          return { text: results[0].rawValue };
+        }
+      } catch {
+        // fall through to html5-qrcode
+      }
+    }
+
+    // Fallback: html5-qrcode
+    const result = await scanFileWithHtml5Qrcode(file);
+    bitmap.close?.();
+    return result;
+  } catch (err) {
+    console.error('scanImageFile error:', err);
+    return null;
+  }
+}
 
 function ensureFileScannerElement(): string {
   const id = 'barcode-reader-file-scan';
@@ -39,7 +100,9 @@ function ensureFileScannerElement(): string {
   return id;
 }
 
-export async function scanImageFile(file: File): Promise<ScanResult | null> {
+let fileScannerInstance: Html5Qrcode | null = null;
+
+async function scanFileWithHtml5Qrcode(file: File): Promise<ScanResult | null> {
   const elementId = ensureFileScannerElement();
 
   try {
@@ -53,7 +116,10 @@ export async function scanImageFile(file: File): Promise<ScanResult | null> {
       verbose: false,
     });
 
-    const decodedText = await fileScannerInstance.scanFile(file, false);
+    const decodedText = await withTimeout(
+      fileScannerInstance.scanFile(file, false),
+      15000
+    );
 
     await fileScannerInstance.clear();
     fileScannerInstance = null;
@@ -67,7 +133,7 @@ export async function scanImageFile(file: File): Promise<ScanResult | null> {
       await fileScannerInstance.clear().catch(() => {});
       fileScannerInstance = null;
     }
-    console.error('Barcode scan error:', err);
+    console.error('html5-qrcode scanFile error:', err);
     return null;
   }
 }
@@ -99,6 +165,7 @@ export class CameraScanner {
         return { width: Math.max(100, boxSize), height: Math.max(100, boxSize) };
       },
       aspectRatio: 1.0,
+      disableFlip: true,
     };
 
     await this.html5Qrcode.start(
