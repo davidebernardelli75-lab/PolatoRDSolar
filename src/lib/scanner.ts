@@ -103,7 +103,7 @@ async function createImageVariants(file: File): Promise<ImageVariant[]> {
   const height = Math.max(1, Math.round(source.height * scale));
   const variants: ImageVariant[] = [];
 
-  const render = async (name: string, rotation: 0 | 90 | -90) => {
+  const render = async (name: string, rotation: 0 | 90 | -90, inverted = false) => {
     const rotated = rotation !== 0;
     const canvas = document.createElement('canvas');
     canvas.width = rotated ? height : width;
@@ -119,7 +119,9 @@ async function createImageVariants(file: File): Promise<ImageVariant[]> {
       context.translate(0, canvas.height);
       context.rotate(-Math.PI / 2);
     }
-    context.filter = 'grayscale(1) contrast(1.65)';
+    context.filter = inverted
+      ? 'grayscale(1) invert(1) contrast(1.65)'
+      : 'grayscale(1) contrast(1.65)';
     context.drawImage(source, 0, 0, width, height);
     context.restore();
 
@@ -138,8 +140,9 @@ async function createImageVariants(file: File): Promise<ImageVariant[]> {
 
   try {
     await render('barcode-enhanced', 0);
-    await render('barcode-right', 90);
-    await render('barcode-left', -90);
+    await render('barcode-inverted', 0, true);
+    await render('barcode-inverted-right', 90, true);
+    await render('barcode-inverted-left', -90, true);
     return variants;
   } finally {
     source.close();
@@ -213,6 +216,7 @@ export class CameraScanner {
   private detected = false;
   private zbarTimer: number | null = null;
   private zbarBusy = false;
+  private zbarCanvas: HTMLCanvasElement | null = null;
 
   constructor(private elementId: string) {}
 
@@ -244,11 +248,21 @@ export class CameraScanner {
 
     const video = document.querySelector<HTMLVideoElement>(`#${this.elementId} video`);
     if (video) {
+      this.zbarCanvas = document.createElement('canvas');
       this.zbarTimer = window.setInterval(async () => {
         if (this.detected || this.zbarBusy || video.readyState < 2) return;
         this.zbarBusy = true;
         try {
-          const result = await scanZbar(video);
+          const canvas = this.zbarCanvas;
+          if (!canvas || !video.videoWidth || !video.videoHeight) return;
+          const scale = Math.min(1, 1280 / video.videoWidth);
+          canvas.width = Math.max(1, Math.round(video.videoWidth * scale));
+          canvas.height = Math.max(1, Math.round(video.videoHeight * scale));
+          const context = canvas.getContext('2d');
+          if (!context) return;
+          context.filter = 'grayscale(1) invert(1) contrast(1.55)';
+          context.drawImage(video, 0, 0, canvas.width, canvas.height);
+          const result = await scanZbar(canvas);
           if (result?.text && !this.detected) {
             this.detected = true;
             onDetected(result.text);
@@ -275,5 +289,10 @@ export class CameraScanner {
     this.html5Qrcode = null;
     this.detected = false;
     this.zbarBusy = false;
+    if (this.zbarCanvas) {
+      this.zbarCanvas.width = 1;
+      this.zbarCanvas.height = 1;
+      this.zbarCanvas = null;
+    }
   }
 }
