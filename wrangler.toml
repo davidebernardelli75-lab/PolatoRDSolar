@@ -1,0 +1,6 @@
+name = "polatordsolar"
+compatibility_date = "2024-09-04"
+
+[assets]
+directory = "./dist"
+binding = "ASSETS"
