@@ -217,6 +217,7 @@ export class CameraScanner {
   private zbarTimer: number | null = null;
   private zbarBusy = false;
   private zbarCanvas: HTMLCanvasElement | null = null;
+  private fallbackLastRun = 0;
 
   constructor(private elementId: string) {}
 
@@ -263,9 +264,23 @@ export class CameraScanner {
           context.filter = 'grayscale(1) invert(1) contrast(1.55)';
           context.drawImage(video, 0, 0, canvas.width, canvas.height);
           const result = await scanZbar(canvas);
-          if (result?.text && !this.detected) {
+          let fallbackResult = result;
+          // Safari/iOS può non inizializzare il decoder WASM al primo tentativo;
+          // riprova il fotogramma invertito tramite html5-qrcode in JPEG.
+          if (!fallbackResult && Date.now() - this.fallbackLastRun > 900) {
+            this.fallbackLastRun = Date.now();
+            const blob = await new Promise<Blob | null>((resolve) =>
+              canvas.toBlob(resolve, 'image/jpeg', 0.94)
+            );
+            if (blob) {
+              fallbackResult = await scanWithHtml5Qrcode([
+                new File([blob], 'live-barcode.jpg', { type: 'image/jpeg' }),
+              ]);
+            }
+          }
+          if (fallbackResult?.text && !this.detected) {
             this.detected = true;
-            onDetected(result.text);
+            onDetected(fallbackResult.text);
           }
         } finally {
           this.zbarBusy = false;
@@ -289,6 +304,7 @@ export class CameraScanner {
     this.html5Qrcode = null;
     this.detected = false;
     this.zbarBusy = false;
+    this.fallbackLastRun = 0;
     if (this.zbarCanvas) {
       this.zbarCanvas.width = 1;
       this.zbarCanvas.height = 1;
