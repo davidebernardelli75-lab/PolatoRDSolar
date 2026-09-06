@@ -12,7 +12,9 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.57.4",
-    "@undecaf/barcode-detector-polyfill": "^0.9.23",
+    "@undecaf/zbar-wasm": "^0.9.16",
+    "@zxing/browser": "^0.1.5",
+    "@zxing/library": "^0.21.3",
     "file-saver": "^2.0.5",
     "html5-qrcode": "^2.3.8",
     "jspdf": "^4.2.1",
