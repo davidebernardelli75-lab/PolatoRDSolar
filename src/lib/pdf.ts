@@ -1,14 +1,29 @@
 import { jsPDF } from 'jspdf';
 import type { Plant, Panel } from './types';
 
-const NAVY: [number, number, number] = [26, 35, 126];
-const NAVY_LIGHT: [number, number, number] = [59, 76, 202];
-const YELLOW: [number, number, number] = [250, 204, 21];
-const YELLOW_DARK: [number, number, number] = [202, 138, 4];
+const POLATO_BLUE: [number, number, number] = [30, 64, 145];
+const POLATO_BLUE_LIGHT: [number, number, number] = [91, 119, 190];
+const POLATO_RED: [number, number, number] = [229, 35, 41];
 const SLATE_DARK: [number, number, number] = [51, 65, 85];
 const SLATE: [number, number, number] = [100, 116, 139];
 const SLATE_LIGHT: [number, number, number] = [241, 245, 249];
 const WHITE: [number, number, number] = [255, 255, 255];
+
+async function loadLogoDataUrl(): Promise<string | null> {
+  try {
+    const response = await fetch('/assets/images/Polato_R&D.png');
+    if (!response.ok) return null;
+    const blob = await response.blob();
+    return await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result));
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  } catch {
+    return null;
+  }
+}
 
 function formatDate(dateStr: string | null): string {
   if (!dateStr) return 'N/D';
@@ -20,8 +35,8 @@ function orNa(value: string | null | undefined | number): string {
   return String(value);
 }
 
-export function generatePlantPdf(plant: Plant, panels: Panel[]): Blob {
-  const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+export async function generatePlantPdf(plant: Plant, panels: Panel[]): Promise<Blob> {
+  const [doc, logoDataUrl] = [new jsPDF({ unit: 'mm', format: 'a4' }), await loadLogoDataUrl()];
   const pageW = 210;
   const pageH = 297;
   const margin = 15;
@@ -29,30 +44,29 @@ export function generatePlantPdf(plant: Plant, panels: Panel[]): Blob {
   let y = 0;
 
   // ── Header band (navy) ──────────────────────────────────────────
-  doc.setFillColor(...NAVY);
+  doc.setFillColor(...POLATO_BLUE);
   doc.rect(0, 0, pageW, 35, 'F');
 
-  // Yellow accent stripe
-  doc.setFillColor(...YELLOW);
+  // Polato red accent stripe
+  doc.setFillColor(...POLATO_RED);
   doc.rect(0, 35, pageW, 1.5, 'F');
 
-  // Logo box (yellow square with "P&R")
-  doc.setFillColor(...YELLOW);
-  doc.roundedRect(margin, 8, 18, 18, 2, 2, 'F');
-  doc.setTextColor(...NAVY);
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(11);
-  doc.text('P&R', margin + 9, 18, { align: 'center' });
+  // Official logo
+  if (logoDataUrl) {
+    doc.setFillColor(...WHITE);
+    doc.roundedRect(margin, 5, 30, 25, 2, 2, 'F');
+    doc.addImage(logoDataUrl, 'PNG', margin + 1, 6, 28, 23);
+  }
 
   // Company name
   doc.setTextColor(...WHITE);
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(18);
-  doc.text('POLATO R&D', margin + 24, 16);
+  doc.text('POLATO R&D', margin + 36, 16);
 
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(9);
-  doc.setTextColor(200, 210, 240);
+  doc.setTextColor(220, 228, 245);
   doc.text('Relazione Tecnica Impianto Solare', margin + 24, 23);
 
   // Export date (right side)
@@ -67,13 +81,13 @@ export function generatePlantPdf(plant: Plant, panels: Panel[]): Blob {
   y = 44;
 
   // ── Owner section ────────────────────────────────────────────────
-  doc.setTextColor(...NAVY);
+  doc.setTextColor(...POLATO_BLUE);
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(11);
   doc.text('DATI PROPRIETARIO', margin, y);
   y += 2;
 
-  doc.setDrawColor(...YELLOW);
+  doc.setDrawColor(...POLATO_RED);
   doc.setLineWidth(0.6);
   doc.line(margin, y, pageW - margin, y);
   y += 6;
@@ -102,13 +116,13 @@ export function generatePlantPdf(plant: Plant, panels: Panel[]): Blob {
   y += 4;
 
   // ── Technical specs section ─────────────────────────────────────
-  doc.setTextColor(...NAVY);
+  doc.setTextColor(...POLATO_BLUE);
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(11);
   doc.text('DATI TECNICI IMPIANTO', margin, y);
   y += 2;
 
-  doc.setDrawColor(...YELLOW);
+  doc.setDrawColor(...POLATO_RED);
   doc.line(margin, y, pageW - margin, y);
   y += 6;
 
@@ -135,13 +149,13 @@ export function generatePlantPdf(plant: Plant, panels: Panel[]): Blob {
   y += 6;
 
   // ── Panels table ─────────────────────────────────────────────────
-  doc.setTextColor(...NAVY);
+  doc.setTextColor(...POLATO_BLUE);
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(11);
   doc.text('PANNELLI REGISTRATI', margin, y);
   y += 2;
 
-  doc.setDrawColor(...YELLOW);
+  doc.setDrawColor(...POLATO_RED);
   doc.line(margin, y, pageW - margin, y);
   y += 5;
 
@@ -152,7 +166,7 @@ export function generatePlantPdf(plant: Plant, panels: Panel[]): Blob {
   const colNotes = contentW - colN - colSerial - colPos;
   const colX = [margin, margin + colN, margin + colN + colSerial, margin + colN + colSerial + colPos];
 
-  doc.setFillColor(...NAVY);
+  doc.setFillColor(...POLATO_BLUE);
   doc.rect(margin, y, contentW, 7, 'F');
 
   doc.setTextColor(...WHITE);
@@ -207,13 +221,13 @@ export function generatePlantPdf(plant: Plant, panels: Panel[]): Blob {
   }
 
   // Table border
-  doc.setDrawColor(...NAVY_LIGHT);
+  doc.setDrawColor(...POLATO_BLUE_LIGHT);
   doc.setLineWidth(0.3);
   doc.rect(margin, y - panels.length * 7 - (panels.length === 0 ? 8 : 0) - 7, contentW, panels.length * 7 + (panels.length === 0 ? 8 : 0) + 7);
 
   // ── Footer ───────────────────────────────────────────────────────
   const footerY = pageH - 12;
-  doc.setDrawColor(...YELLOW);
+  doc.setDrawColor(...POLATO_RED);
   doc.setLineWidth(0.5);
   doc.line(margin, footerY - 2, pageW - margin, footerY - 2);
 

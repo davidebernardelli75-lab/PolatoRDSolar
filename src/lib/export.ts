@@ -66,7 +66,7 @@ export async function exportPlantArchive(
   if (!folder) throw new Error('Impossibile creare la cartella principale.');
 
   folder.file('Scheda_Tecnica.txt', buildPlantTextFile(plant, panels));
-  folder.file('Relazione_Tecnica.pdf', generatePlantPdf(plant, panels));
+  folder.file('Relazione_Tecnica.pdf', await generatePlantPdf(plant, panels));
 
   const photoFolder = folder.folder('Foto_Pannelli');
   if (!photoFolder) throw new Error('Impossibile creare la cartella foto.');

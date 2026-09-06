@@ -109,11 +109,11 @@ export function PlantDetail({ plantId, onBack, onDeleted }: PlantDetailProps) {
     }
   };
 
-  const handleExportPdf = () => {
+  const handleExportPdf = async () => {
     if (!plant) return;
     setExportingPdf(true);
     try {
-      const blob = generatePlantPdf(plant, panels);
+      const blob = await generatePlantPdf(plant, panels);
       const fileName = `${sanitizeFileName(plant.owner_name)}_${sanitizeFileName(plant.address)}.pdf`;
       saveAs(blob, fileName);
     } catch {
