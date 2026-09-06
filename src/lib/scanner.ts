@@ -1,6 +1,11 @@
 import { BrowserMultiFormatReader } from '@zxing/browser';
 import { BarcodeFormat, DecodeHintType } from '@zxing/library';
-import { getDefaultScanner, scanImageData } from '@undecaf/zbar-wasm';
+import {
+  getDefaultScanner,
+  scanImageData,
+  ZBarConfigType,
+  ZBarSymbolType,
+} from '@undecaf/zbar-wasm';
 
 export interface ScanResult {
   text: string;
@@ -40,7 +45,11 @@ function decodeCanvas(reader: BrowserMultiFormatReader, canvas: HTMLCanvasElemen
 }
 
 // Il motore e il relativo WebAssembly vengono serviti dalla stessa app, anche su iOS.
-const zbarScannerPromise = getDefaultScanner();
+// TEST_INVERTED riconosce direttamente le etichette con barre chiare su fondo scuro.
+const zbarScannerPromise = getDefaultScanner().then((scanner) => {
+  scanner.setConfig(ZBarSymbolType.ZBAR_NONE, ZBarConfigType.ZBAR_CFG_TEST_INVERTED, 1);
+  return scanner;
+});
 
 async function decodeZbarCanvas(canvas: HTMLCanvasElement): Promise<ScanResult | null> {
   try {
