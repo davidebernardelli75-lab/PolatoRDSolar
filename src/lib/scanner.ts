@@ -39,6 +39,7 @@ function decodeCanvas(reader: BrowserMultiFormatReader, canvas: HTMLCanvasElemen
   }
 }
 
+// Il motore e il relativo WebAssembly vengono serviti dalla stessa app, anche su iOS.
 const zbarScannerPromise = getDefaultScanner();
 
 async function decodeZbarCanvas(canvas: HTMLCanvasElement): Promise<ScanResult | null> {
