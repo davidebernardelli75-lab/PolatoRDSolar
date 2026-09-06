@@ -1,28 +1,60 @@
 import { jsPDF } from 'jspdf';
 import type { Plant, Panel } from './types';
 
-const POLATO_BLUE: [number, number, number] = [30, 64, 145];
-const POLATO_BLUE_LIGHT: [number, number, number] = [91, 119, 190];
-const POLATO_RED: [number, number, number] = [229, 35, 41];
+const POLATO_BLUE: [number, number, number] = [31, 64, 142];
+const POLATO_BLUE_LIGHT: [number, number, number] = [118, 135, 181];
+const POLATO_BLUE_PALE: [number, number, number] = [241, 244, 251];
+const POLATO_RED: [number, number, number] = [225, 33, 38];
 const SLATE_DARK: [number, number, number] = [51, 65, 85];
 const SLATE: [number, number, number] = [100, 116, 139];
-const SLATE_LIGHT: [number, number, number] = [241, 245, 249];
 const WHITE: [number, number, number] = [255, 255, 255];
+
+function arrayBufferToBase64(buffer: ArrayBuffer): string {
+  const bytes = new Uint8Array(buffer);
+  let binary = '';
+  const chunkSize = 0x8000;
+  for (let offset = 0; offset < bytes.length; offset += chunkSize) {
+    binary += String.fromCharCode(...bytes.subarray(offset, offset + chunkSize));
+  }
+  return btoa(binary);
+}
 
 async function loadLogoDataUrl(): Promise<string | null> {
   try {
-    const response = await fetch('/assets/images/Polato_R&D.png');
+    const response = await fetch('/assets/images/Polato_R&D.png', { cache: 'force-cache' });
     if (!response.ok) return null;
-    const blob = await response.blob();
-    return await new Promise<string>((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(String(reader.result));
-      reader.onerror = reject;
-      reader.readAsDataURL(blob);
-    });
+    const mimeType = response.headers.get('content-type') || 'image/png';
+    const base64 = arrayBufferToBase64(await response.arrayBuffer());
+    return `data:${mimeType};base64,${base64}`;
   } catch {
     return null;
   }
+}
+
+function addContainedLogo(
+  doc: jsPDF,
+  logoDataUrl: string,
+  x: number,
+  y: number,
+  maxWidth: number,
+  maxHeight: number
+): void {
+  const properties = doc.getImageProperties(logoDataUrl);
+  const ratio = properties.width / properties.height;
+  let width = maxWidth;
+  let height = width / ratio;
+  if (height > maxHeight) {
+    height = maxHeight;
+    width = height * ratio;
+  }
+  doc.addImage(
+    logoDataUrl,
+    'PNG',
+    x + (maxWidth - width) / 2,
+    y + (maxHeight - height) / 2,
+    width,
+    height
+  );
 }
 
 function formatDate(dateStr: string | null): string {
@@ -36,51 +68,52 @@ function orNa(value: string | null | undefined | number): string {
 }
 
 export async function generatePlantPdf(plant: Plant, panels: Panel[]): Promise<Blob> {
-  const [doc, logoDataUrl] = [new jsPDF({ unit: 'mm', format: 'a4' }), await loadLogoDataUrl()];
+  const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+  const logoDataUrl = await loadLogoDataUrl();
   const pageW = 210;
   const pageH = 297;
   const margin = 15;
   const contentW = pageW - margin * 2;
   let y = 0;
 
-  // ── Header band (navy) ──────────────────────────────────────────
+  // Header band in the official Polato blue.
   doc.setFillColor(...POLATO_BLUE);
   doc.rect(0, 0, pageW, 35, 'F');
 
-  // Polato red accent stripe
   doc.setFillColor(...POLATO_RED);
   doc.rect(0, 35, pageW, 1.5, 'F');
 
-  // Official logo
   if (logoDataUrl) {
     doc.setFillColor(...WHITE);
-    doc.roundedRect(margin, 5, 30, 25, 2, 2, 'F');
-    doc.addImage(logoDataUrl, 'PNG', margin + 1, 6, 28, 23);
+    doc.roundedRect(margin, 5.5, 43, 24, 2, 2, 'F');
+    addContainedLogo(doc, logoDataUrl, margin + 2, 7, 39, 21);
+  } else {
+    doc.setTextColor(...WHITE);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(16);
+    doc.text('POLATO R&D', margin, 17);
   }
 
-  // Company name
   doc.setTextColor(...WHITE);
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(18);
-  doc.text('POLATO R&D', margin + 36, 16);
+  doc.setFontSize(14);
+  doc.text('RELAZIONE TECNICA', margin + 50, 15);
 
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(9);
-  doc.setTextColor(220, 228, 245);
-  doc.text('Relazione Tecnica Impianto Solare', margin + 24, 23);
+  doc.setTextColor(227, 232, 245);
+  doc.text('Impianto solare', margin + 50, 21.5);
 
-  // Export date (right side)
   doc.setFontSize(8);
   doc.text(
     `Generato: ${new Date().toLocaleDateString('it-IT')}`,
     pageW - margin,
-    16,
+    28,
     { align: 'right' }
   );
 
   y = 44;
 
-  // ── Owner section ────────────────────────────────────────────────
   doc.setTextColor(...POLATO_BLUE);
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(11);
@@ -115,7 +148,6 @@ export async function generatePlantPdf(plant: Plant, panels: Panel[]): Promise<B
 
   y += 4;
 
-  // ── Technical specs section ─────────────────────────────────────
   doc.setTextColor(...POLATO_BLUE);
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(11);
@@ -148,7 +180,6 @@ export async function generatePlantPdf(plant: Plant, panels: Panel[]): Promise<B
 
   y += 6;
 
-  // ── Panels table ─────────────────────────────────────────────────
   doc.setTextColor(...POLATO_BLUE);
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(11);
@@ -159,7 +190,6 @@ export async function generatePlantPdf(plant: Plant, panels: Panel[]): Promise<B
   doc.line(margin, y, pageW - margin, y);
   y += 5;
 
-  // Table header
   const colN = 12;
   const colSerial = 70;
   const colPos = 50;
@@ -178,27 +208,24 @@ export async function generatePlantPdf(plant: Plant, panels: Panel[]): Promise<B
   doc.text('Note', colX[3] + 2, y + 5);
   y += 7;
 
-  // Table rows
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8);
 
   if (panels.length === 0) {
-    doc.setFillColor(...SLATE_LIGHT);
+    doc.setFillColor(...POLATO_BLUE_PALE);
     doc.rect(margin, y, contentW, 8, 'F');
     doc.setTextColor(...SLATE);
     doc.text('Nessun pannello registrato.', margin + 2, y + 5);
     y += 8;
   } else {
     panels.forEach((panel, i) => {
-      // Check page break
       if (y > pageH - 30) {
         doc.addPage();
         y = margin;
       }
 
-      // Alternate row background
       if (i % 2 === 0) {
-        doc.setFillColor(...SLATE_LIGHT);
+        doc.setFillColor(...POLATO_BLUE_PALE);
         doc.rect(margin, y, contentW, 7, 'F');
       }
 
@@ -220,12 +247,15 @@ export async function generatePlantPdf(plant: Plant, panels: Panel[]): Promise<B
     });
   }
 
-  // Table border
   doc.setDrawColor(...POLATO_BLUE_LIGHT);
   doc.setLineWidth(0.3);
-  doc.rect(margin, y - panels.length * 7 - (panels.length === 0 ? 8 : 0) - 7, contentW, panels.length * 7 + (panels.length === 0 ? 8 : 0) + 7);
+  doc.rect(
+    margin,
+    y - panels.length * 7 - (panels.length === 0 ? 8 : 0) - 7,
+    contentW,
+    panels.length * 7 + (panels.length === 0 ? 8 : 0) + 7
+  );
 
-  // ── Footer ───────────────────────────────────────────────────────
   const footerY = pageH - 12;
   doc.setDrawColor(...POLATO_RED);
   doc.setLineWidth(0.5);
@@ -235,7 +265,7 @@ export async function generatePlantPdf(plant: Plant, panels: Panel[]): Promise<B
   doc.setFontSize(7);
   doc.setTextColor(...SLATE);
   doc.text('POLATO R&D - Documento generato automaticamente', margin, footerY);
-  doc.text(`Pagina 1`, pageW - margin, footerY, { align: 'right' });
+  doc.text('Pagina 1', pageW - margin, footerY, { align: 'right' });
 
   return doc.output('blob');
 }
