@@ -10,7 +10,6 @@ import {
   FileText,
   Plus,
   ScanLine,
-  Camera,
   Upload,
   Trash2,
   Download,
@@ -113,7 +112,7 @@ export function PlantDetail({ plantId, onBack, onDeleted }: PlantDetailProps) {
     if (!plant) return;
     setExportingPdf(true);
     try {
-      const blob = await generatePlantPdf(plant, panels);
+      const blob = await generatePlantPdf(plant, panels, photos);
       const fileName = `${sanitizeFileName(plant.owner_name)}_${sanitizeFileName(plant.address)}.pdf`;
       saveAs(blob, fileName);
     } catch {
@@ -178,7 +177,9 @@ export function PlantDetail({ plantId, onBack, onDeleted }: PlantDetailProps) {
             <h1 className="text-xl lg:text-2xl font-bold mb-1 truncate">{plant.owner_name}</h1>
             <div className="flex items-center gap-1 text-slate-400 text-sm">
               <MapPin size={14} />
-              <span className="truncate">{plant.address}</span>
+              <span className="truncate">
+                {[plant.address, plant.city, plant.province].filter(Boolean).join(', ')}
+              </span>
             </div>
           </div>
           <div className="flex-shrink-0">
@@ -205,9 +206,17 @@ export function PlantDetail({ plantId, onBack, onDeleted }: PlantDetailProps) {
         <h2 className="font-semibold text-slate-900 mb-4">Dettagli Tecnici</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
           <DetailRow label="Codice Fiscale / P.IVA" value={plant.fiscal_or_vat} />
+          <DetailRow label="Città / Paese" value={plant.city} />
+          <DetailRow label="Provincia" value={plant.province} />
+          <DetailRow label="Regione" value={plant.region} />
+          <DetailRow label="POD" value={plant.pod} />
+          <DetailRow label="Codice CENSIMP" value={plant.censimp_code} />
           <DetailRow label="Potenza Totale" value={plant.total_power_kw != null ? `${plant.total_power_kw} kW` : null} />
           <DetailRow label="Pannelli" value={plant.panel_brand_model} />
           <DetailRow label="Inverter" value={plant.inverter_brand_model} />
+          <DetailRow label="Potenza Accumulo" value={plant.storage_power_kw != null ? `${plant.storage_power_kw} kW` : null} />
+          <DetailRow label="Marca Accumulo" value={plant.storage_brand} />
+          <DetailRow label="Modello Accumulo" value={plant.storage_model} />
           <DetailRow label="Data Installazione" value={plant.installation_date ? plant.installation_date.slice(0, 10) : null} />
           <DetailRow label="Note" value={plant.notes} />
         </div>
@@ -296,9 +305,14 @@ export function PlantDetail({ plantId, onBack, onDeleted }: PlantDetailProps) {
         <PanelFormModal
           onClose={() => setShowPanelForm(false)}
           onSave={async (serial, positionLabel, notes) => {
-            await createPanel({ plant_id: plantId, serial_number: serial, position_label: positionLabel, notes });
+            const created = await createPanel({
+              plant_id: plantId,
+              serial_number: serial,
+              position_label: positionLabel,
+              notes,
+            });
+            setPanels((current) => [...current, created]);
             setShowPanelForm(false);
-            loadAll();
           }}
         />
       )}
@@ -490,21 +504,29 @@ function PanelFormModal({
   const [scanSuccess, setScanSuccess] = useState(false);
   const [cameraActive, setCameraActive] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const previewUrlRef = useRef<string | null>(null);
   const cameraScannerRef = useRef<CameraScanner | null>(null);
+  const cameraStartTimerRef = useRef<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileScan = async (file: File) => {
     setScanning(true);
     setScanError(null);
     setScanSuccess(false);
-    setPreviewUrl(URL.createObjectURL(file));
-    const result = await scanImageFile(file);
-    setScanning(false);
-    if (result?.text) {
-      setSerial(result.text);
-      setScanSuccess(true);
-    } else {
-      setScanError("Nessun codice rilevato nell'immagine. Inserisci la matricola manualmente.");
+    if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
+    const nextPreviewUrl = URL.createObjectURL(file);
+    previewUrlRef.current = nextPreviewUrl;
+    setPreviewUrl(nextPreviewUrl);
+    try {
+      const result = await scanImageFile(file);
+      if (result?.text) {
+        setSerial(result.text);
+        setScanSuccess(true);
+      } else {
+        setScanError("Nessun codice rilevato nell'immagine. Inserisci la matricola manualmente.");
+      }
+    } finally {
+      setScanning(false);
     }
   };
 
@@ -512,7 +534,8 @@ function PanelFormModal({
     setScanError(null);
     setScanSuccess(false);
     setCameraActive(true);
-    setTimeout(async () => {
+    cameraStartTimerRef.current = window.setTimeout(async () => {
+      cameraStartTimerRef.current = null;
       const scanner = new CameraScanner('barcode-reader-camera');
       cameraScannerRef.current = scanner;
       try {
@@ -530,6 +553,10 @@ function PanelFormModal({
   };
 
   const stopCamera = () => {
+    if (cameraStartTimerRef.current !== null) {
+      window.clearTimeout(cameraStartTimerRef.current);
+      cameraStartTimerRef.current = null;
+    }
     cameraScannerRef.current?.stop();
     cameraScannerRef.current = null;
     setCameraActive(false);
@@ -538,7 +565,10 @@ function PanelFormModal({
   useEffect(() => {
     return () => {
       stopCamera();
-      if (previewUrl) URL.revokeObjectURL(previewUrl);
+      if (previewUrlRef.current) {
+        URL.revokeObjectURL(previewUrlRef.current);
+        previewUrlRef.current = null;
+      }
     };
   }, []);
 

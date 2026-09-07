@@ -14,11 +14,19 @@ const emptyForm: PlantInsert = {
   owner_name: '',
   fiscal_or_vat: '',
   address: '',
+  city: '',
+  province: '',
+  region: '',
   phone: '',
   email: '',
+  pod: '',
+  censimp_code: '',
   total_power_kw: null,
   panel_brand_model: '',
   inverter_brand_model: '',
+  storage_power_kw: null,
+  storage_brand: '',
+  storage_model: '',
   installation_date: null,
   notes: '',
 };
@@ -40,11 +48,19 @@ export function PlantEditor({ plantId, onSaved, onCancel }: PlantEditorProps) {
             owner_name: plant.owner_name,
             fiscal_or_vat: plant.fiscal_or_vat ?? '',
             address: plant.address,
+            city: plant.city ?? '',
+            province: plant.province ?? '',
+            region: plant.region ?? '',
             phone: plant.phone ?? '',
             email: plant.email ?? '',
+            pod: plant.pod ?? '',
+            censimp_code: plant.censimp_code ?? '',
             total_power_kw: plant.total_power_kw,
             panel_brand_model: plant.panel_brand_model ?? '',
             inverter_brand_model: plant.inverter_brand_model ?? '',
+            storage_power_kw: plant.storage_power_kw,
+            storage_brand: plant.storage_brand ?? '',
+            storage_model: plant.storage_model ?? '',
             installation_date: plant.installation_date ?? null,
             notes: plant.notes ?? '',
           });
@@ -166,6 +182,23 @@ export function PlantEditor({ plantId, onSaved, onCancel }: PlantEditorProps) {
               onChange={(v) => update('address', v)}
               required
             />
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <Field
+                label="Città / Paese"
+                value={form.city ?? ''}
+                onChange={(v) => update('city', v)}
+              />
+              <Field
+                label="Provincia"
+                value={form.province ?? ''}
+                onChange={(v) => update('province', v)}
+              />
+              <Field
+                label="Regione"
+                value={form.region ?? ''}
+                onChange={(v) => update('region', v)}
+              />
+            </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Field
                 label="Telefono"
@@ -185,6 +218,18 @@ export function PlantEditor({ plantId, onSaved, onCancel }: PlantEditorProps) {
         <section className="bg-white rounded-2xl border border-slate-200 p-5">
           <h2 className="font-semibold text-slate-900 mb-4">Dati Tecnici Impianto</h2>
           <div className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <Field
+                label="POD"
+                value={form.pod ?? ''}
+                onChange={(v) => update('pod', v)}
+              />
+              <Field
+                label="Codice CENSIMP"
+                value={form.censimp_code ?? ''}
+                onChange={(v) => update('censimp_code', v)}
+              />
+            </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1.5">
@@ -223,6 +268,36 @@ export function PlantEditor({ plantId, onSaved, onCancel }: PlantEditorProps) {
               value={form.inverter_brand_model ?? ''}
               onChange={(v) => update('inverter_brand_model', v)}
             />
+            <div className="pt-2">
+              <h3 className="text-sm font-semibold text-blue-900 mb-3">Sistema di accumulo</h3>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                    Potenza (kW)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={form.storage_power_kw ?? ''}
+                    onChange={(e) =>
+                      update('storage_power_kw', e.target.value === '' ? null : parseFloat(e.target.value))
+                    }
+                    className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-red-400 focus:border-transparent"
+                  />
+                </div>
+                <Field
+                  label="Marca"
+                  value={form.storage_brand ?? ''}
+                  onChange={(v) => update('storage_brand', v)}
+                />
+                <Field
+                  label="Modello"
+                  value={form.storage_model ?? ''}
+                  onChange={(v) => update('storage_model', v)}
+                />
+              </div>
+            </div>
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1.5">
                 Note

@@ -35,6 +35,8 @@ function createReader(): BrowserMultiFormatReader {
   });
 }
 
+const sharedReader = createReader();
+
 function decodeCanvas(reader: BrowserMultiFormatReader, canvas: HTMLCanvasElement): ScanResult | null {
   try {
     const text = reader.decodeFromCanvas(canvas).getText().trim();
@@ -91,12 +93,12 @@ function renderVariant(
 ): HTMLCanvasElement {
   const rotation = options.rotation ?? 0;
   const crop = options.crop ?? false;
-  const maxSide = crop ? 1800 : 2400;
+  const maxSide = crop ? 1600 : 1800;
   const sourceX = crop ? Math.round(sourceWidth * 0.04) : 0;
   const sourceY = crop ? Math.round(sourceHeight * 0.25) : 0;
   const cropWidth = crop ? Math.round(sourceWidth * 0.92) : sourceWidth;
   const cropHeight = crop ? Math.round(sourceHeight * 0.5) : sourceHeight;
-  const scale = Math.min(2, maxSide / Math.max(cropWidth, cropHeight));
+  const scale = Math.min(1.5, maxSide / Math.max(cropWidth, cropHeight));
   const drawWidth = Math.max(1, Math.round(cropWidth * scale));
   const drawHeight = Math.max(1, Math.round(cropHeight * scale));
   const rotated = rotation !== 0;
@@ -137,34 +139,40 @@ function renderVariant(
 }
 
 export async function scanImageFile(file: File): Promise<ScanResult | null> {
-  const reader = createReader();
+  let image: HTMLImageElement | null = null;
   try {
-    const image = await loadImage(file);
-    const variants = [
-      renderVariant(image, image.naturalWidth, image.naturalHeight, { inverted: true }),
-      renderVariant(image, image.naturalWidth, image.naturalHeight, { inverted: false }),
-      renderVariant(image, image.naturalWidth, image.naturalHeight, { inverted: true, crop: true }),
-      renderVariant(image, image.naturalWidth, image.naturalHeight, { inverted: true, rotation: 90 }),
-      renderVariant(image, image.naturalWidth, image.naturalHeight, { inverted: true, rotation: -90 }),
+    image = await loadImage(file);
+    const variants: Array<{ inverted: boolean; rotation?: 0 | 90 | -90; crop?: boolean }> = [
+      { inverted: true },
+      { inverted: false },
+      { inverted: true, crop: true },
+      { inverted: true, rotation: 90 },
+      { inverted: true, rotation: -90 },
     ];
 
-    for (const canvas of variants) {
-      const result = await decodeZbarCanvas(canvas) ?? decodeCanvas(reader, canvas);
-      canvas.width = 1;
-      canvas.height = 1;
-      if (result) return result;
+    // Una sola variante alla volta: su iPhone evita di trattenere cinque grandi canvas
+    // e relativi ImageData per ogni scansione consecutiva.
+    for (const options of variants) {
+      const canvas = renderVariant(image, image.naturalWidth, image.naturalHeight, options);
+      try {
+        const result = await decodeZbarCanvas(canvas) ?? decodeCanvas(sharedReader, canvas);
+        if (result) return result;
+      } finally {
+        canvas.width = 1;
+        canvas.height = 1;
+      }
     }
     return null;
   } catch (error) {
     console.error('scanImageFile error:', error);
     return null;
   } finally {
-    // Il reader non mantiene stream o risorse esterne nella scansione da canvas.
+    if (image) image.src = '';
   }
 }
 
 export class CameraScanner {
-  private reader = createReader();
+  private reader = sharedReader;
   private stream: MediaStream | null = null;
   private video: HTMLVideoElement | null = null;
   private canvas: HTMLCanvasElement | null = null;
@@ -240,8 +248,10 @@ export class CameraScanner {
       const scale = Math.min(1, 1280 / frameWidth);
       const width = Math.max(1, Math.round(frameWidth * scale));
       const height = Math.max(1, Math.round(frameHeight * scale));
-      canvas.width = width;
-      canvas.height = height;
+      if (canvas.width !== width || canvas.height !== height) {
+        canvas.width = width;
+        canvas.height = height;
+      }
       const context = canvas.getContext('2d', { willReadFrequently: true });
       if (!context) return;
 

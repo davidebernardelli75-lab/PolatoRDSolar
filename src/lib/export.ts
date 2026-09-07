@@ -25,14 +25,22 @@ function buildPlantTextFile(plant: Plant, panels: Panel[]): string {
   lines.push(`${plant.owner_type === 'Azienda' ? 'Ragione Sociale' : 'Nome Proprietario'}: ${plant.owner_name}`);
   lines.push(`Codice Fiscale / P.IVA: ${plant.fiscal_or_vat || 'N/D'}`);
   lines.push(`Indirizzo: ${plant.address}`);
+  lines.push(`Città / Paese: ${plant.city || 'N/D'}`);
+  lines.push(`Provincia: ${plant.province || 'N/D'}`);
+  lines.push(`Regione: ${plant.region || 'N/D'}`);
   lines.push(`Telefono: ${plant.phone || 'N/D'}`);
   lines.push(`Email: ${plant.email || 'N/D'}`);
   lines.push('');
   lines.push('DATI TECNICI IMPIANTO');
   lines.push('---------------------------------');
+  lines.push(`POD: ${plant.pod || 'N/D'}`);
+  lines.push(`Codice CENSIMP: ${plant.censimp_code || 'N/D'}`);
   lines.push(`Potenza Totale (kW): ${plant.total_power_kw ?? 'N/D'}`);
   lines.push(`Marca/Modello Pannelli: ${plant.panel_brand_model || 'N/D'}`);
   lines.push(`Marca/Modello Inverter: ${plant.inverter_brand_model || 'N/D'}`);
+  lines.push(`Potenza Accumulo (kW): ${plant.storage_power_kw ?? 'N/D'}`);
+  lines.push(`Marca Accumulo: ${plant.storage_brand || 'N/D'}`);
+  lines.push(`Modello Accumulo: ${plant.storage_model || 'N/D'}`);
   lines.push(`Data Installazione: ${formatDate(plant.installation_date)}`);
   lines.push(`Note: ${plant.notes || 'Nessuna'}`);
   lines.push('');
@@ -66,7 +74,7 @@ export async function exportPlantArchive(
   if (!folder) throw new Error('Impossibile creare la cartella principale.');
 
   folder.file('Scheda_Tecnica.txt', buildPlantTextFile(plant, panels));
-  folder.file('Relazione_Tecnica.pdf', await generatePlantPdf(plant, panels));
+  folder.file('Relazione_Tecnica.pdf', await generatePlantPdf(plant, panels, photos));
 
   const photoFolder = folder.folder('Foto_Pannelli');
   if (!photoFolder) throw new Error('Impossibile creare la cartella foto.');
