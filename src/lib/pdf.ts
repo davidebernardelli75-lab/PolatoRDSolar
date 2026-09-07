@@ -221,15 +221,15 @@ function addPhotoCard(
   prepared: PreparedPhoto,
   photo: PanelPhoto,
   panelSerial: string | null,
-  y: number
+  x: number,
+  y: number,
+  cardW: number,
+  cardH: number
 ): void {
-  const x = MARGIN;
-  const cardW = CONTENT_W;
-  const cardH = 112;
-  const imageX = x + 4;
-  const imageY = y + 4;
-  const imageMaxW = cardW - 8;
-  const imageMaxH = 88;
+  const imageX = x + 3;
+  const imageY = y + 3;
+  const imageMaxW = cardW - 6;
+  const imageMaxH = cardH - 22;
   const ratio = prepared.width / prepared.height;
   let imageW = imageMaxW;
   let imageH = imageW / ratio;
@@ -256,14 +256,18 @@ function addPhotoCard(
 
   doc.setTextColor(...SLATE_DARK);
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(8);
+  doc.setFontSize(7);
   const caption = panelSerial ? `Pannello: ${panelSerial}` : 'Foto generale impianto';
-  doc.text(doc.splitTextToSize(caption, 105)[0] ?? caption, x + 4, y + 98);
+  doc.text(doc.splitTextToSize(caption, cardW - 6)[0] ?? caption, x + 3, y + cardH - 12);
   doc.setTextColor(...SLATE);
   doc.setFont('helvetica', 'normal');
-  doc.setFontSize(7);
-  doc.text(doc.splitTextToSize(photo.file_name, 105)[0] ?? photo.file_name, x + 4, y + 104);
-  doc.text(formatDate(photo.created_at), x + cardW - 4, y + 104, { align: 'right' });
+  doc.setFontSize(6);
+  doc.text(
+    doc.splitTextToSize(photo.file_name, cardW - 29)[0] ?? photo.file_name,
+    x + 3,
+    y + cardH - 5
+  );
+  doc.text(formatDate(photo.created_at), x + cardW - 3, y + cardH - 5, { align: 'right' });
 }
 
 function addFooters(doc: jsPDF): void {
@@ -364,21 +368,34 @@ export async function generatePlantPdf(
   }
 
   const panelMap = new Map(panels.map((panel) => [panel.id, panel.serial_number]));
+  const photosPerPage = 6;
+  const photoColumns = 2;
+  const photoGap = 5;
+  const photoCardW = (CONTENT_W - photoGap) / photoColumns;
+  const photoCardH = 78;
+  const photoStartY = 30;
   let includedPhotos = 0;
   for (const photo of photos) {
     try {
       const prepared = await preparePhoto(await photoLoader(photo.storage_path));
-      if (includedPhotos % 2 === 0) {
+      if (includedPhotos % photosPerPage === 0) {
         doc.addPage();
         addCompactHeader(doc, logoDataUrl, 'ALLEGATO FOTOGRAFICO');
       }
-      const cardY = includedPhotos % 2 === 0 ? 30 : 148;
+      const positionOnPage = includedPhotos % photosPerPage;
+      const column = positionOnPage % photoColumns;
+      const row = Math.floor(positionOnPage / photoColumns);
+      const cardX = MARGIN + column * (photoCardW + photoGap);
+      const cardY = photoStartY + row * (photoCardH + photoGap);
       addPhotoCard(
         doc,
         prepared,
         photo,
         photo.panel_id ? panelMap.get(photo.panel_id) ?? null : null,
-        cardY
+        cardX,
+        cardY,
+        photoCardW,
+        photoCardH
       );
       includedPhotos += 1;
     } catch (error) {
