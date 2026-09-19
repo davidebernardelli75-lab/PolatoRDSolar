@@ -111,7 +111,7 @@ export function Dashboard({ plants, loading, roadmapProgress, onOpenPlant, onNew
           }
         }}
         disabled={recovering}
-        className="mb-4 flex sm:hidden items-center justify-center gap-2 bg-blue-900 hover:bg-blue-800 disabled:opacity-50 text-white font-semibold px-4 py-2.5 rounded-xl transition-colors shadow-sm w-full"
+        className="mb-4 flex items-center justify-center gap-2 bg-blue-900 hover:bg-blue-800 disabled:opacity-50 text-white font-semibold px-4 py-2.5 rounded-xl transition-colors shadow-sm w-full"
       >
         {recovering ? <Loader2 className="animate-spin" size={18} /> : <RefreshCw size={18} />}
         {recovering ? 'Recupero in corso...' : 'Recupera impianti dal telefono'}
