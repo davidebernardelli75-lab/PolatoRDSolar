@@ -99,9 +99,9 @@ export function Dashboard({ plants, loading, roadmapProgress, onOpenPlant, onNew
           try {
             const result = await recoverFromCache();
             if (result.plants === 0 && result.panels === 0 && result.photos === 0) {
-              setRecoverResult('Nessun dato trovato nella cache del telefono.');
+              setRecoverResult(`Nessun dato trovato. Fonti controllate: ${result.source}.`);
             } else {
-              setRecoverResult(`Recuperati: ${result.plants} impianti, ${result.panels} pannelli, ${result.photos} foto.`);
+              setRecoverResult(`Recuperati da ${result.source}: ${result.plants} impianti, ${result.panels} pannelli, ${result.photos} foto.`);
               window.location.reload();
             }
           } catch {
