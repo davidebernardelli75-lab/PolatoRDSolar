@@ -1,8 +1,7 @@
-import { Sun, MapPin, Zap, Plus, Search, MoreVertical, Pencil, Trash2, AlertTriangle, X, ListChecks, Loader2, RefreshCw, CheckCircle2 } from 'lucide-react';
+import { Sun, MapPin, Zap, Plus, Search, MoreVertical, Pencil, Trash2, AlertTriangle, X, ListChecks } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 import type { Plant } from '@/lib/types';
 import { getProgressColor } from '@/components/Roadmap';
-import { recoverFromCache } from '@/lib/recover';
 
 interface DashboardProps {
   plants: Plant[];
@@ -19,8 +18,6 @@ export function Dashboard({ plants, loading, roadmapProgress, onOpenPlant, onNew
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<Plant | null>(null);
   const [deleting, setDeleting] = useState(false);
-  const [recovering, setRecovering] = useState(false);
-  const [recoverResult, setRecoverResult] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -81,41 +78,6 @@ export function Dashboard({ plants, loading, roadmapProgress, onOpenPlant, onNew
           Nuovo Impianto
         </button>
       </div>
-
-      {/* Recovery banner */}
-      {recoverResult && (
-        <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-xl text-green-700 text-sm flex items-center gap-2">
-          <CheckCircle2 size={18} className="flex-shrink-0" />
-          <span>{recoverResult}</span>
-          <button onClick={() => setRecoverResult(null)} className="ml-auto text-green-600 hover:text-green-800">
-            <X size={16} />
-          </button>
-        </div>
-      )}
-      <button
-        onClick={async () => {
-          setRecovering(true);
-          setRecoverResult(null);
-          try {
-            const result = await recoverFromCache();
-            if (result.plants === 0 && result.panels === 0 && result.photos === 0) {
-              setRecoverResult(`Nessun dato trovato. Fonti controllate: ${result.source}.`);
-            } else {
-              setRecoverResult(`Recuperati da ${result.source}: ${result.plants} impianti, ${result.panels} pannelli, ${result.photos} foto.`);
-              window.location.reload();
-            }
-          } catch {
-            setRecoverResult('Errore durante il recupero. Riprova.');
-          } finally {
-            setRecovering(false);
-          }
-        }}
-        disabled={recovering}
-        className="mb-4 flex items-center justify-center gap-2 bg-blue-900 hover:bg-blue-800 disabled:opacity-50 text-white font-semibold px-4 py-2.5 rounded-xl transition-colors shadow-sm w-full"
-      >
-        {recovering ? <Loader2 className="animate-spin" size={18} /> : <RefreshCw size={18} />}
-        {recovering ? 'Recupero in corso...' : 'Recupera impianti dal telefono'}
-      </button>
 
       {/* Search bar */}
       <div className="relative mb-6">
