@@ -1,4 +1,4 @@
-const CACHE_NAME = 'polato-solar-v3';
+const CACHE_NAME = 'polato-solar-v4';
 const APP_SHELL = [
   '/',
   '/manifest.webmanifest',
