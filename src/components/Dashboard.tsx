@@ -1,17 +1,19 @@
-import { Sun, MapPin, Zap, Plus, Search, MoreVertical, Pencil, Trash2, AlertTriangle, X } from 'lucide-react';
+import { Sun, MapPin, Zap, Plus, Search, MoreVertical, Pencil, Trash2, AlertTriangle, X, ListChecks } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 import type { Plant } from '@/lib/types';
+import { getProgressColor } from '@/components/Roadmap';
 
 interface DashboardProps {
   plants: Plant[];
   loading: boolean;
+  roadmapProgress: Record<string, number>;
   onOpenPlant: (id: string) => void;
   onNewPlant: () => void;
   onEditPlant: (id: string) => void;
   onDeletePlant: (id: string) => Promise<void>;
 }
 
-export function Dashboard({ plants, loading, onOpenPlant, onNewPlant, onEditPlant, onDeletePlant }: DashboardProps) {
+export function Dashboard({ plants, loading, roadmapProgress, onOpenPlant, onNewPlant, onEditPlant, onDeletePlant }: DashboardProps) {
   const [search, setSearch] = useState('');
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<Plant | null>(null);
@@ -160,10 +162,29 @@ export function Dashboard({ plants, loading, onOpenPlant, onNewPlant, onEditPlan
                     <span>{plant.total_power_kw} kW</span>
                   </div>
                 )}
+
+                {/* SyncroSolar roadmap progress badge */}
+                <div className="flex items-center gap-2 mt-3">
+                  <div className="flex items-center gap-1.5">
+                    <ListChecks size={14} className="text-slate-400" />
+                    <span className="text-[10px] font-medium text-slate-500 uppercase tracking-wider">SyncroSolar</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 ml-auto">
+                    <div className="w-16 h-2 bg-slate-200 rounded-full overflow-hidden">
+                      <div
+                        className={`h-full rounded-full transition-all duration-500 ${getProgressColor(roadmapProgress[plant.id] ?? 0).bar}`}
+                        style={{ width: `${roadmapProgress[plant.id] ?? 0}%` }}
+                      />
+                    </div>
+                    <span className={`text-sm font-bold tabular-nums ${getProgressColor(roadmapProgress[plant.id] ?? 0).text}`}>
+                      {roadmapProgress[plant.id] ?? 0}%
+                    </span>
+                  </div>
+                </div>
               </button>
 
-              {/* More menu trigger */}
-              <div className="absolute top-3 right-3" ref={openMenuId === plant.id ? menuRef : undefined}>
+              {/* More menu trigger — bottom-right, away from owner_type badge */}
+              <div className="absolute bottom-3 right-3" ref={openMenuId === plant.id ? menuRef : undefined}>
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
@@ -177,7 +198,7 @@ export function Dashboard({ plants, loading, onOpenPlant, onNewPlant, onEditPlan
 
                 {/* Dropdown menu */}
                 {openMenuId === plant.id && (
-                  <div className="absolute right-0 top-full mt-1 w-52 bg-white rounded-xl shadow-xl border border-slate-200 py-1.5 z-50 overflow-hidden">
+                  <div className="absolute right-0 bottom-full mb-1 w-52 bg-white rounded-xl shadow-xl border border-slate-200 py-1.5 z-50 overflow-hidden">
                     <button
                       onClick={(e) => {
                         e.stopPropagation();

@@ -50,6 +50,20 @@ export interface PlantWithRelations extends Plant {
   photos: PanelPhoto[];
 }
 
+export type RoadmapCategory = 'Burocrazia' | 'Funzionale';
+
+export interface RoadmapTask {
+  id: string;
+  plant_id: string;
+  category: RoadmapCategory;
+  label: string;
+  sort_order: number;
+  completed: boolean;
+  completed_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export type PlantInsert = Omit<Plant, 'id' | 'created_at' | 'updated_at'>;
 export type PlantUpdate = Partial<PlantInsert>;
 export type PanelInsert = Omit<Panel, 'id' | 'created_at'>;

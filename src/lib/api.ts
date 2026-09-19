@@ -1,5 +1,5 @@
 import { supabase, STORAGE_BUCKET } from './supabase';
-import type { Plant, Panel, PanelPhoto, PlantInsert, PlantUpdate, PanelInsert } from './types';
+import type { Plant, Panel, PanelPhoto, PlantInsert, PlantUpdate, PanelInsert, RoadmapTask } from './types';
 
 export async function fetchPlants(): Promise<Plant[]> {
   const { data, error } = await supabase
@@ -146,4 +146,67 @@ export async function downloadPhotoBlob(storagePath: string): Promise<Blob> {
     .download(storagePath);
   if (error) throw error;
   return data;
+}
+
+// ── Roadmap (SyncroSolar) ──────────────────────────────────────────
+
+export async function fetchRoadmapTasks(plantId: string): Promise<RoadmapTask[]> {
+  const { data, error } = await supabase
+    .from('roadmap_tasks')
+    .select('*')
+    .eq('plant_id', plantId)
+    .order('category', { ascending: true })
+    .order('sort_order', { ascending: true });
+  if (error) throw error;
+  return data ?? [];
+}
+
+export async function toggleRoadmapTask(taskId: string, completed: boolean): Promise<void> {
+  const { error } = await supabase
+    .from('roadmap_tasks')
+    .update({
+      completed,
+      completed_at: completed ? new Date().toISOString() : null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', taskId);
+  if (error) throw error;
+}
+
+export async function fetchRoadmapProgress(plantId: string): Promise<number> {
+  const { count, error } = await supabase
+    .from('roadmap_tasks')
+    .select('*', { count: 'exact', head: true })
+    .eq('plant_id', plantId);
+  if (error) throw error;
+  if (!count || count === 0) return 0;
+
+  const { count: doneCount, error: doneError } = await supabase
+    .from('roadmap_tasks')
+    .select('*', { count: 'exact', head: true })
+    .eq('plant_id', plantId)
+    .eq('completed', true);
+  if (doneError) throw doneError;
+  return Math.round(((doneCount ?? 0) / count) * 100);
+}
+
+export async function fetchAllRoadmapProgress(): Promise<Record<string, number>> {
+  const { data, error } = await supabase
+    .from('roadmap_tasks')
+    .select('plant_id, completed');
+  if (error) throw error;
+  if (!data || data.length === 0) return {};
+
+  const byPlant: Record<string, { total: number; done: number }> = {};
+  for (const row of data as Array<{ plant_id: string; completed: boolean }>) {
+    if (!byPlant[row.plant_id]) byPlant[row.plant_id] = { total: 0, done: 0 };
+    byPlant[row.plant_id].total++;
+    if (row.completed) byPlant[row.plant_id].done++;
+  }
+
+  const result: Record<string, number> = {};
+  for (const [pid, { total, done }] of Object.entries(byPlant)) {
+    result[pid] = total > 0 ? Math.round((done / total) * 100) : 0;
+  }
+  return result;
 }

@@ -39,6 +39,7 @@ import { scanImageFile, CameraScanner } from '@/lib/scanner';
 import { exportPlantArchive } from '@/lib/export';
 import { generatePlantPdf } from '@/lib/pdf';
 import { saveAs } from 'file-saver';
+import { Roadmap } from '@/components/Roadmap';
 
 interface PlantDetailProps {
   plantId: string;
@@ -220,6 +221,11 @@ export function PlantDetail({ plantId, onBack, onDeleted }: PlantDetailProps) {
           <DetailRow label="Data Installazione" value={plant.installation_date ? plant.installation_date.slice(0, 10) : null} />
           <DetailRow label="Note" value={plant.notes} />
         </div>
+      </div>
+
+      {/* SyncroSolar Roadmap */}
+      <div className="mb-6">
+        <Roadmap plantId={plantId} />
       </div>
 
       {/* Action buttons */}

@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 import type { Plant } from '@/lib/types';
-import { fetchPlants, deletePlant } from '@/lib/api';
+import { fetchPlants, deletePlant, fetchAllRoadmapProgress } from '@/lib/api';
 import { Sidebar } from '@/components/Sidebar';
 import { Dashboard } from '@/components/Dashboard';
 import { PlantEditor } from '@/components/PlantEditor';
@@ -20,6 +20,7 @@ export default function App() {
   const [authLoading, setAuthLoading] = useState(true);
   const [view, setView] = useState<View>({ name: 'dashboard' });
   const [plants, setPlants] = useState<Plant[]>([]);
+  const [roadmapProgress, setRoadmapProgress] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -28,8 +29,9 @@ export default function App() {
     setLoading(true);
     setError(null);
     try {
-      const data = await fetchPlants();
+      const [data, progress] = await Promise.all([fetchPlants(), fetchAllRoadmapProgress()]);
       setPlants(data);
+      setRoadmapProgress(progress);
     } catch {
       setError('Impossibile caricare gli impianti. Riprova.');
     } finally {
@@ -107,6 +109,7 @@ export default function App() {
             <Dashboard
               plants={plants}
               loading={loading}
+              roadmapProgress={roadmapProgress}
               onOpenPlant={(id) => navigate({ name: 'plant', plantId: id })}
               onNewPlant={() => navigate({ name: 'new-plant' })}
               onEditPlant={(id) => navigate({ name: 'edit-plant', plantId: id })}
