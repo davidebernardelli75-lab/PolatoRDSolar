@@ -164,7 +164,7 @@ export function Dashboard({ plants, loading, roadmapProgress, onOpenPlant, onNew
                 )}
 
                 {/* SyncroSolar roadmap progress badge */}
-                <div className="flex items-center gap-2 mt-3">
+                <div className="flex items-center gap-2 mt-3 pr-9">
                   <div className="flex items-center gap-1.5">
                     <ListChecks size={14} className="text-slate-400" />
                     <span className="text-[10px] font-medium text-slate-500 uppercase tracking-wider">SyncroSolar</span>
