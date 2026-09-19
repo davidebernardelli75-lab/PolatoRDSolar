@@ -1,4 +1,6 @@
-import { Sun, LayoutGrid, PlusCircle, LogOut, X } from 'lucide-react';
+import { useState } from 'react';
+import { Sun, LayoutGrid, PlusCircle, LogOut, X, KeyRound, Eye, EyeOff } from 'lucide-react';
+import { supabase } from '@/lib/supabase';
 import type { View } from '@/App';
 
 interface SidebarProps {
@@ -10,6 +12,7 @@ interface SidebarProps {
 }
 
 export function Sidebar({ open, onClose, onNavigate, currentView, onSignOut }: SidebarProps) {
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
   const items = [
     { id: 'dashboard' as const, label: 'Dashboard', icon: LayoutGrid },
     { id: 'new-plant' as const, label: 'Nuovo Impianto', icon: PlusCircle },
@@ -75,6 +78,12 @@ export function Sidebar({ open, onClose, onNavigate, currentView, onSignOut }: S
         </nav>
 
         <div className="px-5 py-4 border-t border-blue-800">
+          <button
+            onClick={() => setShowPasswordModal(true)}
+            className="mb-3 flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-blue-100 transition hover:bg-blue-800 hover:text-white"
+          >
+            <KeyRound size={16} />Cambia password
+          </button>
           <button onClick={onSignOut} className="mb-4 flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-blue-100 transition hover:bg-blue-800 hover:text-white">
             <LogOut size={16} />Esci
           </button>
@@ -84,6 +93,143 @@ export function Sidebar({ open, onClose, onNavigate, currentView, onSignOut }: S
           </div>
         </div>
       </aside>
+
+      {showPasswordModal && (
+        <ChangePasswordModal onClose={() => setShowPasswordModal(false)} />
+      )}
     </>
+  );
+}
+
+function ChangePasswordModal({ onClose }: { onClose: () => void }) {
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showCurrent, setShowCurrent] = useState(false);
+  const [showNew, setShowNew] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
+
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setError(null);
+
+    if (newPassword.length < 8) {
+      setError('La nuova password deve avere almeno 8 caratteri.');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setError('Le password non coincidono.');
+      return;
+    }
+    if (newPassword === currentPassword) {
+      setError('La nuova password deve essere diversa da quella attuale.');
+      return;
+    }
+
+    setLoading(true);
+
+    const { error: signInError } = await supabase.auth.signInWithPassword({
+      email: (await supabase.auth.getUser()).data.user?.email ?? '',
+      password: currentPassword,
+    });
+    if (signInError) {
+      setError('La password attuale non e\' corretta.');
+      setLoading(false);
+      return;
+    }
+
+    const { error: updateError } = await supabase.auth.updateUser({ password: newPassword });
+    setLoading(false);
+
+    if (updateError) {
+      setError('Impossibile aggiornare la password. Riprova piu\' tardi.');
+    } else {
+      setSuccess(true);
+    }
+  };
+
+  if (success) {
+    return (
+      <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4">
+        <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl">
+          <div className="text-center">
+            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-green-100">
+              <KeyRound size={28} className="text-green-600" />
+            </div>
+            <h3 className="text-lg font-semibold text-slate-800">Password aggiornata</h3>
+            <p className="mt-2 text-sm text-slate-600">La tua password e\' stata cambiata con successo. Usa la nuova password al prossimo accesso.</p>
+            <button onClick={onClose} className="mt-5 w-full rounded-lg bg-blue-900 px-4 py-3 font-semibold text-white transition hover:bg-blue-800">Chiudi</button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4">
+      <div className="w-full max-w-sm rounded-2xl bg-white shadow-2xl">
+        <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
+          <div className="flex items-center gap-2 text-blue-900">
+            <KeyRound size={20} />
+            <h3 className="font-semibold">Cambia password</h3>
+          </div>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 transition-colors" aria-label="Chiudi">
+            <X size={20} />
+          </button>
+        </div>
+        <form onSubmit={handleSubmit} className="space-y-4 px-6 py-5">
+          <label className="block text-sm font-medium text-slate-700">Password attuale
+            <div className="relative mt-1.5">
+              <input
+                type={showCurrent ? 'text' : 'password'}
+                required
+                value={currentPassword}
+                onChange={(e) => setCurrentPassword(e.target.value)}
+                className="w-full rounded-lg border border-slate-300 px-3 py-2.5 pr-10 outline-none transition focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
+              />
+              <button type="button" onClick={() => setShowCurrent((p) => !p)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-blue-600" tabIndex={-1}>
+                {showCurrent ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
+          </label>
+          <label className="block text-sm font-medium text-slate-700">Nuova password
+            <div className="relative mt-1.5">
+              <input
+                type={showNew ? 'text' : 'password'}
+                required
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                className="w-full rounded-lg border border-slate-300 px-3 py-2.5 pr-10 outline-none transition focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
+              />
+              <button type="button" onClick={() => setShowNew((p) => !p)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-blue-600" tabIndex={-1}>
+                {showNew ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
+            <p className="mt-1 text-xs text-slate-500">Minimo 8 caratteri</p>
+          </label>
+          <label className="block text-sm font-medium text-slate-700">Conferma nuova password
+            <div className="relative mt-1.5">
+              <input
+                type={showConfirm ? 'text' : 'password'}
+                required
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                className="w-full rounded-lg border border-slate-300 px-3 py-2.5 pr-10 outline-none transition focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
+              />
+              <button type="button" onClick={() => setShowConfirm((p) => !p)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-blue-600" tabIndex={-1}>
+                {showConfirm ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
+          </label>
+          {error && <p role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</p>}
+          <button type="submit" disabled={loading} className="w-full rounded-lg bg-red-500 px-4 py-3 font-semibold text-white transition hover:bg-red-600 disabled:cursor-wait disabled:opacity-70">
+            {loading ? 'Aggiornamento…' : 'Aggiorna password'}
+          </button>
+        </form>
+      </div>
+    </div>
   );
 }
