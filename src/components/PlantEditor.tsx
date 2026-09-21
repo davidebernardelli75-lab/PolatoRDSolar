@@ -237,11 +237,13 @@ export function PlantEditor({ plantId, onSaved, onCancel }: PlantEditorProps) {
                 label="POD"
                 value={form.pod ?? ''}
                 onChange={(v) => update('pod', v)}
+                upper
               />
               <Field
                 label="Codice CENSIMP"
                 value={form.censimp_code ?? ''}
                 onChange={(v) => update('censimp_code', v)}
+                upper
               />
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -276,6 +278,7 @@ export function PlantEditor({ plantId, onSaved, onCancel }: PlantEditorProps) {
               label="Marca/Modello Pannelli"
               value={form.panel_brand_model ?? ''}
               onChange={(v) => update('panel_brand_model', v)}
+              upper
             />
 
             {/* Inverter — gestito nella pagina di dettaglio */}
@@ -290,16 +293,19 @@ export function PlantEditor({ plantId, onSaved, onCancel }: PlantEditorProps) {
                   label="Marca"
                   value={form.charger_brand ?? ''}
                   onChange={(v) => update('charger_brand', v)}
+                  upper
                 />
                 <Field
                   label="Modello"
                   value={form.charger_model ?? ''}
                   onChange={(v) => update('charger_model', v)}
+                  upper
                 />
                 <Field
                   label="Codice"
                   value={form.charger_code ?? ''}
                   onChange={(v) => update('charger_code', v)}
+                  upper
                 />
               </div>
             </div>
@@ -345,9 +351,10 @@ interface FieldProps {
   onChange: (value: string) => void;
   required?: boolean;
   type?: string;
+  upper?: boolean;
 }
 
-function Field({ label, value, onChange, required, type = 'text' }: FieldProps) {
+function Field({ label, value, onChange, required, type = 'text', upper = false }: FieldProps) {
   return (
     <div>
       <label className="block text-sm font-medium text-slate-700 mb-1.5">
@@ -356,9 +363,9 @@ function Field({ label, value, onChange, required, type = 'text' }: FieldProps) 
       <input
         type={type}
         value={value}
-        onChange={(e) => onChange(e.target.value)}
+        onChange={(e) => onChange(upper ? e.target.value.toUpperCase() : e.target.value)}
         required={required}
-        className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-red-400 focus:border-transparent"
+        className={`w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-red-400 focus:border-transparent ${upper ? 'uppercase' : ''}`}
       />
     </div>
   );

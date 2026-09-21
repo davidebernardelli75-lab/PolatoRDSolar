@@ -625,8 +625,8 @@ function EquipmentRow({
               <label className="block text-xs font-medium text-slate-600 mb-1">{f.label}</label>
               <input
                 value={f.value}
-                onChange={(e) => onChange(i, e.target.value)}
-                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-400"
+                onChange={(e) => onChange(i, e.target.value.toUpperCase())}
+                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm uppercase focus:outline-none focus:ring-2 focus:ring-red-400"
               />
             </div>
           ))}
@@ -742,25 +742,25 @@ function PanelRow({
           <label className="block text-xs font-medium text-slate-600 mb-1">Matricola / Barcode</label>
           <input
             value={serial}
-            onChange={(e) => setSerial(e.target.value)}
-            className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-400"
+            onChange={(e) => setSerial(e.target.value.toUpperCase())}
+            className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm uppercase focus:outline-none focus:ring-2 focus:ring-red-400"
           />
         </div>
         <div>
           <label className="block text-xs font-medium text-slate-600 mb-1">Posizione</label>
           <input
             value={position}
-            onChange={(e) => setPosition(e.target.value)}
+            onChange={(e) => setPosition(e.target.value.toUpperCase())}
             placeholder="es. Tetto Nord, Fila 2"
-            className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-400"
+            className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm uppercase focus:outline-none focus:ring-2 focus:ring-red-400"
           />
         </div>
         <div>
           <label className="block text-xs font-medium text-slate-600 mb-1">Note</label>
           <input
             value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-400"
+            onChange={(e) => setNotes(e.target.value.toUpperCase())}
+            className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm uppercase focus:outline-none focus:ring-2 focus:ring-red-400"
           />
         </div>
         <div className="flex gap-2">
@@ -996,9 +996,9 @@ function PanelFormModal({
             <div className="relative">
               <input
                 value={serial}
-                onChange={(e) => { setSerial(e.target.value); setScanSuccess(false); }}
+                onChange={(e) => { setSerial(e.target.value.toUpperCase()); setScanSuccess(false); }}
                 placeholder="Scansiona o inserisci manualmente"
-                className={`w-full pl-3 pr-10 py-2.5 bg-slate-50 border rounded-xl text-sm font-mono focus:outline-none focus:ring-2 focus:border-transparent transition-colors ${
+                className={`w-full pl-3 pr-10 py-2.5 bg-slate-50 border rounded-xl text-sm font-mono uppercase focus:outline-none focus:ring-2 focus:border-transparent transition-colors ${
                   scanSuccess
                     ? 'border-green-400 focus:ring-green-400'
                     : 'border-slate-200 focus:ring-red-400'
@@ -1032,9 +1032,9 @@ function PanelFormModal({
             <label className="block text-sm font-medium text-slate-700 mb-1.5">Posizione</label>
             <input
               value={position}
-              onChange={(e) => setPosition(e.target.value)}
+              onChange={(e) => setPosition(e.target.value.toUpperCase())}
               placeholder="es. Tetto Nord, Fila 2"
-              className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-red-400"
+              className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm uppercase focus:outline-none focus:ring-2 focus:ring-red-400"
             />
           </div>
 
@@ -1042,8 +1042,8 @@ function PanelFormModal({
             <label className="block text-sm font-medium text-slate-700 mb-1.5">Note</label>
             <input
               value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-red-400"
+              onChange={(e) => setNotes(e.target.value.toUpperCase())}
+              className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm uppercase focus:outline-none focus:ring-2 focus:ring-red-400"
             />
           </div>
 
