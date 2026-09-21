@@ -1,5 +1,5 @@
 import { jsPDF } from 'jspdf';
-import type { Plant, Panel, PanelPhoto } from './types';
+import type { Plant, Panel, PanelPhoto, PlantInverter, PlantStorage } from './types';
 import { downloadPhotoBlob } from './api';
 
 const POLATO_BLUE: [number, number, number] = [31, 64, 142];
@@ -290,7 +290,9 @@ export async function generatePlantPdf(
   plant: Plant,
   panels: Panel[],
   photos: PanelPhoto[] = [],
-  photoLoader: PhotoLoader = downloadPhotoBlob
+  photoLoader: PhotoLoader = downloadPhotoBlob,
+  inverters: PlantInverter[] = [],
+  storages: PlantStorage[] = [],
 ): Promise<Blob> {
   const doc = new jsPDF({ unit: 'mm', format: 'a4' });
   const logoDataUrl = await loadLogoDataUrl();
@@ -316,19 +318,35 @@ export async function generatePlantPdf(
     ['Codice CENSIMP', orNa(plant.censimp_code)],
     ['Potenza Totale', plant.total_power_kw != null ? `${plant.total_power_kw} kW` : 'N/D'],
     ['Marca/Modello Pannelli', orNa(plant.panel_brand_model)],
-    ['Inverter - Marca', orNa(plant.inverter_brand)],
-    ['Inverter - Modello', orNa(plant.inverter_model)],
-    ['Inverter - Codice', orNa(plant.inverter_code)],
-    ['Accumulo - Potenza', plant.storage_power_kw != null ? `${plant.storage_power_kw} kW` : 'N/D'],
-    ['Accumulo - Marca', orNa(plant.storage_brand)],
-    ['Accumulo - Modello', orNa(plant.storage_model)],
-    ['Accumulo - Codice', orNa(plant.storage_code)],
     ['Colonnina - Marca', orNa(plant.charger_brand)],
     ['Colonnina - Modello', orNa(plant.charger_model)],
     ['Colonnina - Codice', orNa(plant.charger_code)],
     ['Data Installazione', formatDate(plant.installation_date)],
     ['Note', orNa(plant.notes)],
   ], y);
+
+  if (inverters.length > 0) {
+    y = addSectionTitle(doc, 'INVERTER', y + 3);
+    inverters.forEach((inv, i) => {
+      y = addRows(doc, [
+        [`Inverter ${i + 1} - Marca`, orNa(inv.brand)],
+        [`Inverter ${i + 1} - Modello`, orNa(inv.model)],
+        [`Inverter ${i + 1} - Codice`, orNa(inv.code)],
+      ], y);
+    });
+  }
+
+  if (storages.length > 0) {
+    y = addSectionTitle(doc, 'SISTEMI DI ACCUMULO', y + 3);
+    storages.forEach((sto, i) => {
+      y = addRows(doc, [
+        [`Accumulo ${i + 1} - Marca`, orNa(sto.brand)],
+        [`Accumulo ${i + 1} - Modello`, orNa(sto.model)],
+        [`Accumulo ${i + 1} - Codice`, orNa(sto.code)],
+        [`Accumulo ${i + 1} - Potenza`, sto.power_kw != null ? `${sto.power_kw} kW` : 'N/D'],
+      ], y);
+    });
+  }
 
   if (y > PAGE_H - 45) {
     doc.addPage();

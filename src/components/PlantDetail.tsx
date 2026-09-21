@@ -13,7 +13,6 @@ import {
   Upload,
   Trash2,
   Download,
-  Hash,
   X,
   Image as ImageIcon,
   Loader2,
@@ -21,9 +20,10 @@ import {
   ImagePlus,
   Video,
   ChevronDown,
+  Battery,
   type LucideIcon,
 } from 'lucide-react';
-import type { Plant, Panel, PanelPhoto } from '@/lib/types';
+import type { Plant, Panel, PanelPhoto, PlantInverter, PlantStorage } from '@/lib/types';
 import {
   fetchPlant,
   fetchPanels,
@@ -35,6 +35,14 @@ import {
   deletePhoto,
   getPhotoUrl,
   deletePlant,
+  fetchInverters,
+  createInverter,
+  updateInverter,
+  deleteInverter,
+  fetchStorages,
+  createStorage,
+  updateStorage,
+  deleteStorage,
 } from '@/lib/api';
 import { scanImageFile, CameraScanner } from '@/lib/scanner';
 import { exportPlantArchive } from '@/lib/export';
@@ -63,18 +71,26 @@ export function PlantDetail({ plantId, onBack, onDeleted }: PlantDetailProps) {
   const [showPanelForm, setShowPanelForm] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [panelsExpanded, setPanelsExpanded] = useState(false);
+  const [inverters, setInverters] = useState<PlantInverter[]>([]);
+  const [storages, setStorages] = useState<PlantStorage[]>([]);
+  const [invertersExpanded, setInvertersExpanded] = useState(false);
+  const [storagesExpanded, setStoragesExpanded] = useState(false);
 
   const loadAll = useCallback(async () => {
     setLoading(true);
     try {
-      const [p, pnl, pho] = await Promise.all([
+      const [p, pnl, pho, inv, sto] = await Promise.all([
         fetchPlant(plantId),
         fetchPanels(plantId),
         fetchPhotos(plantId),
+        fetchInverters(plantId),
+        fetchStorages(plantId),
       ]);
       setPlant(p);
       setPanels(pnl);
       setPhotos(pho);
+      setInverters(inv);
+      setStorages(sto);
 
       const urlMap: Record<string, string> = {};
       await Promise.all(
@@ -103,7 +119,7 @@ export function PlantDetail({ plantId, onBack, onDeleted }: PlantDetailProps) {
     if (!plant) return;
     setExporting(true);
     try {
-      await exportPlantArchive(plant, panels, photos);
+      await exportPlantArchive(plant, panels, photos, inverters, storages);
     } catch {
       // skip
     } finally {
@@ -115,7 +131,7 @@ export function PlantDetail({ plantId, onBack, onDeleted }: PlantDetailProps) {
     if (!plant) return;
     setExportingPdf(true);
     try {
-      const blob = await generatePlantPdf(plant, panels, photos);
+      const blob = await generatePlantPdf(plant, panels, photos, undefined, inverters, storages);
       const fileName = `${sanitizeFileName(plant.owner_name)}_${sanitizeFileName(plant.address)}.pdf`;
       saveAs(blob, fileName);
     } catch {
@@ -216,13 +232,6 @@ export function PlantDetail({ plantId, onBack, onDeleted }: PlantDetailProps) {
           <DetailRow label="Codice CENSIMP" value={plant.censimp_code} />
           <DetailRow label="Potenza Totale" value={plant.total_power_kw != null ? `${plant.total_power_kw} kW` : null} />
           <DetailRow label="Pannelli" value={plant.panel_brand_model} />
-          <DetailRow label="Marca Inverter" value={plant.inverter_brand} />
-          <DetailRow label="Modello Inverter" value={plant.inverter_model} />
-          <DetailRow label="Codice Inverter" value={plant.inverter_code} />
-          <DetailRow label="Potenza Accumulo" value={plant.storage_power_kw != null ? `${plant.storage_power_kw} kW` : null} />
-          <DetailRow label="Marca Accumulo" value={plant.storage_brand} />
-          <DetailRow label="Modello Accumulo" value={plant.storage_model} />
-          <DetailRow label="Codice Accumulo" value={plant.storage_code} />
           <DetailRow label="Marca Colonnina" value={plant.charger_brand} />
           <DetailRow label="Modello Colonnina" value={plant.charger_model} />
           <DetailRow label="Codice Colonnina" value={plant.charger_code} />
@@ -263,6 +272,144 @@ export function PlantDetail({ plantId, onBack, onDeleted }: PlantDetailProps) {
         </button>
       </div>
 
+      {/* Inverters section — collapsible */}
+      <div className="mb-6">
+        <div className="flex items-center justify-between mb-4">
+          <button
+            onClick={() => setInvertersExpanded((v) => !v)}
+            className="flex items-center gap-2 font-semibold text-slate-900 hover:text-blue-900 transition-colors"
+          >
+            <Zap size={18} />
+            Inverter ({inverters.length})
+            <ChevronDown
+              size={18}
+              className={`transition-transform ${invertersExpanded ? '' : '-rotate-90'}`}
+            />
+          </button>
+          <button
+            onClick={() => setInverters((prev) => [...prev, { id: '', plant_id: plantId, brand: '', model: '', code: '', sort_order: prev.length, created_at: '', updated_at: '' }])}
+            className="flex items-center gap-1.5 bg-blue-900 hover:bg-blue-800 text-white text-sm font-medium px-3 py-2 rounded-lg transition-colors"
+          >
+            <Plus size={16} />
+            Aggiungi
+          </button>
+        </div>
+        {invertersExpanded && (
+          <div className="space-y-3">
+            {inverters.length === 0 ? (
+              <div className="bg-white rounded-2xl border border-dashed border-slate-300 p-8 text-center">
+                <Zap className="mx-auto text-slate-300 mb-2" size={32} />
+                <p className="text-slate-500 text-sm">Nessun inverter registrato.</p>
+              </div>
+            ) : (
+              inverters.map((inv, index) => (
+                <EquipmentRow
+                  key={inv.id || `new-${index}`}
+                  index={index}
+                  fields={[
+                    { label: 'Marca', value: inv.brand },
+                    { label: 'Modello', value: inv.model },
+                    { label: 'Codice', value: inv.code }]}
+                  onChange={(fieldIndex, value) => {
+                    setInverters((prev) => prev.map((it, i) => {
+                      if (i !== index) return it;
+                      const keys = ['brand', 'model', 'code'] as const;
+                      return { ...it, [keys[fieldIndex]]: value };
+                    }));
+                  }}
+                  onSave={async () => {
+                    const row = inverters[index];
+                    if (!row.brand && !row.model && !row.code) return;
+                    if (row.id) {
+                      await updateInverter(row.id, { brand: row.brand, model: row.model, code: row.code });
+                    } else {
+                      const created = await createInverter({ plant_id: plantId, brand: row.brand, model: row.model, code: row.code, sort_order: index });
+                      setInverters((prev) => prev.map((it, i) => i === index ? created : it));
+                    }
+                  }}
+                  onDelete={async () => {
+                    const row = inverters[index];
+                    if (row.id) await deleteInverter(row.id);
+                    setInverters((prev) => prev.filter((_, i) => i !== index));
+                  }}
+                />
+              ))
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Storages section — collapsible */}
+      <div className="mb-6">
+        <div className="flex items-center justify-between mb-4">
+          <button
+            onClick={() => setStoragesExpanded((v) => !v)}
+            className="flex items-center gap-2 font-semibold text-slate-900 hover:text-blue-900 transition-colors"
+          >
+            <Battery size={18} />
+            Accumuli ({storages.length})
+            <ChevronDown
+              size={18}
+              className={`transition-transform ${storagesExpanded ? '' : '-rotate-90'}`}
+            />
+          </button>
+          <button
+            onClick={() => setStorages((prev) => [...prev, { id: '', plant_id: plantId, brand: '', model: '', code: '', power_kw: null, sort_order: prev.length, created_at: '', updated_at: '' }])}
+            className="flex items-center gap-1.5 bg-blue-900 hover:bg-blue-800 text-white text-sm font-medium px-3 py-2 rounded-lg transition-colors"
+          >
+            <Plus size={16} />
+            Aggiungi
+          </button>
+        </div>
+        {storagesExpanded && (
+          <div className="space-y-3">
+            {storages.length === 0 ? (
+              <div className="bg-white rounded-2xl border border-dashed border-slate-300 p-8 text-center">
+                <Battery className="mx-auto text-slate-300 mb-2" size={32} />
+                <p className="text-slate-500 text-sm">Nessun accumulo registrato.</p>
+              </div>
+            ) : (
+              storages.map((sto, index) => (
+                <EquipmentRow
+                  key={sto.id || `new-${index}`}
+                  index={index}
+                  fields={[
+                    { label: 'Marca', value: sto.brand },
+                    { label: 'Modello', value: sto.model },
+                    { label: 'Codice', value: sto.code }]}
+                  extraField={{ label: 'Potenza (kW)', value: sto.power_kw != null ? String(sto.power_kw) : '' }}
+                  onChangeExtra={(value) => {
+                    setStorages((prev) => prev.map((it, i) => i === index ? { ...it, power_kw: value === '' ? null : parseFloat(value) } : it));
+                  }}
+                  onChange={(fieldIndex, value) => {
+                    setStorages((prev) => prev.map((it, i) => {
+                      if (i !== index) return it;
+                      const keys = ['brand', 'model', 'code'] as const;
+                      return { ...it, [keys[fieldIndex]]: value };
+                    }));
+                  }}
+                  onSave={async () => {
+                    const row = storages[index];
+                    if (!row.brand && !row.model && !row.code && row.power_kw == null) return;
+                    if (row.id) {
+                      await updateStorage(row.id, { brand: row.brand, model: row.model, code: row.code, power_kw: row.power_kw });
+                    } else {
+                      const created = await createStorage({ plant_id: plantId, brand: row.brand, model: row.model, code: row.code, power_kw: row.power_kw, sort_order: index });
+                      setStorages((prev) => prev.map((it, i) => i === index ? created : it));
+                    }
+                  }}
+                  onDelete={async () => {
+                    const row = storages[index];
+                    if (row.id) await deleteStorage(row.id);
+                    setStorages((prev) => prev.filter((_, i) => i !== index));
+                  }}
+                />
+              ))
+            )}
+          </div>
+        )}
+      </div>
+
       {/* Panels section — collapsible */}
       <div className="mb-6">
         <div className="flex items-center justify-between mb-4">
@@ -270,7 +417,6 @@ export function PlantDetail({ plantId, onBack, onDeleted }: PlantDetailProps) {
             onClick={() => setPanelsExpanded((v) => !v)}
             className="flex items-center gap-2 font-semibold text-slate-900 hover:text-blue-900 transition-colors"
           >
-            <Hash size={18} />
             Pannelli ({panels.length})
             <ChevronDown
               size={18}
@@ -289,8 +435,7 @@ export function PlantDetail({ plantId, onBack, onDeleted }: PlantDetailProps) {
         {panelsExpanded && (
           panels.length === 0 ? (
             <div className="bg-white rounded-2xl border border-dashed border-slate-300 p-8 text-center">
-              <Hash className="mx-auto text-slate-300 mb-2" size={32} />
-              <p className="text-slate-500 text-sm">Nessun pannello registrato.</p>
+              <p className="text-slate-500 text-sm mt-2">Nessun pannello registrato.</p>
             </div>
           ) : (
             <div className="space-y-3">
@@ -396,6 +541,164 @@ function DetailRow({ label, value }: { label: string; value: string | null }) {
     <div>
       <div className="text-slate-400 text-xs mb-0.5">{label}</div>
       <div className="text-slate-900 font-medium">{value || 'N/D'}</div>
+    </div>
+  );
+}
+
+interface EquipmentField {
+  label: string;
+  value: string;
+}
+
+function EquipmentRow({
+  index,
+  fields,
+  extraField,
+  onChange,
+  onChangeExtra,
+  onSave,
+  onDelete,
+}: {
+  index: number;
+  fields: EquipmentField[];
+  extraField?: EquipmentField;
+  onChange: (fieldIndex: number, value: string) => void;
+  onChangeExtra?: (value: string) => void;
+  onSave: () => Promise<void>;
+  onDelete: () => Promise<void>;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [confirmDel, setConfirmDel] = useState(false);
+
+  const hasData = fields.some((f) => f.value) || (extraField && extraField.value);
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      await onSave();
+      setEditing(false);
+    } catch {
+      // skip
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (confirmDel) {
+    return (
+      <div className="bg-white rounded-2xl border border-red-400 p-4 flex items-center justify-between gap-3">
+        <span className="text-sm text-slate-700">Eliminare questa voce?</span>
+        <div className="flex gap-2">
+          <button
+            onClick={async () => { await onDelete(); setConfirmDel(false); }}
+            className="bg-red-500 hover:bg-red-600 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+          >
+            Elimina
+          </button>
+          <button
+            onClick={() => setConfirmDel(false)}
+            className="bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+          >
+            Annulla
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (editing) {
+    return (
+      <div className="bg-white rounded-2xl border border-red-400 p-4 space-y-3">
+        <div className="flex items-center justify-between">
+          <span className="text-sm font-medium text-slate-500">Voce {index + 1}</span>
+          <button
+            onClick={() => setEditing(false)}
+            className="p-1 text-slate-400 hover:text-slate-900 rounded-lg"
+          >
+            <X size={18} />
+          </button>
+        </div>
+        <div className={`grid grid-cols-1 ${extraField ? 'sm:grid-cols-4' : 'sm:grid-cols-3'} gap-3`}>
+          {fields.map((f, i) => (
+            <div key={f.label}>
+              <label className="block text-xs font-medium text-slate-600 mb-1">{f.label}</label>
+              <input
+                value={f.value}
+                onChange={(e) => onChange(i, e.target.value)}
+                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-400"
+              />
+            </div>
+          ))}
+          {extraField && (
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">{extraField.label}</label>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                value={extraField.value}
+                onChange={(e) => onChangeExtra?.(e.target.value)}
+                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-400"
+              />
+            </div>
+          )}
+        </div>
+        <div className="flex gap-2">
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="flex-1 bg-blue-900 hover:bg-blue-800 text-white text-sm font-medium py-2 rounded-lg transition-colors"
+          >
+            {saving ? 'Salvataggio...' : 'Salva'}
+          </button>
+          <button
+            onClick={() => setEditing(false)}
+            className="px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-medium py-2 rounded-lg transition-colors"
+          >
+            Annulla
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-white rounded-2xl border border-slate-200 p-4 flex items-start gap-3">
+      <div className="inline-flex items-center justify-center w-8 h-8 bg-slate-100 rounded-lg text-slate-500 text-sm font-semibold flex-shrink-0">
+        {index + 1}
+      </div>
+      <div className="flex-1 min-w-0">
+        {hasData ? (
+          <div className="text-sm text-slate-900">
+            {fields.map((f, i) => (
+              <span key={f.label}>
+                {i > 0 && <span className="text-slate-300 mx-1.5">·</span>}
+                {f.value && <span className="font-medium">{f.value}</span>}
+              </span>
+            ))}
+            {extraField && extraField.value && (
+              <span className="text-slate-500 ml-1.5">· {extraField.value} kW</span>
+            )}
+          </div>
+        ) : (
+          <div className="text-sm text-slate-400 italic">Nuova voce — compila e salva</div>
+        )}
+      </div>
+      <div className="flex gap-1 flex-shrink-0">
+        <button
+          onClick={() => setEditing(true)}
+          className="p-2 text-slate-400 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors"
+        >
+          <FileText size={16} />
+        </button>
+        <button
+          onClick={() => setConfirmDel(true)}
+          className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+        >
+          <Trash2 size={16} />
+        </button>
+      </div>
     </div>
   );
 }

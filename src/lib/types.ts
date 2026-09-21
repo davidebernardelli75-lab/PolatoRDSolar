@@ -71,6 +71,32 @@ export interface RoadmapTask {
   updated_at: string;
 }
 
+export interface PlantInverter {
+  id: string;
+  plant_id: string;
+  brand: string;
+  model: string;
+  code: string;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PlantStorage {
+  id: string;
+  plant_id: string;
+  brand: string;
+  model: string;
+  code: string;
+  power_kw: number | null;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export type PlantInverterInsert = Omit<PlantInverter, 'id' | 'created_at' | 'updated_at'>;
+export type PlantStorageInsert = Omit<PlantStorage, 'id' | 'created_at' | 'updated_at'>;
+
 export type PlantInsert = Omit<Plant, 'id' | 'created_at' | 'updated_at'>;
 export type PlantUpdate = Partial<PlantInsert>;
 export type PanelInsert = Omit<Panel, 'id' | 'created_at'>;

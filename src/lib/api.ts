@@ -1,5 +1,5 @@
 import { supabase, STORAGE_BUCKET } from './supabase';
-import type { Plant, Panel, PanelPhoto, PlantInsert, PlantUpdate, PanelInsert, RoadmapTask } from './types';
+import type { Plant, Panel, PanelPhoto, PlantInsert, PlantUpdate, PanelInsert, RoadmapTask, PlantInverter, PlantStorage, PlantInverterInsert, PlantStorageInsert } from './types';
 
 export async function fetchPlants(): Promise<Plant[]> {
   const { data, error } = await supabase
@@ -146,6 +146,82 @@ export async function downloadPhotoBlob(storagePath: string): Promise<Blob> {
     .download(storagePath);
   if (error) throw error;
   return data;
+}
+
+// ── Inverters ─────────────────────────────────────────────────────
+
+export async function fetchInverters(plantId: string): Promise<PlantInverter[]> {
+  const { data, error } = await supabase
+    .from('plant_inverters')
+    .select('*')
+    .eq('plant_id', plantId)
+    .order('sort_order', { ascending: true });
+  if (error) throw error;
+  return data ?? [];
+}
+
+export async function createInverter(input: PlantInverterInsert): Promise<PlantInverter> {
+  const { data, error } = await supabase
+    .from('plant_inverters')
+    .insert(input)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+export async function updateInverter(id: string, input: Partial<PlantInverterInsert>): Promise<PlantInverter> {
+  const { data, error } = await supabase
+    .from('plant_inverters')
+    .update({ ...input, updated_at: new Date().toISOString() })
+    .eq('id', id)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+export async function deleteInverter(id: string): Promise<void> {
+  const { error } = await supabase.from('plant_inverters').delete().eq('id', id);
+  if (error) throw error;
+}
+
+// ── Storages ──────────────────────────────────────────────────────
+
+export async function fetchStorages(plantId: string): Promise<PlantStorage[]> {
+  const { data, error } = await supabase
+    .from('plant_storages')
+    .select('*')
+    .eq('plant_id', plantId)
+    .order('sort_order', { ascending: true });
+  if (error) throw error;
+  return data ?? [];
+}
+
+export async function createStorage(input: PlantStorageInsert): Promise<PlantStorage> {
+  const { data, error } = await supabase
+    .from('plant_storages')
+    .insert(input)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+export async function updateStorage(id: string, input: Partial<PlantStorageInsert>): Promise<PlantStorage> {
+  const { data, error } = await supabase
+    .from('plant_storages')
+    .update({ ...input, updated_at: new Date().toISOString() })
+    .eq('id', id)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+export async function deleteStorage(id: string): Promise<void> {
+  const { error } = await supabase.from('plant_storages').delete().eq('id', id);
+  if (error) throw error;
 }
 
 // ── Roadmap (SyncroSolar) ──────────────────────────────────────────

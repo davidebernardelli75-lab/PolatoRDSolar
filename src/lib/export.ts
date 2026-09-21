@@ -1,6 +1,6 @@
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
-import type { Plant, Panel, PanelPhoto } from './types';
+import type { Plant, Panel, PanelPhoto, PlantInverter, PlantStorage } from './types';
 import { downloadPhotoBlob } from './api';
 import { generatePlantPdf } from './pdf';
 
@@ -13,7 +13,7 @@ function formatDate(dateStr: string | null): string {
   return dateStr.slice(0, 10);
 }
 
-function buildPlantTextFile(plant: Plant, panels: Panel[]): string {
+function buildPlantTextFile(plant: Plant, panels: Panel[], inverters: PlantInverter[] = [], storages: PlantStorage[] = []): string {
   const lines: string[] = [];
   lines.push('=================================');
   lines.push('   POLATO R&D - ARCHIVIO IMPIANTO');
@@ -37,18 +37,36 @@ function buildPlantTextFile(plant: Plant, panels: Panel[]): string {
   lines.push(`Codice CENSIMP: ${plant.censimp_code || 'N/D'}`);
   lines.push(`Potenza Totale (kW): ${plant.total_power_kw ?? 'N/D'}`);
   lines.push(`Marca/Modello Pannelli: ${plant.panel_brand_model || 'N/D'}`);
-  lines.push(`Inverter - Marca: ${plant.inverter_brand || 'N/D'}`);
-  lines.push(`Inverter - Modello: ${plant.inverter_model || 'N/D'}`);
-  lines.push(`Inverter - Codice: ${plant.inverter_code || 'N/D'}`);
-  lines.push(`Potenza Accumulo (kW): ${plant.storage_power_kw ?? 'N/D'}`);
-  lines.push(`Marca Accumulo: ${plant.storage_brand || 'N/D'}`);
-  lines.push(`Modello Accumulo: ${plant.storage_model || 'N/D'}`);
-  lines.push(`Codice Accumulo: ${plant.storage_code || 'N/D'}`);
   lines.push(`Colonnina - Marca: ${plant.charger_brand || 'N/D'}`);
   lines.push(`Colonnina - Modello: ${plant.charger_model || 'N/D'}`);
   lines.push(`Colonnina - Codice: ${plant.charger_code || 'N/D'}`);
   lines.push(`Data Installazione: ${formatDate(plant.installation_date)}`);
   lines.push(`Note: ${plant.notes || 'Nessuna'}`);
+  if (inverters.length > 0) {
+    lines.push('');
+    lines.push('INVERTER');
+    lines.push('---------------------------------');
+    inverters.forEach((inv, i) => {
+      lines.push(`Inverter ${i + 1}:`);
+      lines.push(`  Marca: ${inv.brand || 'N/D'}`);
+      lines.push(`  Modello: ${inv.model || 'N/D'}`);
+      lines.push(`  Codice: ${inv.code || 'N/D'}`);
+    });
+  }
+
+  if (storages.length > 0) {
+    lines.push('');
+    lines.push('SISTEMI DI ACCUMULO');
+    lines.push('---------------------------------');
+    storages.forEach((sto, i) => {
+      lines.push(`Accumulo ${i + 1}:`);
+      lines.push(`  Marca: ${sto.brand || 'N/D'}`);
+      lines.push(`  Modello: ${sto.model || 'N/D'}`);
+      lines.push(`  Codice: ${sto.code || 'N/D'}`);
+      lines.push(`  Potenza (kW): ${sto.power_kw ?? 'N/D'}`);
+    });
+  }
+
   lines.push('');
   lines.push('PANNELLI REGISTRATI');
   lines.push('---------------------------------');
@@ -72,15 +90,17 @@ function buildPlantTextFile(plant: Plant, panels: Panel[]): string {
 export async function exportPlantArchive(
   plant: Plant,
   panels: Panel[],
-  photos: PanelPhoto[]
+  photos: PanelPhoto[],
+  inverters: PlantInverter[] = [],
+  storages: PlantStorage[] = [],
 ): Promise<void> {
   const zip = new JSZip();
   const folderName = `${sanitizeFileName(plant.owner_name)} - ${sanitizeFileName(plant.address)}`;
   const folder = zip.folder(folderName);
   if (!folder) throw new Error('Impossibile creare la cartella principale.');
 
-  folder.file('Scheda_Tecnica.txt', buildPlantTextFile(plant, panels));
-  folder.file('Relazione_Tecnica.pdf', await generatePlantPdf(plant, panels, photos));
+  folder.file('Scheda_Tecnica.txt', buildPlantTextFile(plant, panels, inverters, storages));
+  folder.file('Relazione_Tecnica.pdf', await generatePlantPdf(plant, panels, photos, undefined, inverters, storages));
 
   const photoFolder = folder.folder('Foto_Pannelli');
   if (!photoFolder) throw new Error('Impossibile creare la cartella foto.');
