@@ -20,6 +20,7 @@ import {
   CheckCircle2,
   ImagePlus,
   Video,
+  ChevronDown,
   type LucideIcon,
 } from 'lucide-react';
 import type { Plant, Panel, PanelPhoto } from '@/lib/types';
@@ -61,6 +62,7 @@ export function PlantDetail({ plantId, onBack, onDeleted }: PlantDetailProps) {
   const [exportingPdf, setExportingPdf] = useState(false);
   const [showPanelForm, setShowPanelForm] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [panelsExpanded, setPanelsExpanded] = useState(false);
 
   const loadAll = useCallback(async () => {
     setLoading(true);
@@ -214,10 +216,16 @@ export function PlantDetail({ plantId, onBack, onDeleted }: PlantDetailProps) {
           <DetailRow label="Codice CENSIMP" value={plant.censimp_code} />
           <DetailRow label="Potenza Totale" value={plant.total_power_kw != null ? `${plant.total_power_kw} kW` : null} />
           <DetailRow label="Pannelli" value={plant.panel_brand_model} />
-          <DetailRow label="Inverter" value={plant.inverter_brand_model} />
+          <DetailRow label="Marca Inverter" value={plant.inverter_brand} />
+          <DetailRow label="Modello Inverter" value={plant.inverter_model} />
+          <DetailRow label="Codice Inverter" value={plant.inverter_code} />
           <DetailRow label="Potenza Accumulo" value={plant.storage_power_kw != null ? `${plant.storage_power_kw} kW` : null} />
           <DetailRow label="Marca Accumulo" value={plant.storage_brand} />
           <DetailRow label="Modello Accumulo" value={plant.storage_model} />
+          <DetailRow label="Codice Accumulo" value={plant.storage_code} />
+          <DetailRow label="Marca Colonnina" value={plant.charger_brand} />
+          <DetailRow label="Modello Colonnina" value={plant.charger_model} />
+          <DetailRow label="Codice Colonnina" value={plant.charger_code} />
           <DetailRow label="Data Installazione" value={plant.installation_date ? plant.installation_date.slice(0, 10) : null} />
           <DetailRow label="Note" value={plant.notes} />
         </div>
@@ -255,13 +263,20 @@ export function PlantDetail({ plantId, onBack, onDeleted }: PlantDetailProps) {
         </button>
       </div>
 
-      {/* Panels section */}
+      {/* Panels section — collapsible */}
       <div className="mb-6">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="font-semibold text-slate-900 flex items-center gap-2">
+          <button
+            onClick={() => setPanelsExpanded((v) => !v)}
+            className="flex items-center gap-2 font-semibold text-slate-900 hover:text-blue-900 transition-colors"
+          >
             <Hash size={18} />
             Pannelli ({panels.length})
-          </h2>
+            <ChevronDown
+              size={18}
+              className={`transition-transform ${panelsExpanded ? '' : '-rotate-90'}`}
+            />
+          </button>
           <button
             onClick={() => setShowPanelForm(true)}
             className="flex items-center gap-1.5 bg-blue-900 hover:bg-blue-800 text-white text-sm font-medium px-3 py-2 rounded-lg transition-colors"
@@ -271,25 +286,27 @@ export function PlantDetail({ plantId, onBack, onDeleted }: PlantDetailProps) {
           </button>
         </div>
 
-        {panels.length === 0 ? (
-          <div className="bg-white rounded-2xl border border-dashed border-slate-300 p-8 text-center">
-            <Hash className="mx-auto text-slate-300 mb-2" size={32} />
-            <p className="text-slate-500 text-sm">Nessun pannello registrato.</p>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {panels.map((panel, index) => (
-              <PanelRow
-                key={panel.id}
-                panel={panel}
-                index={index}
-                onUpdate={(serial, positionLabel, notes) =>
-                  updatePanel(panel.id, { serial_number: serial, position_label: positionLabel, notes }).then(() => undefined)
-                }
-                onDelete={() => deletePanel(panel.id).then(loadAll)}
-              />
-            ))}
-          </div>
+        {panelsExpanded && (
+          panels.length === 0 ? (
+            <div className="bg-white rounded-2xl border border-dashed border-slate-300 p-8 text-center">
+              <Hash className="mx-auto text-slate-300 mb-2" size={32} />
+              <p className="text-slate-500 text-sm">Nessun pannello registrato.</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {panels.map((panel, index) => (
+                <PanelRow
+                  key={panel.id}
+                  panel={panel}
+                  index={index}
+                  onUpdate={(serial, positionLabel, notes) =>
+                    updatePanel(panel.id, { serial_number: serial, position_label: positionLabel, notes }).then(() => undefined)
+                  }
+                  onDelete={() => deletePanel(panel.id).then(loadAll)}
+                />
+              ))}
+            </div>
+          )
         )}
       </div>
 

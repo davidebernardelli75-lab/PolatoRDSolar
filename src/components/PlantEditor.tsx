@@ -24,9 +24,16 @@ const emptyForm: PlantInsert = {
   total_power_kw: null,
   panel_brand_model: '',
   inverter_brand_model: '',
+  inverter_brand: '',
+  inverter_model: '',
+  inverter_code: '',
   storage_power_kw: null,
   storage_brand: '',
   storage_model: '',
+  storage_code: '',
+  charger_brand: '',
+  charger_model: '',
+  charger_code: '',
   installation_date: null,
   notes: '',
 };
@@ -58,9 +65,16 @@ export function PlantEditor({ plantId, onSaved, onCancel }: PlantEditorProps) {
             total_power_kw: plant.total_power_kw,
             panel_brand_model: plant.panel_brand_model ?? '',
             inverter_brand_model: plant.inverter_brand_model ?? '',
+            inverter_brand: plant.inverter_brand ?? '',
+            inverter_model: plant.inverter_model ?? '',
+            inverter_code: plant.inverter_code ?? '',
             storage_power_kw: plant.storage_power_kw,
             storage_brand: plant.storage_brand ?? '',
             storage_model: plant.storage_model ?? '',
+            storage_code: plant.storage_code ?? '',
+            charger_brand: plant.charger_brand ?? '',
+            charger_model: plant.charger_model ?? '',
+            charger_code: plant.charger_code ?? '',
             installation_date: plant.installation_date ?? null,
             notes: plant.notes ?? '',
           });
@@ -263,14 +277,33 @@ export function PlantEditor({ plantId, onSaved, onCancel }: PlantEditorProps) {
               value={form.panel_brand_model ?? ''}
               onChange={(v) => update('panel_brand_model', v)}
             />
-            <Field
-              label="Marca/Modello Inverter"
-              value={form.inverter_brand_model ?? ''}
-              onChange={(v) => update('inverter_brand_model', v)}
-            />
+
+            {/* Inverter */}
+            <div className="pt-2">
+              <h3 className="text-sm font-semibold text-blue-900 mb-3">Inverter</h3>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <Field
+                  label="Marca"
+                  value={form.inverter_brand ?? ''}
+                  onChange={(v) => update('inverter_brand', v)}
+                />
+                <Field
+                  label="Modello"
+                  value={form.inverter_model ?? ''}
+                  onChange={(v) => update('inverter_model', v)}
+                />
+                <Field
+                  label="Codice"
+                  value={form.inverter_code ?? ''}
+                  onChange={(v) => update('inverter_code', v)}
+                />
+              </div>
+            </div>
+
+            {/* Sistema di accumulo */}
             <div className="pt-2">
               <h3 className="text-sm font-semibold text-blue-900 mb-3">Sistema di accumulo</h3>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1.5">
                     Potenza (kW)
@@ -295,6 +328,33 @@ export function PlantEditor({ plantId, onSaved, onCancel }: PlantEditorProps) {
                   label="Modello"
                   value={form.storage_model ?? ''}
                   onChange={(v) => update('storage_model', v)}
+                />
+                <Field
+                  label="Codice"
+                  value={form.storage_code ?? ''}
+                  onChange={(v) => update('storage_code', v)}
+                />
+              </div>
+            </div>
+
+            {/* Colonnine di ricarica */}
+            <div className="pt-2">
+              <h3 className="text-sm font-semibold text-blue-900 mb-3">Colonnine di ricarica</h3>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <Field
+                  label="Marca"
+                  value={form.charger_brand ?? ''}
+                  onChange={(v) => update('charger_brand', v)}
+                />
+                <Field
+                  label="Modello"
+                  value={form.charger_model ?? ''}
+                  onChange={(v) => update('charger_model', v)}
+                />
+                <Field
+                  label="Codice"
+                  value={form.charger_code ?? ''}
+                  onChange={(v) => update('charger_code', v)}
                 />
               </div>
             </div>

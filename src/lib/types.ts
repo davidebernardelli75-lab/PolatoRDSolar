@@ -16,9 +16,16 @@ export interface Plant {
   total_power_kw: number | null;
   panel_brand_model: string | null;
   inverter_brand_model: string | null;
+  inverter_brand: string | null;
+  inverter_model: string | null;
+  inverter_code: string | null;
   storage_power_kw: number | null;
   storage_brand: string | null;
   storage_model: string | null;
+  storage_code: string | null;
+  charger_brand: string | null;
+  charger_model: string | null;
+  charger_code: string | null;
   installation_date: string | null;
   notes: string | null;
   created_at: string;

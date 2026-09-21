@@ -37,10 +37,16 @@ function buildPlantTextFile(plant: Plant, panels: Panel[]): string {
   lines.push(`Codice CENSIMP: ${plant.censimp_code || 'N/D'}`);
   lines.push(`Potenza Totale (kW): ${plant.total_power_kw ?? 'N/D'}`);
   lines.push(`Marca/Modello Pannelli: ${plant.panel_brand_model || 'N/D'}`);
-  lines.push(`Marca/Modello Inverter: ${plant.inverter_brand_model || 'N/D'}`);
+  lines.push(`Inverter - Marca: ${plant.inverter_brand || 'N/D'}`);
+  lines.push(`Inverter - Modello: ${plant.inverter_model || 'N/D'}`);
+  lines.push(`Inverter - Codice: ${plant.inverter_code || 'N/D'}`);
   lines.push(`Potenza Accumulo (kW): ${plant.storage_power_kw ?? 'N/D'}`);
   lines.push(`Marca Accumulo: ${plant.storage_brand || 'N/D'}`);
   lines.push(`Modello Accumulo: ${plant.storage_model || 'N/D'}`);
+  lines.push(`Codice Accumulo: ${plant.storage_code || 'N/D'}`);
+  lines.push(`Colonnina - Marca: ${plant.charger_brand || 'N/D'}`);
+  lines.push(`Colonnina - Modello: ${plant.charger_model || 'N/D'}`);
+  lines.push(`Colonnina - Codice: ${plant.charger_code || 'N/D'}`);
   lines.push(`Data Installazione: ${formatDate(plant.installation_date)}`);
   lines.push(`Note: ${plant.notes || 'Nessuna'}`);
   lines.push('');
