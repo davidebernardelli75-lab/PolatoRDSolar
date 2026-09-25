@@ -133,7 +133,7 @@ export interface EquipmentCatalogEntry {
   created_at: string;
 }
 
-export type VehicleType = 'Auto' | 'Furgone';
+export type VehicleType = 'Auto' | 'Furgone' | 'Motoveicolo';
 
 export interface Vehicle {
   id: string;
@@ -146,13 +146,32 @@ export interface Vehicle {
   last_service_km: number;
   last_service_date: string | null;
   insurance_expiry: string | null;
+  insurance_company: string | null;
   inspection_expiry: string | null;
+  tax_expiry: string | null;
+  vehicle_category: string | null;
   notes: string | null;
   created_at: string;
   updated_at: string;
 }
 
 export type VehicleInsert = Omit<Vehicle, 'id' | 'created_at' | 'updated_at'>;
+
+export interface Insurance {
+  id: string;
+  category: string;
+  provider: string;
+  policy_number: string | null;
+  insured_item: string | null;
+  premium_amount: number | null;
+  start_date: string | null;
+  expiry_date: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type InsuranceInsert = Omit<Insurance, 'id' | 'created_at' | 'updated_at'>;
 
 export type PlantInsert = Omit<Plant, 'id' | 'created_at' | 'updated_at'>;
 export type PlantUpdate = Partial<PlantInsert>;

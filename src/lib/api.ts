@@ -1,5 +1,5 @@
 import { supabase, STORAGE_BUCKET } from './supabase';
-import type { Plant, Panel, PanelPhoto, PlantInsert, PlantUpdate, PanelInsert, RoadmapTask, PlantInverter, PlantStorage, PlantCharger, PlantInverterInsert, PlantStorageInsert, PlantChargerInsert, PlantPowerMeter, PlantPowerMeterInsert, Vehicle, VehicleInsert, EquipmentCatalogEntry, EquipmentCategory } from './types';
+import type { Plant, Panel, PanelPhoto, PlantInsert, PlantUpdate, PanelInsert, RoadmapTask, PlantInverter, PlantStorage, PlantCharger, PlantInverterInsert, PlantStorageInsert, PlantChargerInsert, PlantPowerMeter, PlantPowerMeterInsert, Vehicle, VehicleInsert, Insurance, InsuranceInsert, EquipmentCatalogEntry, EquipmentCategory } from './types';
 
 export async function fetchPlants(): Promise<Plant[]> {
   const { data, error } = await supabase
@@ -397,6 +397,43 @@ export async function updateVehicle(id: string, input: Partial<VehicleInsert>): 
 
 export async function deleteVehicle(id: string): Promise<void> {
   const { error } = await supabase.from('vehicles').delete().eq('id', id);
+  if (error) throw error;
+}
+
+// ── Insurances (Assicurazioni Varie) ───────────────────────────────
+
+export async function fetchInsurances(): Promise<Insurance[]> {
+  const { data, error } = await supabase
+    .from('insurances')
+    .select('*')
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  return data ?? [];
+}
+
+export async function createInsurance(input: InsuranceInsert): Promise<Insurance> {
+  const { data, error } = await supabase
+    .from('insurances')
+    .insert(input)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+export async function updateInsurance(id: string, input: Partial<InsuranceInsert>): Promise<Insurance> {
+  const { data, error } = await supabase
+    .from('insurances')
+    .update({ ...input, updated_at: new Date().toISOString() })
+    .eq('id', id)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+export async function deleteInsurance(id: string): Promise<void> {
+  const { error } = await supabase.from('insurances').delete().eq('id', id);
   if (error) throw error;
 }
 

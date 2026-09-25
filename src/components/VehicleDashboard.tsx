@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Car, Truck, Plus, Trash2, FileText, Loader2, ChevronDown, AlertTriangle, Calendar, Wrench, Shield } from 'lucide-react';
+import { Car, Truck, Bike, Plus, Trash2, FileText, Loader2, ChevronDown, AlertTriangle, Calendar, Wrench, Shield, Receipt } from 'lucide-react';
 import type { Vehicle, VehicleInsert } from '@/lib/types';
 import { fetchVehicles, createVehicle, updateVehicle, deleteVehicle } from '@/lib/api';
 import { DetailItem, VehicleEditCard, VehicleFormModal } from './vehicle-forms';
@@ -27,12 +27,17 @@ function getVehicleAlerts(v: Vehicle): VehicleAlert[] {
   const alerts: VehicleAlert[] = [];
   const insDays = daysUntil(v.insurance_expiry);
   const inspDays = daysUntil(v.inspection_expiry);
+  const taxDays = daysUntil(v.tax_expiry);
   const kmSinceService = v.mileage_km - v.last_service_km;
   const kmUntilService = v.service_interval_km - kmSinceService;
 
   if (insDays !== null) {
     if (insDays < 0) alerts.push({ level: 'danger', label: 'Assicurazione scaduta' });
     else if (insDays <= 30) alerts.push({ level: 'warning', label: `Assicurazione in ${insDays}g` });
+  }
+  if (taxDays !== null) {
+    if (taxDays < 0) alerts.push({ level: 'danger', label: 'Bollo scaduto' });
+    else if (taxDays <= 30) alerts.push({ level: 'warning', label: `Bollo in ${taxDays}g` });
   }
   if (inspDays !== null) {
     if (inspDays < 0) alerts.push({ level: 'danger', label: 'Revisione scaduta' });
@@ -140,7 +145,7 @@ function VehicleCard({
   const [confirmDel, setConfirmDel] = useState(false);
   const status = getOverallStatus(vehicle);
   const alerts = getVehicleAlerts(vehicle);
-  const Icon = vehicle.type === 'Furgone' ? Truck : Car;
+  const Icon = vehicle.type === 'Furgone' ? Truck : vehicle.type === 'Motoveicolo' ? Bike : Car;
 
   const statusConfig = {
     ok: { dot: 'bg-green-500', text: 'text-green-600', bg: 'bg-green-50', border: 'border-green-200' },
@@ -172,7 +177,7 @@ function VehicleCard({
     <div className={`bg-white rounded-2xl border ${cfg.border} p-4`}>
       <div className="flex items-center gap-3">
         <div className={`inline-flex items-center justify-center w-10 h-10 rounded-lg flex-shrink-0 ${
-          vehicle.type === 'Furgone' ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-600'
+          vehicle.type === 'Furgone' ? 'bg-blue-100 text-blue-700' : vehicle.type === 'Motoveicolo' ? 'bg-orange-100 text-orange-700' : 'bg-slate-100 text-slate-600'
         }`}>
           <Icon size={20} />
         </div>
@@ -214,8 +219,10 @@ function VehicleCard({
               vehicle.last_service_km > 0 ? `${(vehicle.mileage_km - vehicle.last_service_km).toLocaleString('it-IT')} km fa` : 'Mai fatto'
             } />
             <DetailItem icon={Calendar} label="Ultimo tagliando" value={formatDate(vehicle.last_service_date)} />
-            <DetailItem icon={Shield} label="Scad. assicurazione" value={formatDate(vehicle.insurance_expiry)} />
+            <DetailItem icon={Shield} label="Assicurazione" value={formatDate(vehicle.insurance_expiry)} />
+            <DetailItem icon={Receipt} label="Bollo" value={formatDate(vehicle.tax_expiry)} />
             <DetailItem icon={Calendar} label="Scad. revisione" value={formatDate(vehicle.inspection_expiry)} />
+            <DetailItem icon={Shield} label="Compagnia" value={vehicle.insurance_company || 'N/D'} />
             <DetailItem icon={Wrench} label="Intervallo tagliando" value={`${vehicle.service_interval_km.toLocaleString('it-IT')} km`} />
             <DetailItem icon={Car} label="Tipo" value={vehicle.type} />
           </div>

@@ -9,13 +9,15 @@ import { PlantEditor } from '@/components/PlantEditor';
 import { PlantDetail } from '@/components/PlantDetail';
 import { Login } from '@/components/Login';
 import { VehicleDashboard } from '@/components/VehicleDashboard';
+import { InsuranceDashboard } from '@/components/InsuranceDashboard';
 
 export type View =
   | { name: 'dashboard' }
   | { name: 'new-plant' }
   | { name: 'edit-plant'; plantId: string }
   | { name: 'plant'; plantId: string }
-  | { name: 'vehicles' };
+  | { name: 'vehicles' }
+  | { name: 'insurances' };
 
 export default function App() {
   const [session, setSession] = useState<Session | null>(null);
@@ -152,6 +154,9 @@ export default function App() {
           )}
           {view.name === 'vehicles' && (
             <VehicleDashboard />
+          )}
+          {view.name === 'insurances' && (
+            <InsuranceDashboard />
           )}
         </main>
       </div>

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { X, ScanLine, Loader2, ImagePlus, Video, CheckCircle2, Plus } from 'lucide-react';
+import { X, Loader2, ImagePlus, Video, CheckCircle2, Plus } from 'lucide-react';
 import { scanImageFile, CameraScanner } from '@/lib/scanner';
 import { PANEL_BRANDS, PANEL_POWERS } from '@/lib/equipment-presets';
 

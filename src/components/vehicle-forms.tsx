@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { Car, Truck, X, type LucideIcon } from 'lucide-react';
+import { Car, Truck, Bike, X, type LucideIcon } from 'lucide-react';
 import type { Vehicle, VehicleInsert, VehicleType } from '@/lib/types';
+import { INSURANCE_COMPANIES } from '@/lib/insurance-presets';
 
-export const VEHICLE_TYPES: VehicleType[] = ['Auto', 'Furgone'];
+export const VEHICLE_TYPES: VehicleType[] = ['Auto', 'Furgone', 'Motoveicolo'];
 
 export const VEHICLE_BRANDS = [
   'FIAT', 'VOLKSWAGEN', 'FORD', 'RENAULT', 'CITROEN', 'PEUGEOT',
@@ -41,7 +42,10 @@ export function VehicleEditCard({
     last_service_km: vehicle.last_service_km,
     last_service_date: vehicle.last_service_date ?? '',
     insurance_expiry: vehicle.insurance_expiry ?? '',
+    insurance_company: vehicle.insurance_company ?? '',
     inspection_expiry: vehicle.inspection_expiry ?? '',
+    tax_expiry: vehicle.tax_expiry ?? '',
+    vehicle_category: vehicle.vehicle_category ?? '',
     notes: vehicle.notes ?? '',
   });
   const [saving, setSaving] = useState(false);
@@ -57,7 +61,10 @@ export function VehicleEditCard({
         ...form,
         last_service_date: form.last_service_date || null,
         insurance_expiry: form.insurance_expiry || null,
+        insurance_company: form.insurance_company || null,
         inspection_expiry: form.inspection_expiry || null,
+        tax_expiry: form.tax_expiry || null,
+        vehicle_category: form.vehicle_category || null,
         notes: form.notes || null,
       });
     } catch {
@@ -100,7 +107,8 @@ export function VehicleFormModal({
   const [form, setForm] = useState<VehicleInsert>({
     type: 'Auto', plate: '', brand: '', model: '', mileage_km: 0,
     service_interval_km: 20000, last_service_km: 0, last_service_date: '',
-    insurance_expiry: '', inspection_expiry: '', notes: '',
+    insurance_expiry: '', insurance_company: '', inspection_expiry: '',
+    tax_expiry: '', vehicle_category: '', notes: '',
   });
   const [saving, setSaving] = useState(false);
 
@@ -115,7 +123,10 @@ export function VehicleFormModal({
         ...form,
         last_service_date: form.last_service_date || null,
         insurance_expiry: form.insurance_expiry || null,
+        insurance_company: form.insurance_company || null,
         inspection_expiry: form.inspection_expiry || null,
+        tax_expiry: form.tax_expiry || null,
+        vehicle_category: form.vehicle_category || null,
         notes: form.notes || null,
       });
     } catch {
@@ -160,7 +171,7 @@ function VehicleFormFields({
           <label className="block text-xs font-medium text-slate-600 mb-1">Tipo Veicolo</label>
           <div className="flex gap-2">
             {VEHICLE_TYPES.map((t) => {
-              const Icon = t === 'Furgone' ? Truck : Car;
+              const Icon = t === 'Furgone' ? Truck : t === 'Motoveicolo' ? Bike : Car;
               return (
                 <button key={t} type="button" onClick={() => update('type', t)}
                   className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-lg text-sm font-medium border transition-colors ${
@@ -233,6 +244,28 @@ function VehicleFormFields({
           <label className="block text-xs font-medium text-slate-600 mb-1">Scadenza Assicurazione</label>
           <input type="date" value={form.insurance_expiry ?? ''}
             onChange={(e) => update('insurance_expiry', e.target.value)}
+            className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-400" />
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-slate-600 mb-1">Compagnia Assicurativa</label>
+          <select value={form.insurance_company ?? ''} onChange={(e) => update('insurance_company', e.target.value)}
+            className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm uppercase focus:outline-none focus:ring-2 focus:ring-red-400">
+            <option value="">— Seleziona —</option>
+            {INSURANCE_COMPANIES.map((c) => <option key={c} value={c}>{c}</option>)}
+            <option value="__custom">Altro...</option>
+          </select>
+        </div>
+      </div>
+      {form.insurance_company === '__custom' && (
+        <input value="" onChange={(e) => update('insurance_company', e.target.value.toUpperCase())}
+          placeholder="Inserisci compagnia"
+          className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm uppercase focus:outline-none focus:ring-2 focus:ring-red-400" />
+      )}
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="block text-xs font-medium text-slate-600 mb-1">Scadenza Bollo</label>
+          <input type="date" value={form.tax_expiry ?? ''}
+            onChange={(e) => update('tax_expiry', e.target.value)}
             className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-400" />
         </div>
         <div>

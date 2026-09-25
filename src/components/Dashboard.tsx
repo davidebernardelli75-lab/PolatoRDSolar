@@ -1,4 +1,4 @@
-import { Sun, MapPin, Zap, Plus, Search, MoreVertical, Pencil, Trash2, AlertTriangle, X, ListChecks } from 'lucide-react';
+import { Sun, MapPin, Zap, Plus, Search, MoreVertical, Pencil, Trash2, AlertTriangle, X, ListChecks, Home, Factory } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 import type { Plant } from '@/lib/types';
 import { getProgressColor } from '@/components/Roadmap';
@@ -139,7 +139,9 @@ export function Dashboard({ plants, loading, roadmapProgress, onOpenPlant, onNew
               >
                 <div className="flex items-start justify-between mb-3">
                   <div className="inline-flex items-center justify-center w-10 h-10 bg-blue-900 rounded-lg group-hover:bg-red-500 transition-colors">
-                    <Sun className="text-red-400 group-hover:text-white transition-colors" size={20} />
+                    {plant.owner_type === 'Azienda'
+                      ? <Factory className="text-red-400 group-hover:text-white transition-colors" size={20} />
+                      : <Home className="text-red-400 group-hover:text-white transition-colors" size={20} />}
                   </div>
                   <span className={`text-[10px] font-semibold px-2 py-1 rounded-full ${
                     plant.owner_type === 'Azienda'
