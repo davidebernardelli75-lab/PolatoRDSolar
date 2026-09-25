@@ -49,7 +49,8 @@ import {
   updateCharger,
   deleteCharger,
 } from '@/lib/api';
-import { INVERTER_BRANDS, INVERTER_MODELS, STORAGE_BRANDS, STORAGE_MODELS } from '@/lib/equipment-presets';
+import { useEquipmentOptions } from '@/lib/use-equipment-options';
+import type { EquipmentCategory } from '@/lib/types';
 import { scanImageFile, CameraScanner } from '@/lib/scanner';
 import { exportPlantArchive } from '@/lib/export';
 import { generatePlantPdf } from '@/lib/pdf';
@@ -83,6 +84,8 @@ export function PlantDetail({ plantId, onBack, onDeleted }: PlantDetailProps) {
   const [invertersExpanded, setInvertersExpanded] = useState(false);
   const [storagesExpanded, setStoragesExpanded] = useState(false);
   const [chargersExpanded, setChargersExpanded] = useState(false);
+  const inverterOpts = useEquipmentOptions('inverter');
+  const storageOpts = useEquipmentOptions('storage');
 
   const loadAll = useCallback(async () => {
     setLoading(true);
@@ -317,8 +320,10 @@ export function PlantDetail({ plantId, onBack, onDeleted }: PlantDetailProps) {
                     { label: 'Marca', value: inv.brand },
                     { label: 'Modello', value: inv.model },
                     { label: 'Codice', value: inv.code }]}
-                  brandOptions={INVERTER_BRANDS}
-                  modelOptionsFor={(b) => INVERTER_MODELS[b] ?? []}
+                  brandOptions={inverterOpts.brands}
+                  modelOptionsFor={inverterOpts.modelsFor}
+                  onEnsureBrand={inverterOpts.ensureBrand}
+                  onEnsureModel={inverterOpts.ensureModel}
                   onChange={(fieldIndex, value) => {
                     setInverters((prev) => prev.map((it, i) => {
                       if (i !== index) return it;
@@ -386,8 +391,10 @@ export function PlantDetail({ plantId, onBack, onDeleted }: PlantDetailProps) {
                     { label: 'Marca', value: sto.brand },
                     { label: 'Modello', value: sto.model },
                     { label: 'Codice', value: sto.code }]}
-                  brandOptions={STORAGE_BRANDS}
-                  modelOptionsFor={(b) => STORAGE_MODELS[b] ?? []}
+                  brandOptions={storageOpts.brands}
+                  modelOptionsFor={storageOpts.modelsFor}
+                  onEnsureBrand={storageOpts.ensureBrand}
+                  onEnsureModel={storageOpts.ensureModel}
                   extraField={{ label: 'Potenza (kW)', value: sto.power_kw != null ? String(sto.power_kw) : '' }}
                   onChangeExtra={(value) => {
                     setStorages((prev) => prev.map((it, i) => i === index ? { ...it, power_kw: value === '' ? null : parseFloat(value) } : it));
@@ -639,6 +646,8 @@ function EquipmentRow({
   onDelete,
   brandOptions,
   modelOptionsFor,
+  onEnsureBrand,
+  onEnsureModel,
 }: {
   index: number;
   fields: EquipmentField[];
@@ -649,18 +658,32 @@ function EquipmentRow({
   onDelete: () => Promise<void>;
   brandOptions?: readonly string[];
   modelOptionsFor?: (brand: string) => readonly string[];
+  onEnsureBrand?: (brand: string) => Promise<void>;
+  onEnsureModel?: (brand: string, model: string) => Promise<void>;
 }) {
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [confirmDel, setConfirmDel] = useState(false);
   const [showScanner, setShowScanner] = useState(false);
+  const [customBrand, setCustomBrand] = useState(false);
+  const [customModel, setCustomModel] = useState(false);
 
   const hasData = fields.some((f) => f.value) || (extraField && extraField.value);
 
   const handleSave = async () => {
     setSaving(true);
     try {
+      const brandVal = fields.find((f) => f.label === 'Marca')?.value ?? '';
+      const modelVal = fields.find((f) => f.label === 'Modello')?.value ?? '';
+      if (onEnsureBrand && brandVal && brandVal !== '__custom') {
+        await onEnsureBrand(brandVal);
+      }
+      if (onEnsureModel && brandVal && modelVal && brandVal !== '__custom' && modelVal !== '__custom') {
+        await onEnsureModel(brandVal, modelVal);
+      }
       await onSave();
+      setCustomBrand(false);
+      setCustomModel(false);
       setEditing(false);
     } catch {
       // skip
@@ -729,50 +752,82 @@ function EquipmentRow({
                     </button>
                   </div>
                 ) : isBrand ? (
-                  <select
-                    value={f.value}
-                    onChange={(e) => onChange(i, e.target.value.toUpperCase())}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm uppercase focus:outline-none focus:ring-2 focus:ring-red-400"
-                  >
-                    <option value="">— Seleziona —</option>
-                    {brandOptions!.map((b) => (
-                      <option key={b} value={b}>{b}</option>
-                    ))}
-                    <option value="__custom">Altro...</option>
-                  </select>
+                  customBrand ? (
+                    <div className="flex gap-1">
+                      <input
+                        autoFocus
+                        value={f.value}
+                        onChange={(e) => onChange(i, e.target.value.toUpperCase())}
+                        placeholder="Inserisci marca"
+                        className="flex-1 px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm uppercase focus:outline-none focus:ring-2 focus:ring-red-400"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => { onChange(i, ''); setCustomBrand(false); }}
+                        className="flex items-center justify-center px-2.5 bg-slate-200 hover:bg-slate-300 text-slate-600 rounded-lg transition-colors"
+                        title="Torna al menu"
+                      >
+                        <X size={16} />
+                      </button>
+                    </div>
+                  ) : (
+                    <select
+                      value={f.value}
+                      onChange={(e) => {
+                        const val = e.target.value.toUpperCase();
+                        if (val === '__CUSTOM') { onChange(i, ''); setCustomBrand(true); }
+                        else onChange(i, val);
+                      }}
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm uppercase focus:outline-none focus:ring-2 focus:ring-red-400"
+                    >
+                      <option value="">— Seleziona —</option>
+                      {brandOptions!.map((b) => (
+                        <option key={b} value={b}>{b}</option>
+                      ))}
+                      <option value="__custom">Altro...</option>
+                    </select>
+                  )
                 ) : isModel && models.length > 0 ? (
-                  <select
-                    value={f.value}
-                    onChange={(e) => onChange(i, e.target.value.toUpperCase())}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm uppercase focus:outline-none focus:ring-2 focus:ring-red-400"
-                  >
-                    <option value="">— Seleziona —</option>
-                    {models.map((m) => (
-                      <option key={m} value={m}>{m}</option>
-                    ))}
-                    <option value="__custom">Altro...</option>
-                  </select>
+                  customModel ? (
+                    <div className="flex gap-1">
+                      <input
+                        autoFocus
+                        value={f.value}
+                        onChange={(e) => onChange(i, e.target.value.toUpperCase())}
+                        placeholder="Inserisci modello"
+                        className="flex-1 px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm uppercase focus:outline-none focus:ring-2 focus:ring-red-400"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => { onChange(i, ''); setCustomModel(false); }}
+                        className="flex items-center justify-center px-2.5 bg-slate-200 hover:bg-slate-300 text-slate-600 rounded-lg transition-colors"
+                        title="Torna al menu"
+                      >
+                        <X size={16} />
+                      </button>
+                    </div>
+                  ) : (
+                    <select
+                      value={f.value}
+                      onChange={(e) => {
+                        const val = e.target.value.toUpperCase();
+                        if (val === '__CUSTOM') { onChange(i, ''); setCustomModel(true); }
+                        else onChange(i, val);
+                      }}
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm uppercase focus:outline-none focus:ring-2 focus:ring-red-400"
+                    >
+                      <option value="">— Seleziona —</option>
+                      {models.map((m) => (
+                        <option key={m} value={m}>{m}</option>
+                      ))}
+                      <option value="__custom">Altro...</option>
+                    </select>
+                  )
                 ) : (
                   <input
                     value={f.value}
                     onChange={(e) => onChange(i, e.target.value.toUpperCase())}
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm uppercase focus:outline-none focus:ring-2 focus:ring-red-400"
-                  />
-                )}
-                {isBrand && f.value === '__custom' && (
-                  <input
-                    value=""
-                    onChange={(e) => onChange(i, e.target.value.toUpperCase())}
-                    placeholder="Inserisci marca"
-                    className="w-full mt-1 px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm uppercase focus:outline-none focus:ring-2 focus:ring-red-400"
-                  />
-                )}
-                {isModel && f.value === '__custom' && (
-                  <input
-                    value=""
-                    onChange={(e) => onChange(i, e.target.value.toUpperCase())}
-                    placeholder="Inserisci modello"
-                    className="w-full mt-1 px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm uppercase focus:outline-none focus:ring-2 focus:ring-red-400"
                   />
                 )}
               </div>

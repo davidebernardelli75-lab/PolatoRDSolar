@@ -1,5 +1,5 @@
 import { supabase, STORAGE_BUCKET } from './supabase';
-import type { Plant, Panel, PanelPhoto, PlantInsert, PlantUpdate, PanelInsert, RoadmapTask, PlantInverter, PlantStorage, PlantCharger, PlantInverterInsert, PlantStorageInsert, PlantChargerInsert, Vehicle, VehicleInsert } from './types';
+import type { Plant, Panel, PanelPhoto, PlantInsert, PlantUpdate, PanelInsert, RoadmapTask, PlantInverter, PlantStorage, PlantCharger, PlantInverterInsert, PlantStorageInsert, PlantChargerInsert, Vehicle, VehicleInsert, EquipmentCatalogEntry, EquipmentCategory } from './types';
 
 export async function fetchPlants(): Promise<Plant[]> {
   const { data, error } = await supabase
@@ -359,5 +359,29 @@ export async function updateVehicle(id: string, input: Partial<VehicleInsert>): 
 
 export async function deleteVehicle(id: string): Promise<void> {
   const { error } = await supabase.from('vehicles').delete().eq('id', id);
+  if (error) throw error;
+}
+
+// ── Equipment Catalog (custom brands/models) ──────────────────────
+
+export async function fetchEquipmentCatalog(category?: EquipmentCategory): Promise<EquipmentCatalogEntry[]> {
+  let query = supabase.from('equipment_catalog').select('*');
+  if (category) query = query.eq('category', category);
+  const { data, error } = await query.order('brand', { ascending: true }).order('model', { ascending: true });
+  if (error) throw error;
+  return data ?? [];
+}
+
+export async function addEquipmentBrand(category: EquipmentCategory, brand: string): Promise<void> {
+  const { error } = await supabase
+    .from('equipment_catalog')
+    .insert({ category, brand, model: null });
+  if (error) throw error;
+}
+
+export async function addEquipmentModel(category: EquipmentCategory, brand: string, model: string): Promise<void> {
+  const { error } = await supabase
+    .from('equipment_catalog')
+    .insert({ category, brand, model });
   if (error) throw error;
 }
