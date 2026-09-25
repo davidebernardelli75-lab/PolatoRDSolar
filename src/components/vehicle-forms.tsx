@@ -91,11 +91,11 @@ export function VehicleEditCard({
       <VehicleFormFields form={form} update={update} />
       {error && <div className="text-sm text-red-600 bg-red-50 rounded-lg p-2">{error}</div>}
       <div className="flex gap-2">
-        <button onClick={handleSave} disabled={saving}
+        <button type="button" onClick={handleSave} disabled={saving}
           className="flex-1 bg-blue-900 hover:bg-blue-800 text-white text-sm font-medium py-2 rounded-lg transition-colors">
           {saving ? 'Salvataggio...' : 'Salva'}
         </button>
-        <button onClick={onCancel}
+        <button type="button" onClick={onCancel}
           className="px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-medium py-2 rounded-lg transition-colors">
           Annulla
         </button>
@@ -160,7 +160,7 @@ export function VehicleFormModal({
         <div className="space-y-3">
           <VehicleFormFields form={form} update={update} />
           {error && <div className="text-sm text-red-600 bg-red-50 rounded-lg p-2">{error}</div>}
-          <button onClick={handleSave} disabled={saving}
+          <button type="button" onClick={handleSave} disabled={saving}
             className="w-full bg-blue-900 hover:bg-blue-800 text-white text-sm font-medium py-2.5 rounded-lg transition-colors">
             {saving ? 'Salvataggio...' : 'Salva Veicolo'}
           </button>
