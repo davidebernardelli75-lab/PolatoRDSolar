@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Car, Truck, Bike, X, type LucideIcon } from 'lucide-react';
+import { Car, Truck, Bike, X, CalendarDays, ClipboardCheck, Gauge, ReceiptText, ShieldCheck, Tag, Wrench, StickyNote, Building2, type LucideIcon } from 'lucide-react';
 import type { Vehicle, VehicleInsert, VehicleType } from '@/lib/types';
 import { INSURANCE_COMPANIES } from '@/lib/insurance-presets';
 
@@ -164,122 +164,109 @@ function VehicleFormFields({
   form: VehicleInsert;
   update: <K extends keyof VehicleInsert>(key: K, value: VehicleInsert[K]) => void;
 }) {
+  const inputClass = 'w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-red-400 focus:ring-2 focus:ring-red-100';
+  const selectClass = `${inputClass} uppercase`;
+
   return (
-    <>
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <label className="block text-xs font-medium text-slate-600 mb-1">Tipo Veicolo</label>
-          <div className="flex gap-2">
-            {VEHICLE_TYPES.map((t) => {
-              const Icon = t === 'Furgone' ? Truck : t === 'Motoveicolo' ? Bike : Car;
-              return (
-                <button key={t} type="button" onClick={() => update('type', t)}
-                  className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-lg text-sm font-medium border transition-colors ${
-                    form.type === t ? 'bg-blue-900 text-white border-blue-900' : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
-                  }`}>
-                  <Icon size={16} /> {t}
-                </button>
-              );
-            })}
-          </div>
+    <div className="space-y-4">
+      <section className="rounded-xl border border-slate-200 bg-slate-50/70 p-3">
+        <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+          <Car size={14} className="text-blue-900" /> Identificazione veicolo
         </div>
-        <div>
-          <label className="block text-xs font-medium text-slate-600 mb-1">Targa</label>
-          <input value={form.plate} onChange={(e) => update('plate', e.target.value.toUpperCase())}
-            placeholder="es. AB123CD"
-            className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm uppercase focus:outline-none focus:ring-2 focus:ring-red-400" />
+        <div className="grid grid-cols-3 gap-2">
+          {VEHICLE_TYPES.map((t) => {
+            const Icon = t === 'Furgone' ? Truck : t === 'Motoveicolo' ? Bike : Car;
+            return (
+              <button key={t} type="button" onClick={() => update('type', t)}
+                className={`flex min-w-0 flex-col items-center justify-center gap-1 rounded-lg border px-2 py-2 text-xs font-semibold transition-colors sm:flex-row sm:gap-1.5 sm:py-2.5 sm:text-sm ${
+                  form.type === t ? 'border-blue-900 bg-blue-900 text-white shadow-sm' : 'border-slate-200 bg-white text-slate-600 hover:border-blue-200 hover:bg-blue-50'
+                }`}>
+                <Icon size={16} /> <span className="truncate">{t}</span>
+              </button>
+            );
+          })}
         </div>
-      </div>
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <label className="block text-xs font-medium text-slate-600 mb-1">Marca</label>
-          <select value={form.brand} onChange={(e) => update('brand', e.target.value.toUpperCase())}
-            className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm uppercase focus:outline-none focus:ring-2 focus:ring-red-400">
-            <option value="">— Seleziona —</option>
-            {VEHICLE_BRANDS.map((b) => <option key={b} value={b}>{b}</option>)}
-            <option value="__custom">Altro...</option>
-          </select>
+        <div className="mt-3 grid gap-3 sm:grid-cols-3">
+          <Field label="Targa" icon={Tag}>
+            <input value={form.plate} onChange={(e) => update('plate', e.target.value.toUpperCase())} placeholder="AB123CD" className={selectClass} />
+          </Field>
+          <Field label="Marca" icon={Building2}>
+            <select value={form.brand} onChange={(e) => update('brand', e.target.value.toUpperCase())} className={selectClass}>
+              <option value="">Seleziona marca</option>
+              {VEHICLE_BRANDS.map((b) => <option key={b} value={b}>{b}</option>)}
+              <option value="__custom">Altro...</option>
+            </select>
+          </Field>
+          <Field label="Modello" icon={Car}>
+            <input value={form.model} onChange={(e) => update('model', e.target.value.toUpperCase())} placeholder="Modello" className={selectClass} />
+          </Field>
         </div>
-        <div>
-          <label className="block text-xs font-medium text-slate-600 mb-1">Modello</label>
-          <input value={form.model} onChange={(e) => update('model', e.target.value.toUpperCase())}
-            className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm uppercase focus:outline-none focus:ring-2 focus:ring-red-400" />
+        {form.brand === '__custom' && (
+          <input value="" onChange={(e) => update('brand', e.target.value.toUpperCase())} placeholder="Inserisci marca personalizzata" className={`${selectClass} mt-3`} />
+        )}
+      </section>
+
+      <section className="rounded-xl border border-slate-200 bg-slate-50/70 p-3">
+        <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+          <Gauge size={14} className="text-blue-900" /> Manutenzione
         </div>
-      </div>
-      {form.brand === '__custom' && (
-        <input value="" onChange={(e) => update('brand', e.target.value.toUpperCase())}
-          placeholder="Inserisci marca"
-          className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm uppercase focus:outline-none focus:ring-2 focus:ring-red-400" />
-      )}
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <label className="block text-xs font-medium text-slate-600 mb-1">Chilometri Attuali</label>
-          <input type="number" min="0" value={form.mileage_km}
-            onChange={(e) => update('mileage_km', parseInt(e.target.value) || 0)}
-            className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-400" />
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Field label="Chilometri attuali" icon={Gauge}>
+            <input type="number" min="0" value={form.mileage_km} onChange={(e) => update('mileage_km', parseInt(e.target.value) || 0)} className={inputClass} />
+          </Field>
+          <Field label="Intervallo tagliando (km)" icon={Wrench}>
+            <input type="number" min="1000" step="1000" value={form.service_interval_km} onChange={(e) => update('service_interval_km', parseInt(e.target.value) || 20000)} className={inputClass} />
+          </Field>
+          <Field label="Km ultimo tagliando" icon={Wrench}>
+            <input type="number" min="0" value={form.last_service_km} onChange={(e) => update('last_service_km', parseInt(e.target.value) || 0)} className={inputClass} />
+          </Field>
+          <Field label="Data ultimo tagliando" icon={CalendarDays}>
+            <input type="date" value={form.last_service_date ?? ''} onChange={(e) => update('last_service_date', e.target.value)} className={inputClass} />
+          </Field>
         </div>
-        <div>
-          <label className="block text-xs font-medium text-slate-600 mb-1">Intervallo Tagliando (km)</label>
-          <input type="number" min="1000" step="1000" value={form.service_interval_km}
-            onChange={(e) => update('service_interval_km', parseInt(e.target.value) || 20000)}
-            className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-400" />
+      </section>
+
+      <section className="rounded-xl border border-slate-200 bg-slate-50/70 p-3">
+        <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+          <ShieldCheck size={14} className="text-blue-900" /> Documenti e scadenze
         </div>
-      </div>
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <label className="block text-xs font-medium text-slate-600 mb-1">Km Ultimo Tagliando</label>
-          <input type="number" min="0" value={form.last_service_km}
-            onChange={(e) => update('last_service_km', parseInt(e.target.value) || 0)}
-            className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-400" />
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Field label="Scadenza assicurazione" icon={ShieldCheck}>
+            <input type="date" value={form.insurance_expiry ?? ''} onChange={(e) => update('insurance_expiry', e.target.value)} className={inputClass} />
+          </Field>
+          <Field label="Compagnia assicurativa" icon={ShieldCheck}>
+            <select value={form.insurance_company ?? ''} onChange={(e) => update('insurance_company', e.target.value)} className={selectClass}>
+              <option value="">Seleziona compagnia</option>
+              {INSURANCE_COMPANIES.map((c) => <option key={c} value={c}>{c}</option>)}
+              <option value="__custom">Altro...</option>
+            </select>
+          </Field>
+          <Field label="Scadenza bollo" icon={ReceiptText}>
+            <input type="date" value={form.tax_expiry ?? ''} onChange={(e) => update('tax_expiry', e.target.value)} className={inputClass} />
+          </Field>
+          <Field label="Scadenza revisione" icon={ClipboardCheck}>
+            <input type="date" value={form.inspection_expiry ?? ''} onChange={(e) => update('inspection_expiry', e.target.value)} className={inputClass} />
+          </Field>
         </div>
-        <div>
-          <label className="block text-xs font-medium text-slate-600 mb-1">Data Ultimo Tagliando</label>
-          <input type="date" value={form.last_service_date ?? ''}
-            onChange={(e) => update('last_service_date', e.target.value)}
-            className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-400" />
-        </div>
-      </div>
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <label className="block text-xs font-medium text-slate-600 mb-1">Scadenza Assicurazione</label>
-          <input type="date" value={form.insurance_expiry ?? ''}
-            onChange={(e) => update('insurance_expiry', e.target.value)}
-            className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-400" />
-        </div>
-        <div>
-          <label className="block text-xs font-medium text-slate-600 mb-1">Compagnia Assicurativa</label>
-          <select value={form.insurance_company ?? ''} onChange={(e) => update('insurance_company', e.target.value)}
-            className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm uppercase focus:outline-none focus:ring-2 focus:ring-red-400">
-            <option value="">— Seleziona —</option>
-            {INSURANCE_COMPANIES.map((c) => <option key={c} value={c}>{c}</option>)}
-            <option value="__custom">Altro...</option>
-          </select>
-        </div>
-      </div>
-      {form.insurance_company === '__custom' && (
-        <input value="" onChange={(e) => update('insurance_company', e.target.value.toUpperCase())}
-          placeholder="Inserisci compagnia"
-          className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm uppercase focus:outline-none focus:ring-2 focus:ring-red-400" />
-      )}
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <label className="block text-xs font-medium text-slate-600 mb-1">Scadenza Bollo</label>
-          <input type="date" value={form.tax_expiry ?? ''}
-            onChange={(e) => update('tax_expiry', e.target.value)}
-            className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-400" />
-        </div>
-        <div>
-          <label className="block text-xs font-medium text-slate-600 mb-1">Scadenza Revisione</label>
-          <input type="date" value={form.inspection_expiry ?? ''}
-            onChange={(e) => update('inspection_expiry', e.target.value)}
-            className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-400" />
-        </div>
-      </div>
-      <div>
-        <label className="block text-xs font-medium text-slate-600 mb-1">Note</label>
-        <textarea value={form.notes ?? ''} onChange={(e) => update('notes', e.target.value)} rows={2}
-          className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-400" />
-      </div>
-    </>
+        {form.insurance_company === '__custom' && (
+          <input value="" onChange={(e) => update('insurance_company', e.target.value.toUpperCase())} placeholder="Inserisci compagnia personalizzata" className={`${selectClass} mt-3`} />
+        )}
+      </section>
+
+      <Field label="Note" icon={StickyNote}>
+        <textarea value={form.notes ?? ''} onChange={(e) => update('notes', e.target.value)} rows={2} placeholder="Aggiungi una nota..." className={`${inputClass} resize-none`} />
+      </Field>
+    </div>
+  );
+}
+
+function Field({ label, icon: Icon, children }: { label: string; icon: LucideIcon; children: React.ReactNode }) {
+  return (
+    <label className="block min-w-0">
+      <span className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-slate-600">
+        <Icon size={13} className="text-slate-400" /> {label}
+      </span>
+      {children}
+    </label>
   );
 }

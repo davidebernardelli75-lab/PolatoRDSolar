@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { X } from 'lucide-react';
+import { X, ShieldCheck, FileText, Package, Euro, CalendarDays, StickyNote, type LucideIcon } from 'lucide-react';
 import type { Insurance, InsuranceInsert } from '@/lib/types';
 import { INSURANCE_CATEGORIES, INSURANCE_COMPANIES } from '@/lib/insurance-presets';
 
@@ -9,70 +9,75 @@ export function InsuranceFormFields({
   form: InsuranceInsert;
   update: <K extends keyof InsuranceInsert>(key: K, value: InsuranceInsert[K]) => void;
 }) {
+  const inputClass = 'w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-red-400 focus:ring-2 focus:ring-red-100';
+  const selectClass = `${inputClass} uppercase`;
+
   return (
-    <>
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <label className="block text-xs font-medium text-slate-600 mb-1">Categoria</label>
-          <select value={form.category} onChange={(e) => update('category', e.target.value)}
-            className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-400">
-            <option value="">— Seleziona —</option>
-            {INSURANCE_CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
-          </select>
+    <div className="space-y-4">
+      <section className="rounded-xl border border-slate-200 bg-slate-50/70 p-3">
+        <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+          <ShieldCheck size={14} className="text-blue-900" /> Polizza
         </div>
-        <div>
-          <label className="block text-xs font-medium text-slate-600 mb-1">Compagnia</label>
-          <select value={form.provider} onChange={(e) => update('provider', e.target.value)}
-            className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm uppercase focus:outline-none focus:ring-2 focus:ring-red-400">
-            <option value="">— Seleziona —</option>
-            {INSURANCE_COMPANIES.map((c) => <option key={c} value={c}>{c}</option>)}
-            <option value="__custom">Altro...</option>
-          </select>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Field label="Categoria" icon={ShieldCheck}>
+            <select value={form.category} onChange={(e) => update('category', e.target.value)} className={inputClass}>
+              <option value="">Seleziona categoria</option>
+              {INSURANCE_CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+            </select>
+          </Field>
+          <Field label="Compagnia" icon={ShieldCheck}>
+            <select value={form.provider} onChange={(e) => update('provider', e.target.value)} className={selectClass}>
+              <option value="">Seleziona compagnia</option>
+              {INSURANCE_COMPANIES.map((c) => <option key={c} value={c}>{c}</option>)}
+              <option value="__custom">Altro...</option>
+            </select>
+          </Field>
         </div>
-      </div>
-      {form.provider === '__custom' && (
-        <input value="" onChange={(e) => update('provider', e.target.value.toUpperCase())}
-          placeholder="Inserisci compagnia"
-          className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm uppercase focus:outline-none focus:ring-2 focus:ring-red-400" />
-      )}
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <label className="block text-xs font-medium text-slate-600 mb-1">Numero Polizza</label>
-          <input value={form.policy_number ?? ''} onChange={(e) => update('policy_number', e.target.value)}
-            className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-400" />
+        {form.provider === '__custom' && (
+          <input value="" onChange={(e) => update('provider', e.target.value.toUpperCase())} placeholder="Inserisci compagnia personalizzata" className={`${selectClass} mt-3`} />
+        )}
+      </section>
+
+      <section className="rounded-xl border border-slate-200 bg-slate-50/70 p-3">
+        <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+          <FileText size={14} className="text-blue-900" /> Dettagli
         </div>
-        <div>
-          <label className="block text-xs font-medium text-slate-600 mb-1">Bene Assicurato</label>
-          <input value={form.insured_item ?? ''} onChange={(e) => update('insured_item', e.target.value)}
-            className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-400" />
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Field label="Numero polizza" icon={FileText}>
+            <input value={form.policy_number ?? ''} onChange={(e) => update('policy_number', e.target.value)} placeholder="N. polizza" className={inputClass} />
+          </Field>
+          <Field label="Bene assicurato" icon={Package}>
+            <input value={form.insured_item ?? ''} onChange={(e) => update('insured_item', e.target.value)} placeholder="Descrizione bene" className={inputClass} />
+          </Field>
+          <Field label="Premio annuo (€)" icon={Euro}>
+            <input type="number" step="0.01" min="0" value={form.premium_amount ?? ''} onChange={(e) => update('premium_amount', e.target.value === '' ? null : parseFloat(e.target.value))} placeholder="0.00" className={inputClass} />
+          </Field>
+          <Field label="Inizio copertura" icon={CalendarDays}>
+            <input type="date" value={form.start_date ?? ''} onChange={(e) => update('start_date', e.target.value || null)} className={inputClass} />
+          </Field>
         </div>
-      </div>
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <label className="block text-xs font-medium text-slate-600 mb-1">Premio Annuo (€)</label>
-          <input type="number" step="0.01" min="0" value={form.premium_amount ?? ''}
-            onChange={(e) => update('premium_amount', e.target.value === '' ? null : parseFloat(e.target.value))}
-            className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-400" />
+        <div className="mt-3">
+          <Field label="Scadenza copertura" icon={CalendarDays}>
+            <input type="date" value={form.expiry_date ?? ''} onChange={(e) => update('expiry_date', e.target.value || null)} className={inputClass} />
+          </Field>
         </div>
-        <div>
-          <label className="block text-xs font-medium text-slate-600 mb-1">Inizio Copertura</label>
-          <input type="date" value={form.start_date ?? ''}
-            onChange={(e) => update('start_date', e.target.value || null)}
-            className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-400" />
-        </div>
-      </div>
-      <div>
-        <label className="block text-xs font-medium text-slate-600 mb-1">Scadenza Copertura</label>
-        <input type="date" value={form.expiry_date ?? ''}
-          onChange={(e) => update('expiry_date', e.target.value || null)}
-          className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-400" />
-      </div>
-      <div>
-        <label className="block text-xs font-medium text-slate-600 mb-1">Note</label>
-        <textarea value={form.notes ?? ''} onChange={(e) => update('notes', e.target.value)} rows={2}
-          className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-400" />
-      </div>
-    </>
+      </section>
+
+      <Field label="Note" icon={StickyNote}>
+        <textarea value={form.notes ?? ''} onChange={(e) => update('notes', e.target.value)} rows={2} placeholder="Aggiungi una nota..." className={`${inputClass} resize-none`} />
+      </Field>
+    </div>
+  );
+}
+
+function Field({ label, icon: Icon, children }: { label: string; icon: LucideIcon; children: React.ReactNode }) {
+  return (
+    <label className="block min-w-0">
+      <span className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-slate-600">
+        <Icon size={13} className="text-slate-400" /> {label}
+      </span>
+      {children}
+    </label>
   );
 }
 
