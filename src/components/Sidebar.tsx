@@ -40,7 +40,7 @@ export function Sidebar({ open, onClose, onNavigate, currentView, onSignOut }: S
   }, []);
 
   const items = [
-    { id: 'dashboard' as const, label: 'Dashboard', icon: LayoutGrid },
+    { id: 'dashboard' as const, label: 'Impianti FV', icon: LayoutGrid },
     { id: 'new-plant' as const, label: 'Nuovo Impianto', icon: PlusCircle },
     { id: 'vehicles' as const, label: 'Parco Automezzi', icon: Car, badge: vehicleAlerts },
   ];
@@ -67,9 +67,6 @@ export function Sidebar({ open, onClose, onNavigate, currentView, onSignOut }: S
             />
             <div>
               <div className="font-bold text-sm leading-tight">Polato R&D</div>
-              <div className="text-[10px] text-red-400 tracking-widest uppercase">
-                Solar Archive
-              </div>
             </div>
           </div>
           <button
