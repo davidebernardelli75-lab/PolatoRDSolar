@@ -28,7 +28,7 @@ export function PlantEditor({ plantId, onSaved, onCancel }: PlantEditorProps) {
             city: plant.city ?? '', province: plant.province ?? '', region: plant.region ?? '',
             phone: plant.phone ?? '', email: plant.email ?? '', pod: plant.pod ?? '',
             censimp_code: plant.censimp_code ?? '', total_power_kw: plant.total_power_kw,
-            panel_brand_model: plant.panel_brand_model ?? '', inverter_brand_model: plant.inverter_brand_model ?? '',
+            inverter_brand_model: plant.inverter_brand_model ?? '',
             inverter_brand: plant.inverter_brand ?? '', inverter_model: plant.inverter_model ?? '',
             inverter_code: plant.inverter_code ?? '', storage_power_kw: plant.storage_power_kw,
             storage_brand: plant.storage_brand ?? '', storage_model: plant.storage_model ?? '',
@@ -126,7 +126,6 @@ export function PlantEditor({ plantId, onSaved, onCancel }: PlantEditorProps) {
                   className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-red-400 focus:border-transparent" />
               </div>
             </div>
-            <Field label="Marca/Modello Pannelli" value={form.panel_brand_model ?? ''} onChange={(v) => update('panel_brand_model', v)} upper />
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1.5">Note</label>
               <textarea value={form.notes ?? ''} onChange={(e) => update('notes', e.target.value)} rows={3}
