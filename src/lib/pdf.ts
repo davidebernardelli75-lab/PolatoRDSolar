@@ -1,5 +1,5 @@
 import { jsPDF } from 'jspdf';
-import type { Plant, Panel, PanelPhoto, PlantInverter, PlantStorage, PlantCharger } from './types';
+import type { Plant, Panel, PanelPhoto, PlantInverter, PlantStorage, PlantCharger, Vehicle, Insurance } from './types';
 import { downloadPhotoBlob } from './api';
 
 const POLATO_BLUE: [number, number, number] = [31, 64, 142];
@@ -437,6 +437,127 @@ export async function generatePlantPdf(
     } catch (error) {
       console.error(`Impossibile inserire la foto ${photo.file_name} nel PDF:`, error);
     }
+  }
+
+  addFooters(doc);
+  return doc.output('blob');
+}
+
+export async function generateVehiclePdf(vehicle: Vehicle): Promise<Blob> {
+  const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+  const logoDataUrl = await loadLogoDataUrl();
+
+  doc.setFillColor(...POLATO_BLUE);
+  doc.rect(0, 0, PAGE_W, 35, 'F');
+  doc.setFillColor(...POLATO_RED);
+  doc.rect(0, 35, PAGE_W, 1.5, 'F');
+
+  if (logoDataUrl) {
+    doc.setFillColor(...WHITE);
+    doc.roundedRect(MARGIN, 5.5, 43, 24, 2, 2, 'F');
+    addContainedLogo(doc, logoDataUrl, MARGIN + 2, 7, 39, 21);
+  } else {
+    doc.setTextColor(...WHITE);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(16);
+    doc.text('POLATO R&D', MARGIN, 17);
+  }
+
+  doc.setTextColor(...WHITE);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(14);
+  doc.text('SCHEDA AUTOMEZZO', MARGIN + 50, 15);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9);
+  doc.setTextColor(227, 232, 245);
+  doc.text('Parco automezzi', MARGIN + 50, 21.5);
+  doc.setFontSize(8);
+  doc.text(`Generato: ${new Date().toLocaleDateString('it-IT')}`, PAGE_W - MARGIN, 28, { align: 'right' });
+
+  let y = 44;
+  y = addSectionTitle(doc, 'DATI VEICOLO', y);
+  y = addRows(doc, [
+    ['Tipo', vehicle.type],
+    ['Targa', vehicle.plate || 'N/D'],
+    ['Marca', orNa(vehicle.brand)],
+    ['Modello', orNa(vehicle.model)],
+    ['Categoria', orNa(vehicle.vehicle_category)],
+  ], y);
+
+  y = addSectionTitle(doc, 'MANUTENZIONE', y + 3);
+  y = addRows(doc, [
+    ['Chilometri attuali', `${vehicle.mileage_km.toLocaleString('it-IT')} km`],
+    ['Intervallo tagliando', `${vehicle.service_interval_km.toLocaleString('it-IT')} km`],
+    ['Km ultimo tagliando', `${vehicle.last_service_km.toLocaleString('it-IT')} km`],
+    ['Data ultimo tagliando', formatDate(vehicle.last_service_date)],
+  ], y);
+
+  y = addSectionTitle(doc, 'DOCUMENTI E SCADENZE', y + 3);
+  y = addRows(doc, [
+    ['Assicurazione - Scadenza', formatDate(vehicle.insurance_expiry)],
+    ['Assicurazione - Compagnia', orNa(vehicle.insurance_company)],
+    ['Bollo - Scadenza', formatDate(vehicle.tax_expiry)],
+    ['Revisione - Scadenza', formatDate(vehicle.inspection_expiry)],
+    ['Revisione bombole gas', formatDate(vehicle.gas_cylinders_inspection_expiry)],
+    ['Revisione metano', formatDate(vehicle.methane_inspection_expiry)],
+  ], y);
+
+  if (vehicle.notes) {
+    y = addSectionTitle(doc, 'NOTE', y + 3);
+    y = addRows(doc, [['Note', vehicle.notes]], y);
+  }
+
+  addFooters(doc);
+  return doc.output('blob');
+}
+
+export async function generateInsurancePdf(insurance: Insurance): Promise<Blob> {
+  const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+  const logoDataUrl = await loadLogoDataUrl();
+
+  doc.setFillColor(...POLATO_BLUE);
+  doc.rect(0, 0, PAGE_W, 35, 'F');
+  doc.setFillColor(...POLATO_RED);
+  doc.rect(0, 35, PAGE_W, 1.5, 'F');
+
+  if (logoDataUrl) {
+    doc.setFillColor(...WHITE);
+    doc.roundedRect(MARGIN, 5.5, 43, 24, 2, 2, 'F');
+    addContainedLogo(doc, logoDataUrl, MARGIN + 2, 7, 39, 21);
+  } else {
+    doc.setTextColor(...WHITE);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(16);
+    doc.text('POLATO R&D', MARGIN, 17);
+  }
+
+  doc.setTextColor(...WHITE);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(14);
+  doc.text('SCHEDA ASSICURAZIONE', MARGIN + 50, 15);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9);
+  doc.setTextColor(227, 232, 245);
+  doc.text('Polizza assicurativa', MARGIN + 50, 21.5);
+  doc.setFontSize(8);
+  doc.text(`Generato: ${new Date().toLocaleDateString('it-IT')}`, PAGE_W - MARGIN, 28, { align: 'right' });
+
+  let y = 44;
+  y = addSectionTitle(doc, 'DATI POLIZZA', y);
+  y = addRows(doc, [
+    ['Categoria', insurance.category],
+    ['Tipo', orNa(insurance.insurance_type)],
+    ['Compagnia', insurance.provider],
+    ['Numero polizza', orNa(insurance.policy_number)],
+    ['Bene assicurato', orNa(insurance.insured_item)],
+    ['Premio annuo', insurance.premium_amount != null ? `€ ${insurance.premium_amount.toLocaleString('it-IT', { minimumFractionDigits: 2 })}` : 'N/D'],
+    ['Inizio copertura', formatDate(insurance.start_date)],
+    ['Scadenza copertura', formatDate(insurance.expiry_date)],
+  ], y);
+
+  if (insurance.notes) {
+    y = addSectionTitle(doc, 'NOTE', y + 3);
+    y = addRows(doc, [['Note', insurance.notes]], y);
   }
 
   addFooters(doc);

@@ -26,8 +26,10 @@ export function Sidebar({ open, onClose, onNavigate, currentView, onSignOut }: S
           const insDays = v.insurance_expiry ? Math.round((new Date(v.insurance_expiry).getTime() - Date.now()) / 86400000) : null;
           const inspDays = v.inspection_expiry ? Math.round((new Date(v.inspection_expiry).getTime() - Date.now()) / 86400000) : null;
           const taxDays = v.tax_expiry ? Math.round((new Date(v.tax_expiry).getTime() - Date.now()) / 86400000) : null;
+          const gasDays = v.gas_cylinders_inspection_expiry ? Math.round((new Date(v.gas_cylinders_inspection_expiry).getTime() - Date.now()) / 86400000) : null;
+          const methaneDays = v.methane_inspection_expiry ? Math.round((new Date(v.methane_inspection_expiry).getTime() - Date.now()) / 86400000) : null;
           const kmUntil = v.service_interval_km - (v.mileage_km - v.last_service_km);
-          return (insDays !== null && insDays <= 30) || (inspDays !== null && inspDays <= 30) || (taxDays !== null && taxDays <= 30) || kmUntil <= 2000;
+          return (insDays !== null && insDays <= 30) || (inspDays !== null && inspDays <= 30) || (taxDays !== null && taxDays <= 30) || (gasDays !== null && gasDays <= 30) || (methaneDays !== null && methaneDays <= 30) || kmUntil <= 2000;
         }).length;
         setVehicleAlerts(count);
       } catch {

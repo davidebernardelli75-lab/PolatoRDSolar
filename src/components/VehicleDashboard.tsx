@@ -1,8 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Car, Truck, Bike, Plus, Trash2, FileText, Loader2, ChevronDown, AlertTriangle, Calendar, Wrench, Shield, Receipt } from 'lucide-react';
+import { Car, Truck, Bike, Plus, Trash2, FileText, Loader2, ChevronDown, AlertTriangle, Calendar, Wrench, Shield, Receipt, Flame, FileDown } from 'lucide-react';
 import type { Vehicle, VehicleInsert } from '@/lib/types';
 import { fetchVehicles, createVehicle, updateVehicle, deleteVehicle } from '@/lib/api';
 import { DetailItem, VehicleEditCard, VehicleFormModal } from './vehicle-forms';
+import { generateVehiclePdf } from '@/lib/pdf';
+import { saveAs } from 'file-saver';
 
 function daysUntil(dateStr: string | null): number | null {
   if (!dateStr) return null;
@@ -42,6 +44,16 @@ function getVehicleAlerts(v: Vehicle): VehicleAlert[] {
   if (inspDays !== null) {
     if (inspDays < 0) alerts.push({ level: 'danger', label: 'Revisione scaduta' });
     else if (inspDays <= 30) alerts.push({ level: 'warning', label: `Revisione in ${inspDays}g` });
+  }
+  const gasDays = daysUntil(v.gas_cylinders_inspection_expiry);
+  if (gasDays !== null) {
+    if (gasDays < 0) alerts.push({ level: 'danger', label: 'Revisione bombole gas scaduta' });
+    else if (gasDays <= 30) alerts.push({ level: 'warning', label: `Bombole gas in ${gasDays}g` });
+  }
+  const methaneDays = daysUntil(v.methane_inspection_expiry);
+  if (methaneDays !== null) {
+    if (methaneDays < 0) alerts.push({ level: 'danger', label: 'Revisione metano scaduta' });
+    else if (methaneDays <= 30) alerts.push({ level: 'warning', label: `Metano in ${methaneDays}g` });
   }
   if (kmUntilService !== null && kmUntilService <= 0) {
     alerts.push({ level: 'danger', label: 'Tagliando necessario' });
@@ -222,6 +234,8 @@ function VehicleCard({
             <DetailItem icon={Shield} label="Assicurazione" value={formatDate(vehicle.insurance_expiry)} />
             <DetailItem icon={Receipt} label="Bollo" value={formatDate(vehicle.tax_expiry)} />
             <DetailItem icon={Calendar} label="Scad. revisione" value={formatDate(vehicle.inspection_expiry)} />
+            <DetailItem icon={Flame} label="Revisione bombole gas" value={formatDate(vehicle.gas_cylinders_inspection_expiry)} />
+            <DetailItem icon={Flame} label="Revisione metano" value={formatDate(vehicle.methane_inspection_expiry)} />
             <DetailItem icon={Shield} label="Compagnia" value={vehicle.insurance_company || 'N/D'} />
             <DetailItem icon={Wrench} label="Intervallo tagliando" value={`${vehicle.service_interval_km.toLocaleString('it-IT')} km`} />
             <DetailItem icon={Car} label="Tipo" value={vehicle.type} />
@@ -231,6 +245,15 @@ function VehicleCard({
             <button onClick={() => setEditing(true)}
               className="flex-1 flex items-center justify-center gap-1.5 bg-blue-900 hover:bg-blue-800 text-white text-sm font-medium py-2 rounded-lg transition-colors">
               <FileText size={16} /> Modifica
+            </button>
+            <button onClick={async () => {
+              try {
+                const blob = await generateVehiclePdf(vehicle);
+                saveAs(blob, `Veicolo_${vehicle.plate || 'senza_targa'}.pdf`);
+              } catch { /* skip */ }
+            }}
+              className="flex items-center justify-center gap-1.5 px-4 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-sm font-medium py-2 rounded-lg transition-colors">
+              <FileDown size={16} /> PDF
             </button>
             <button onClick={() => setConfirmDel(true)}
               className="flex items-center justify-center gap-1.5 px-4 bg-red-50 hover:bg-red-100 text-red-600 text-sm font-medium py-2 rounded-lg transition-colors">

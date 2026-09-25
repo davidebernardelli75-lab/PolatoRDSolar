@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Car, Truck, Bike, X, CalendarDays, ClipboardCheck, Gauge, ReceiptText, ShieldCheck, Tag, Wrench, StickyNote, Building2, type LucideIcon } from 'lucide-react';
+import { Car, Truck, Bike, X, CalendarDays, ClipboardCheck, Gauge, ReceiptText, ShieldCheck, Tag, Wrench, StickyNote, Building2, Flame, type LucideIcon } from 'lucide-react';
 import type { Vehicle, VehicleInsert, VehicleType } from '@/lib/types';
 import { INSURANCE_COMPANIES } from '@/lib/insurance-presets';
 
@@ -44,6 +44,8 @@ export function VehicleEditCard({
     insurance_expiry: vehicle.insurance_expiry ?? '',
     insurance_company: vehicle.insurance_company ?? '',
     inspection_expiry: vehicle.inspection_expiry ?? '',
+    gas_cylinders_inspection_expiry: vehicle.gas_cylinders_inspection_expiry ?? '',
+    methane_inspection_expiry: vehicle.methane_inspection_expiry ?? '',
     tax_expiry: vehicle.tax_expiry ?? '',
     vehicle_category: vehicle.vehicle_category ?? '',
     notes: vehicle.notes ?? '',
@@ -63,6 +65,8 @@ export function VehicleEditCard({
         insurance_expiry: form.insurance_expiry || null,
         insurance_company: form.insurance_company || null,
         inspection_expiry: form.inspection_expiry || null,
+        gas_cylinders_inspection_expiry: form.gas_cylinders_inspection_expiry || null,
+        methane_inspection_expiry: form.methane_inspection_expiry || null,
         tax_expiry: form.tax_expiry || null,
         vehicle_category: form.vehicle_category || null,
         notes: form.notes || null,
@@ -108,6 +112,7 @@ export function VehicleFormModal({
     type: 'Auto', plate: '', brand: '', model: '', mileage_km: 0,
     service_interval_km: 20000, last_service_km: 0, last_service_date: '',
     insurance_expiry: '', insurance_company: '', inspection_expiry: '',
+    gas_cylinders_inspection_expiry: '', methane_inspection_expiry: '',
     tax_expiry: '', vehicle_category: '', notes: '',
   });
   const [saving, setSaving] = useState(false);
@@ -125,6 +130,8 @@ export function VehicleFormModal({
         insurance_expiry: form.insurance_expiry || null,
         insurance_company: form.insurance_company || null,
         inspection_expiry: form.inspection_expiry || null,
+        gas_cylinders_inspection_expiry: form.gas_cylinders_inspection_expiry || null,
+        methane_inspection_expiry: form.methane_inspection_expiry || null,
         tax_expiry: form.tax_expiry || null,
         vehicle_category: form.vehicle_category || null,
         notes: form.notes || null,
@@ -263,6 +270,12 @@ function VehicleFormFields({
           </Field>
           <Field label="Scadenza revisione" icon={ClipboardCheck}>
             <input type="date" value={form.inspection_expiry ?? ''} onChange={(e) => update('inspection_expiry', e.target.value)} className={inputClass} />
+          </Field>
+          <Field label="Revisione bombole gas (10 anni)" icon={Flame}>
+            <input type="date" value={form.gas_cylinders_inspection_expiry ?? ''} onChange={(e) => update('gas_cylinders_inspection_expiry', e.target.value)} className={inputClass} />
+          </Field>
+          <Field label="Revisione metano" icon={Flame}>
+            <input type="date" value={form.methane_inspection_expiry ?? ''} onChange={(e) => update('methane_inspection_expiry', e.target.value)} className={inputClass} />
           </Field>
         </div>
       </section>

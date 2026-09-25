@@ -1,9 +1,11 @@
 import { useState, useEffect, useCallback } from 'react';
-import { ShieldCheck, Plus, Trash2, FileText, Loader2, ChevronDown, AlertTriangle, User, Building2 } from 'lucide-react';
+import { ShieldCheck, Plus, Trash2, FileText, Loader2, ChevronDown, AlertTriangle, User, Building2, FileDown } from 'lucide-react';
 import type { Insurance, InsuranceInsert } from '@/lib/types';
 import { fetchInsurances, createInsurance, updateInsurance, deleteInsurance } from '@/lib/api';
 import { INSURANCE_CATEGORIES } from '@/lib/insurance-presets';
 import { InsuranceEditCard, InsuranceFormModal } from './insurance-forms';
+import { generateInsurancePdf } from '@/lib/pdf';
+import { saveAs } from 'file-saver';
 
 function formatDate(dateStr: string | null): string {
   if (!dateStr) return 'N/D';
@@ -229,6 +231,15 @@ function InsuranceCard({
             <button onClick={() => setEditing(true)}
               className="flex-1 flex items-center justify-center gap-1.5 bg-blue-900 hover:bg-blue-800 text-white text-sm font-medium py-2 rounded-lg transition-colors">
               <FileText size={16} /> Modifica
+            </button>
+            <button onClick={async () => {
+              try {
+                const blob = await generateInsurancePdf(insurance);
+                saveAs(blob, `Assicurazione_${insurance.category}_${insurance.provider}.pdf`);
+              } catch { /* skip */ }
+            }}
+              className="flex items-center justify-center gap-1.5 px-4 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-sm font-medium py-2 rounded-lg transition-colors">
+              <FileDown size={16} /> PDF
             </button>
             <button onClick={() => setConfirmDel(true)}
               className="flex items-center justify-center gap-1.5 px-4 bg-red-50 hover:bg-red-100 text-red-600 text-sm font-medium py-2 rounded-lg transition-colors">
