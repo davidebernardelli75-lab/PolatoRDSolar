@@ -211,6 +211,17 @@ function formatDate(dateStr: string | null): string {
   return dateStr.slice(0, 10);
 }
 
+const PDF_MONTHS = ['Gennaio', 'Febbraio', 'Marzo', 'Aprile', 'Maggio', 'Giugno', 'Luglio', 'Agosto', 'Settembre', 'Ottobre', 'Novembre', 'Dicembre'];
+
+function formatMonthYear(dateStr: string | null): string {
+  if (!dateStr) return 'N/D';
+  const parts = dateStr.slice(0, 10).split('-');
+  if (parts.length < 2) return 'N/D';
+  const monthIdx = parseInt(parts[1], 10) - 1;
+  if (isNaN(monthIdx) || monthIdx < 0 || monthIdx > 11) return 'N/D';
+  return `${PDF_MONTHS[monthIdx]} ${parts[0]}`;
+}
+
 function orNa(value: string | null | undefined | number): string {
   if (value == null || value === '') return 'N/D';
   return String(value);
@@ -496,7 +507,8 @@ export async function generateVehiclePdf(vehicle: Vehicle): Promise<Blob> {
   y = addRows(doc, [
     ['Assicurazione - Scadenza', formatDate(vehicle.insurance_expiry)],
     ['Assicurazione - Compagnia', orNa(vehicle.insurance_company)],
-    ['Bollo - Scadenza', formatDate(vehicle.tax_expiry)],
+    ['Assicurazione - Premio', vehicle.insurance_premium != null ? `€ ${vehicle.insurance_premium.toLocaleString('it-IT', { minimumFractionDigits: 2 })}` : 'N/D'],
+    ['Bollo - Scadenza', formatMonthYear(vehicle.tax_expiry)],
     ['Revisione - Scadenza', formatDate(vehicle.inspection_expiry)],
     ['Revisione bombole gas', formatDate(vehicle.gas_cylinders_inspection_expiry)],
     ['Revisione metano', formatDate(vehicle.methane_inspection_expiry)],

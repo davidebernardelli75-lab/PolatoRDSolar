@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { X, ShieldCheck, FileText, Package, Euro, CalendarDays, StickyNote, User, Building2, type LucideIcon } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { X, ShieldCheck, FileText, Package, Euro, CalendarDays, StickyNote, User, Building2, ChevronDown, Check, type LucideIcon } from 'lucide-react';
 import type { Insurance, InsuranceInsert } from '@/lib/types';
 import { INSURANCE_CATEGORIES, INSURANCE_COMPANIES } from '@/lib/insurance-presets';
 
@@ -21,6 +21,14 @@ function saveCustomCategory(value: string) {
   }
 }
 
+function parseCategories(raw: string): string[] {
+  return raw.split(',').map((s) => s.trim()).filter(Boolean);
+}
+
+function serializeCategories(list: string[]): string {
+  return list.join(', ');
+}
+
 export function InsuranceFormFields({
   form, update,
 }: {
@@ -28,7 +36,6 @@ export function InsuranceFormFields({
   update: <K extends keyof InsuranceInsert>(key: K, value: InsuranceInsert[K]) => void;
 }) {
   const [customProvider, setCustomProvider] = useState(false);
-  const [customCategory, setCustomCategory] = useState(false);
   const [customCategories, setCustomCategories] = useState<string[]>([]);
   const inputClass = 'w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-red-400 focus:ring-2 focus:ring-red-100';
   const selectClass = `${inputClass} uppercase`;
@@ -55,26 +62,16 @@ export function InsuranceFormFields({
           })}
         </div>
         <div className="grid gap-3 sm:grid-cols-2">
-          <Field label="Categoria" icon={ShieldCheck}>
-            {customCategory ? (
-              <div className="flex gap-1">
-                <input autoFocus value={form.category} onChange={(e) => update('category', e.target.value)} placeholder="Inserisci categoria" className={inputClass} />
-                <button type="button" onClick={() => { setCustomCategory(false); update('category', ''); }} className="flex items-center justify-center px-2.5 bg-slate-200 hover:bg-slate-300 text-slate-600 rounded-lg transition-colors">
-                  <X size={16} />
-                </button>
-              </div>
-            ) : (
-              <select value={form.category} onChange={(e) => {
-                const val = e.target.value;
-                if (val === '__custom') { setCustomCategory(true); update('category', ''); }
-                else update('category', val);
-              }} className={inputClass}>
-                <option value="">Categoria</option>
-                {INSURANCE_CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
-                {customCategories.map((c) => <option key={c} value={c}>{c}</option>)}
-                <option value="__custom">Altro...</option>
-              </select>
-            )}
+          <Field label="Categorie" icon={ShieldCheck}>
+            <CategoryMultiSelect
+              value={form.category}
+              customCategories={customCategories}
+              onChange={(val) => update('category', val)}
+              onAddCustom={(val) => {
+                saveCustomCategory(val);
+                setCustomCategories(loadCustomCategories());
+              }}
+            />
           </Field>
           <Field label="Compagnia" icon={ShieldCheck}>
             {customProvider ? (
@@ -158,8 +155,11 @@ export function InsuranceEditCard({
   const handleSave = async () => {
     setSaving(true);
     try {
-      if (form.category.trim() && !INSURANCE_CATEGORIES.includes(form.category as typeof INSURANCE_CATEGORIES[number])) {
-        saveCustomCategory(form.category.trim());
+      const cats = parseCategories(form.category);
+      for (const c of cats) {
+        if (!INSURANCE_CATEGORIES.includes(c as typeof INSURANCE_CATEGORIES[number])) {
+          saveCustomCategory(c);
+        }
       }
       await onSave({
         ...form,
@@ -177,15 +177,15 @@ export function InsuranceEditCard({
     <div className="bg-white rounded-2xl border border-red-400 p-4 space-y-3">
       <div className="flex items-center justify-between">
         <span className="text-sm font-medium text-slate-500">Modifica polizza</span>
-        <button onClick={onCancel} className="p-1 text-slate-400 hover:text-slate-900 rounded-lg"><X size={18} /></button>
+        <button type="button" onClick={onCancel} className="p-1 text-slate-400 hover:text-slate-900 rounded-lg"><X size={18} /></button>
       </div>
       <InsuranceFormFields form={form} update={update} />
       <div className="flex gap-2">
-        <button onClick={handleSave} disabled={saving}
+        <button type="button" onClick={handleSave} disabled={saving}
           className="flex-1 bg-blue-900 hover:bg-blue-800 text-white text-sm font-medium py-2 rounded-lg transition-colors">
           {saving ? 'Salvataggio...' : 'Salva'}
         </button>
-        <button onClick={onCancel}
+        <button type="button" onClick={onCancel}
           className="px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-medium py-2 rounded-lg transition-colors">Annulla</button>
       </div>
     </div>
@@ -208,8 +208,11 @@ export function InsuranceFormModal({
   const handleSave = async () => {
     setSaving(true);
     try {
-      if (form.category.trim() && !INSURANCE_CATEGORIES.includes(form.category as typeof INSURANCE_CATEGORIES[number])) {
-        saveCustomCategory(form.category.trim());
+      const cats = parseCategories(form.category);
+      for (const c of cats) {
+        if (!INSURANCE_CATEGORIES.includes(c as typeof INSURANCE_CATEGORIES[number])) {
+          saveCustomCategory(c);
+        }
       }
       await onSave({
         ...form,
@@ -228,16 +231,127 @@ export function InsuranceFormModal({
       <div className="bg-white rounded-2xl p-5 max-w-lg w-full max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-4">
           <h3 className="font-semibold text-slate-900">Nuova Polizza</h3>
-          <button onClick={onClose} className="p-1 text-slate-400 hover:text-slate-900 rounded-lg"><X size={20} /></button>
+          <button type="button" onClick={onClose} className="p-1 text-slate-400 hover:text-slate-900 rounded-lg"><X size={20} /></button>
         </div>
         <div className="space-y-3">
           <InsuranceFormFields form={form} update={update} />
-          <button onClick={handleSave} disabled={saving || !form.category || !form.provider}
+          <button type="button" onClick={handleSave} disabled={saving || !form.category || !form.provider}
             className="w-full bg-blue-900 hover:bg-blue-800 disabled:opacity-50 text-white text-sm font-medium py-2.5 rounded-lg transition-colors">
             {saving ? 'Salvataggio...' : 'Salva Polizza'}
           </button>
         </div>
       </div>
+    </div>
+  );
+}
+
+function CategoryMultiSelect({
+  value,
+  customCategories,
+  onChange,
+  onAddCustom,
+}: {
+  value: string;
+  customCategories: string[];
+  onChange: (val: string) => void;
+  onAddCustom: (val: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [customMode, setCustomMode] = useState(false);
+  const [customInput, setCustomInput] = useState('');
+  const ref = useRef<HTMLDivElement>(null);
+  const inputClass = 'w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-red-400 focus:ring-2 focus:ring-red-100';
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false);
+        setCustomMode(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const selected = parseCategories(value);
+  const allCategories = [...INSURANCE_CATEGORIES, ...customCategories];
+
+  function toggle(cat: string) {
+    if (selected.includes(cat)) {
+      onChange(serializeCategories(selected.filter((c) => c !== cat)));
+    } else {
+      onChange(serializeCategories([...selected, cat]));
+    }
+  }
+
+  function addCustom() {
+    const trimmed = customInput.trim();
+    if (!trimmed) return;
+    onAddCustom(trimmed);
+    toggle(trimmed);
+    setCustomInput('');
+    setCustomMode(false);
+  }
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        className={`${inputClass} flex items-center justify-between text-left`}
+      >
+        <span className={selected.length === 0 ? 'text-slate-400' : 'text-slate-800'}>
+          {selected.length === 0 ? 'Seleziona categorie' : selected.length === 1 ? selected[0] : `${selected.length} categorie selezionate`}
+        </span>
+        <ChevronDown size={16} className={`text-slate-400 transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+
+      {open && (
+        <div className="absolute z-20 mt-1 w-full rounded-lg border border-slate-200 bg-white shadow-lg max-h-60 overflow-y-auto">
+          {allCategories.map((cat) => {
+            const checked = selected.includes(cat);
+            return (
+              <button
+                key={cat}
+                type="button"
+                onClick={() => toggle(cat)}
+                className="flex w-full items-center gap-2 px-3 py-2 text-sm text-left text-slate-700 hover:bg-slate-50 transition-colors"
+              >
+                <span className={`flex items-center justify-center w-4 h-4 rounded border flex-shrink-0 ${
+                  checked ? 'bg-blue-900 border-blue-900' : 'border-slate-300 bg-white'
+                }`}>
+                  {checked && <Check size={12} className="text-white" />}
+                </span>
+                {cat}
+              </button>
+            );
+          })}
+
+          {customMode ? (
+            <div className="flex gap-1 p-2 border-t border-slate-100">
+              <input
+                autoFocus
+                value={customInput}
+                onChange={(e) => setCustomInput(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addCustom(); } }}
+                placeholder="Nuova categoria..."
+                className={inputClass}
+              />
+              <button type="button" onClick={addCustom} className="flex items-center justify-center px-3 bg-blue-900 hover:bg-blue-800 text-white rounded-lg transition-colors flex-shrink-0">
+                <Check size={16} />
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setCustomMode(true)}
+              className="flex w-full items-center gap-2 px-3 py-2 text-sm text-left text-blue-900 font-medium hover:bg-blue-50 border-t border-slate-100 transition-colors"
+            >
+              + Aggiungi categoria personalizzata
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 }

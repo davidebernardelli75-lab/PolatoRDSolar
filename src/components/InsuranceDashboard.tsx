@@ -51,7 +51,10 @@ export function InsuranceDashboard() {
 
   useEffect(() => { loadInsurances(); }, [loadInsurances]);
 
-  const filtered = filterCategory ? insurances.filter((i) => i.category === filterCategory) : insurances;
+  const filtered = filterCategory ? insurances.filter((i) => {
+    const cats = i.category.split(',').map((s) => s.trim());
+    return cats.includes(filterCategory);
+  }) : insurances;
   const alertCount = insurances.filter((i) => {
     const s = getExpiryStatus(i.expiry_date);
     return s === 'warning' || s === 'danger';

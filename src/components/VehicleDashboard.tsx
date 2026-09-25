@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Car, Truck, Bike, Plus, Trash2, FileText, Loader2, ChevronDown, AlertTriangle, Calendar, Wrench, Shield, Receipt, Flame, FileDown } from 'lucide-react';
 import type { Vehicle, VehicleInsert } from '@/lib/types';
 import { fetchVehicles, createVehicle, updateVehicle, deleteVehicle } from '@/lib/api';
-import { DetailItem, VehicleEditCard, VehicleFormModal } from './vehicle-forms';
+import { DetailItem, VehicleEditCard, VehicleFormModal, formatMonthYear } from './vehicle-forms';
 import { generateVehiclePdf } from '@/lib/pdf';
 import { saveAs } from 'file-saver';
 
@@ -232,11 +232,12 @@ function VehicleCard({
             } />
             <DetailItem icon={Calendar} label="Ultimo tagliando" value={formatDate(vehicle.last_service_date)} />
             <DetailItem icon={Shield} label="Assicurazione" value={formatDate(vehicle.insurance_expiry)} />
-            <DetailItem icon={Receipt} label="Bollo" value={formatDate(vehicle.tax_expiry)} />
+            <DetailItem icon={Receipt} label="Bollo" value={formatMonthYear(vehicle.tax_expiry)} />
             <DetailItem icon={Calendar} label="Scad. revisione" value={formatDate(vehicle.inspection_expiry)} />
             <DetailItem icon={Flame} label="Revisione bombole gas" value={formatDate(vehicle.gas_cylinders_inspection_expiry)} />
             <DetailItem icon={Flame} label="Revisione metano" value={formatDate(vehicle.methane_inspection_expiry)} />
             <DetailItem icon={Shield} label="Compagnia" value={vehicle.insurance_company || 'N/D'} />
+            <DetailItem icon={Shield} label="Premio assicurativo" value={vehicle.insurance_premium != null ? `€ ${vehicle.insurance_premium.toLocaleString('it-IT', { minimumFractionDigits: 2 })}` : 'N/D'} />
             <DetailItem icon={Wrench} label="Intervallo tagliando" value={`${vehicle.service_interval_km.toLocaleString('it-IT')} km`} />
             <DetailItem icon={Car} label="Tipo" value={vehicle.type} />
           </div>

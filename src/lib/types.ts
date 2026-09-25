@@ -147,6 +147,7 @@ export interface Vehicle {
   last_service_date: string | null;
   insurance_expiry: string | null;
   insurance_company: string | null;
+  insurance_premium: number | null;
   inspection_expiry: string | null;
   gas_cylinders_inspection_expiry: string | null;
   methane_inspection_expiry: string | null;

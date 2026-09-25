@@ -1,9 +1,60 @@
 import { useState } from 'react';
-import { Car, Truck, Bike, X, CalendarDays, ClipboardCheck, Gauge, ReceiptText, ShieldCheck, Tag, Wrench, StickyNote, Building2, Flame, type LucideIcon } from 'lucide-react';
+import { Car, Truck, Bike, X, CalendarDays, ClipboardCheck, Gauge, ReceiptText, ShieldCheck, Tag, Wrench, StickyNote, Building2, Flame, Euro, ChevronDown, Check, type LucideIcon } from 'lucide-react';
 import type { Vehicle, VehicleInsert, VehicleType } from '@/lib/types';
 import { INSURANCE_COMPANIES } from '@/lib/insurance-presets';
 
 export const VEHICLE_TYPES: VehicleType[] = ['Auto', 'Furgone', 'Motoveicolo'];
+
+const MONTHS = [
+  { value: '01', label: 'Gennaio' },
+  { value: '02', label: 'Febbraio' },
+  { value: '03', label: 'Marzo' },
+  { value: '04', label: 'Aprile' },
+  { value: '05', label: 'Maggio' },
+  { value: '06', label: 'Giugno' },
+  { value: '07', label: 'Luglio' },
+  { value: '08', label: 'Agosto' },
+  { value: '09', label: 'Settembre' },
+  { value: '10', label: 'Ottobre' },
+  { value: '11', label: 'Novembre' },
+  { value: '12', label: 'Dicembre' },
+] as const;
+
+const CURRENT_YEAR = new Date().getFullYear();
+const TAX_YEARS = Array.from({ length: 11 }, (_, i) => String(CURRENT_YEAR + i));
+
+export function formatMonthYear(dateStr: string | null): string {
+  if (!dateStr) return 'N/D';
+  const parts = dateStr.slice(0, 10).split('-');
+  if (parts.length < 2) return 'N/D';
+  const month = MONTHS.find((m) => m.value === parts[1]);
+  return month ? `${month.label} ${parts[0]}` : 'N/D';
+}
+
+function MonthYearPicker({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const month = value ? value.slice(5, 7) : '';
+  const year = value ? value.slice(0, 4) : '';
+  const inputClass = 'w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-red-400 focus:ring-2 focus:ring-red-100';
+  return (
+    <div className="flex gap-2">
+      <select value={month} onChange={(e) => {
+        const m = e.target.value;
+        const y = year || String(CURRENT_YEAR);
+        onChange(m ? `${y}-${m}-01` : '');
+      }} className={inputClass}>
+        <option value="">Mese</option>
+        {MONTHS.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
+      </select>
+      <select value={year} onChange={(e) => {
+        const y = e.target.value;
+        onChange(y ? `${y}-${month || '01'}-01` : '');
+      }} className={inputClass}>
+        <option value="">Anno</option>
+        {TAX_YEARS.map((y) => <option key={y} value={y}>{y}</option>)}
+      </select>
+    </div>
+  );
+}
 
 export const VEHICLE_BRANDS = [
   'FIAT', 'VOLKSWAGEN', 'FORD', 'RENAULT', 'CITROEN', 'PEUGEOT',
@@ -43,6 +94,7 @@ export function VehicleEditCard({
     last_service_date: vehicle.last_service_date ?? '',
     insurance_expiry: vehicle.insurance_expiry ?? '',
     insurance_company: vehicle.insurance_company ?? '',
+    insurance_premium: vehicle.insurance_premium,
     inspection_expiry: vehicle.inspection_expiry ?? '',
     gas_cylinders_inspection_expiry: vehicle.gas_cylinders_inspection_expiry ?? '',
     methane_inspection_expiry: vehicle.methane_inspection_expiry ?? '',
@@ -66,6 +118,7 @@ export function VehicleEditCard({
         last_service_date: form.last_service_date || null,
         insurance_expiry: form.insurance_expiry || null,
         insurance_company: form.insurance_company || null,
+        insurance_premium: form.insurance_premium,
         inspection_expiry: form.inspection_expiry || null,
         gas_cylinders_inspection_expiry: form.gas_cylinders_inspection_expiry || null,
         methane_inspection_expiry: form.methane_inspection_expiry || null,
@@ -114,7 +167,7 @@ export function VehicleFormModal({
   const [form, setForm] = useState<VehicleInsert>({
     type: 'Auto', plate: '', brand: '', model: '', mileage_km: 0,
     service_interval_km: 20000, last_service_km: 0, last_service_date: '',
-    insurance_expiry: '', insurance_company: '', inspection_expiry: '',
+    insurance_expiry: '', insurance_company: '', insurance_premium: null, inspection_expiry: '',
     gas_cylinders_inspection_expiry: '', methane_inspection_expiry: '',
     tax_expiry: '', vehicle_category: '', notes: '',
   });
@@ -134,6 +187,7 @@ export function VehicleFormModal({
         last_service_date: form.last_service_date || null,
         insurance_expiry: form.insurance_expiry || null,
         insurance_company: form.insurance_company || null,
+        insurance_premium: form.insurance_premium,
         inspection_expiry: form.inspection_expiry || null,
         gas_cylinders_inspection_expiry: form.gas_cylinders_inspection_expiry || null,
         methane_inspection_expiry: form.methane_inspection_expiry || null,
@@ -271,8 +325,11 @@ function VehicleFormFields({
               </select>
             )}
           </Field>
+          <Field label="Premio assicurativo (€)" icon={Euro}>
+            <input type="number" step="0.01" min="0" value={form.insurance_premium ?? ''} onChange={(e) => update('insurance_premium', e.target.value === '' ? null : parseFloat(e.target.value))} placeholder="0.00" className={inputClass} />
+          </Field>
           <Field label="Scadenza bollo" icon={ReceiptText}>
-            <input type="date" value={form.tax_expiry ?? ''} onChange={(e) => update('tax_expiry', e.target.value)} className={inputClass} />
+            <MonthYearPicker value={form.tax_expiry ?? ''} onChange={(v) => update('tax_expiry', v)} />
           </Field>
           <Field label="Scadenza revisione" icon={ClipboardCheck}>
             <input type="date" value={form.inspection_expiry ?? ''} onChange={(e) => update('inspection_expiry', e.target.value)} className={inputClass} />
