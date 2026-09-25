@@ -65,7 +65,7 @@ export function InsuranceDashboard() {
             <div className="flex items-center gap-2 mb-2">
               <span className="text-[10px] font-semibold px-2 py-1 rounded-full bg-red-500/20 text-red-300">ASSICURAZIONI</span>
             </div>
-            <h1 className="text-xl lg:text-2xl font-bold mb-1">Assicurazioni Varie</h1>
+            <h1 className="text-xl lg:text-2xl font-bold mb-1">Assicurazioni</h1>
             <div className="text-slate-400 text-sm">
               {insurances.length} polizze registrate
               {alertCount > 0 && <span className="text-amber-400 ml-2">- {alertCount} in scadenza</span>}
