@@ -1,7 +1,9 @@
-import { useState } from 'react';
-import { Sun, LayoutGrid, PlusCircle, LogOut, X, KeyRound, Eye, EyeOff } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Sun, LayoutGrid, PlusCircle, LogOut, X, KeyRound, Eye, EyeOff, Car, AlertTriangle } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import type { View } from '@/App';
+import { fetchVehicles } from '@/lib/api';
+import type { Vehicle } from '@/lib/types';
 
 interface SidebarProps {
   open: boolean;
@@ -13,9 +15,34 @@ interface SidebarProps {
 
 export function Sidebar({ open, onClose, onNavigate, currentView, onSignOut }: SidebarProps) {
   const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [vehicleAlerts, setVehicleAlerts] = useState(0);
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadAlerts = async () => {
+      try {
+        const vehicles = await fetchVehicles();
+        if (cancelled) return;
+        const count = vehicles.filter((v) => {
+          const insDays = v.insurance_expiry ? Math.round((new Date(v.insurance_expiry).getTime() - Date.now()) / 86400000) : null;
+          const inspDays = v.inspection_expiry ? Math.round((new Date(v.inspection_expiry).getTime() - Date.now()) / 86400000) : null;
+          const kmUntil = v.service_interval_km - (v.mileage_km - v.last_service_km);
+          return (insDays !== null && insDays <= 30) || (inspDays !== null && inspDays <= 30) || kmUntil <= 2000;
+        }).length;
+        setVehicleAlerts(count);
+      } catch {
+        // skip
+      }
+    };
+    loadAlerts();
+    const interval = setInterval(loadAlerts, 60000);
+    return () => { cancelled = true; clearInterval(interval); };
+  }, []);
+
   const items = [
     { id: 'dashboard' as const, label: 'Dashboard', icon: LayoutGrid },
     { id: 'new-plant' as const, label: 'Nuovo Impianto', icon: PlusCircle },
+    { id: 'vehicles' as const, label: 'Parco Automezzi', icon: Car, badge: vehicleAlerts },
   ];
 
   return (
@@ -59,7 +86,9 @@ export function Sidebar({ open, onClose, onNavigate, currentView, onSignOut }: S
             const Icon = item.icon;
             const active =
               (item.id === 'dashboard' && currentView.name === 'dashboard') ||
-              (item.id === 'new-plant' && currentView.name === 'new-plant');
+              (item.id === 'new-plant' && currentView.name === 'new-plant') ||
+              (item.id === 'vehicles' && currentView.name === 'vehicles');
+            const badge = 'badge' in item && item.badge ? item.badge : 0;
             return (
               <button
                 key={item.id}
@@ -72,6 +101,14 @@ export function Sidebar({ open, onClose, onNavigate, currentView, onSignOut }: S
               >
                 <Icon size={18} />
                 {item.label}
+                {badge > 0 && (
+                  <span className={`ml-auto flex items-center gap-0.5 text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
+                    active ? 'bg-white/20 text-white' : 'bg-amber-500 text-white'
+                  }`}>
+                    <AlertTriangle size={10} />
+                    {badge}
+                  </span>
+                )}
               </button>
             );
           })}

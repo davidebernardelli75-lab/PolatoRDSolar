@@ -1,6 +1,6 @@
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
-import type { Plant, Panel, PanelPhoto, PlantInverter, PlantStorage } from './types';
+import type { Plant, Panel, PanelPhoto, PlantInverter, PlantStorage, PlantCharger } from './types';
 import { downloadPhotoBlob } from './api';
 import { generatePlantPdf } from './pdf';
 
@@ -13,7 +13,7 @@ function formatDate(dateStr: string | null): string {
   return dateStr.slice(0, 10);
 }
 
-function buildPlantTextFile(plant: Plant, panels: Panel[], inverters: PlantInverter[] = [], storages: PlantStorage[] = []): string {
+function buildPlantTextFile(plant: Plant, panels: Panel[], inverters: PlantInverter[] = [], storages: PlantStorage[] = [], chargers: PlantCharger[] = []): string {
   const lines: string[] = [];
   lines.push('=================================');
   lines.push('   POLATO R&D - ARCHIVIO IMPIANTO');
@@ -67,6 +67,18 @@ function buildPlantTextFile(plant: Plant, panels: Panel[], inverters: PlantInver
     });
   }
 
+  if (chargers.length > 0) {
+    lines.push('');
+    lines.push('COLONNINE DI RICARICA');
+    lines.push('---------------------------------');
+    chargers.forEach((chg, i) => {
+      lines.push(`Colonnina ${i + 1}:`);
+      lines.push(`  Marca: ${chg.brand || 'N/D'}`);
+      lines.push(`  Modello: ${chg.model || 'N/D'}`);
+      lines.push(`  Codice: ${chg.code || 'N/D'}`);
+    });
+  }
+
   lines.push('');
   lines.push('PANNELLI REGISTRATI');
   lines.push('---------------------------------');
@@ -93,14 +105,15 @@ export async function exportPlantArchive(
   photos: PanelPhoto[],
   inverters: PlantInverter[] = [],
   storages: PlantStorage[] = [],
+  chargers: PlantCharger[] = [],
 ): Promise<void> {
   const zip = new JSZip();
   const folderName = `${sanitizeFileName(plant.owner_name)} - ${sanitizeFileName(plant.address)}`;
   const folder = zip.folder(folderName);
   if (!folder) throw new Error('Impossibile creare la cartella principale.');
 
-  folder.file('Scheda_Tecnica.txt', buildPlantTextFile(plant, panels, inverters, storages));
-  folder.file('Relazione_Tecnica.pdf', await generatePlantPdf(plant, panels, photos, undefined, inverters, storages));
+  folder.file('Scheda_Tecnica.txt', buildPlantTextFile(plant, panels, inverters, storages, chargers));
+  folder.file('Relazione_Tecnica.pdf', await generatePlantPdf(plant, panels, photos, undefined, inverters, storages, chargers));
 
   const photoFolder = folder.folder('Foto_Pannelli');
   if (!photoFolder) throw new Error('Impossibile creare la cartella foto.');

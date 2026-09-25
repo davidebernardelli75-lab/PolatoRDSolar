@@ -1,5 +1,5 @@
 import { jsPDF } from 'jspdf';
-import type { Plant, Panel, PanelPhoto, PlantInverter, PlantStorage } from './types';
+import type { Plant, Panel, PanelPhoto, PlantInverter, PlantStorage, PlantCharger } from './types';
 import { downloadPhotoBlob } from './api';
 
 const POLATO_BLUE: [number, number, number] = [31, 64, 142];
@@ -293,6 +293,7 @@ export async function generatePlantPdf(
   photoLoader: PhotoLoader = downloadPhotoBlob,
   inverters: PlantInverter[] = [],
   storages: PlantStorage[] = [],
+  chargers: PlantCharger[] = [],
 ): Promise<Blob> {
   const doc = new jsPDF({ unit: 'mm', format: 'a4' });
   const logoDataUrl = await loadLogoDataUrl();
@@ -344,6 +345,17 @@ export async function generatePlantPdf(
         [`Accumulo ${i + 1} - Modello`, orNa(sto.model)],
         [`Accumulo ${i + 1} - Codice`, orNa(sto.code)],
         [`Accumulo ${i + 1} - Potenza`, sto.power_kw != null ? `${sto.power_kw} kW` : 'N/D'],
+      ], y);
+    });
+  }
+
+  if (chargers.length > 0) {
+    y = addSectionTitle(doc, 'COLONNINE DI RICARICA', y + 3);
+    chargers.forEach((chg, i) => {
+      y = addRows(doc, [
+        [`Colonnina ${i + 1} - Marca`, orNa(chg.brand)],
+        [`Colonnina ${i + 1} - Modello`, orNa(chg.model)],
+        [`Colonnina ${i + 1} - Codice`, orNa(chg.code)],
       ], y);
     });
   }

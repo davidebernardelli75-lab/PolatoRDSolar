@@ -1,5 +1,5 @@
 import { supabase, STORAGE_BUCKET } from './supabase';
-import type { Plant, Panel, PanelPhoto, PlantInsert, PlantUpdate, PanelInsert, RoadmapTask, PlantInverter, PlantStorage, PlantInverterInsert, PlantStorageInsert } from './types';
+import type { Plant, Panel, PanelPhoto, PlantInsert, PlantUpdate, PanelInsert, RoadmapTask, PlantInverter, PlantStorage, PlantCharger, PlantInverterInsert, PlantStorageInsert, PlantChargerInsert, Vehicle, VehicleInsert } from './types';
 
 export async function fetchPlants(): Promise<Plant[]> {
   const { data, error } = await supabase
@@ -285,4 +285,79 @@ export async function fetchAllRoadmapProgress(): Promise<Record<string, number>>
     result[pid] = total > 0 ? Math.round((done / total) * 100) : 0;
   }
   return result;
+}
+
+// ── Chargers (Colonnine) ───────────────────────────────────────────
+
+export async function fetchChargers(plantId: string): Promise<PlantCharger[]> {
+  const { data, error } = await supabase
+    .from('plant_chargers')
+    .select('*')
+    .eq('plant_id', plantId)
+    .order('sort_order', { ascending: true });
+  if (error) throw error;
+  return data ?? [];
+}
+
+export async function createCharger(input: PlantChargerInsert): Promise<PlantCharger> {
+  const { data, error } = await supabase
+    .from('plant_chargers')
+    .insert(input)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+export async function updateCharger(id: string, input: Partial<PlantChargerInsert>): Promise<PlantCharger> {
+  const { data, error } = await supabase
+    .from('plant_chargers')
+    .update({ ...input, updated_at: new Date().toISOString() })
+    .eq('id', id)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+export async function deleteCharger(id: string): Promise<void> {
+  const { error } = await supabase.from('plant_chargers').delete().eq('id', id);
+  if (error) throw error;
+}
+
+// ── Vehicles ───────────────────────────────────────────────────────
+
+export async function fetchVehicles(): Promise<Vehicle[]> {
+  const { data, error } = await supabase
+    .from('vehicles')
+    .select('*')
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  return data ?? [];
+}
+
+export async function createVehicle(input: VehicleInsert): Promise<Vehicle> {
+  const { data, error } = await supabase
+    .from('vehicles')
+    .insert(input)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+export async function updateVehicle(id: string, input: Partial<VehicleInsert>): Promise<Vehicle> {
+  const { data, error } = await supabase
+    .from('vehicles')
+    .update({ ...input, updated_at: new Date().toISOString() })
+    .eq('id', id)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+export async function deleteVehicle(id: string): Promise<void> {
+  const { error } = await supabase.from('vehicles').delete().eq('id', id);
+  if (error) throw error;
 }

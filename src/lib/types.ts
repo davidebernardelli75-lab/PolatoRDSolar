@@ -94,8 +94,41 @@ export interface PlantStorage {
   updated_at: string;
 }
 
+export interface PlantCharger {
+  id: string;
+  plant_id: string;
+  brand: string;
+  model: string;
+  code: string;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+}
+
 export type PlantInverterInsert = Omit<PlantInverter, 'id' | 'created_at' | 'updated_at'>;
 export type PlantStorageInsert = Omit<PlantStorage, 'id' | 'created_at' | 'updated_at'>;
+export type PlantChargerInsert = Omit<PlantCharger, 'id' | 'created_at' | 'updated_at'>;
+
+export type VehicleType = 'Auto' | 'Furgone';
+
+export interface Vehicle {
+  id: string;
+  type: VehicleType;
+  plate: string;
+  brand: string;
+  model: string;
+  mileage_km: number;
+  service_interval_km: number;
+  last_service_km: number;
+  last_service_date: string | null;
+  insurance_expiry: string | null;
+  inspection_expiry: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type VehicleInsert = Omit<Vehicle, 'id' | 'created_at' | 'updated_at'>;
 
 export type PlantInsert = Omit<Plant, 'id' | 'created_at' | 'updated_at'>;
 export type PlantUpdate = Partial<PlantInsert>;

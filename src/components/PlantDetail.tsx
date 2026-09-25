@@ -21,9 +21,10 @@ import {
   Video,
   ChevronDown,
   Battery,
+  PlugZap,
   type LucideIcon,
 } from 'lucide-react';
-import type { Plant, Panel, PanelPhoto, PlantInverter, PlantStorage } from '@/lib/types';
+import type { Plant, Panel, PanelPhoto, PlantInverter, PlantStorage, PlantCharger } from '@/lib/types';
 import {
   fetchPlant,
   fetchPanels,
@@ -43,7 +44,12 @@ import {
   createStorage,
   updateStorage,
   deleteStorage,
+  fetchChargers,
+  createCharger,
+  updateCharger,
+  deleteCharger,
 } from '@/lib/api';
+import { INVERTER_BRANDS, INVERTER_MODELS, STORAGE_BRANDS, STORAGE_MODELS } from '@/lib/equipment-presets';
 import { scanImageFile, CameraScanner } from '@/lib/scanner';
 import { exportPlantArchive } from '@/lib/export';
 import { generatePlantPdf } from '@/lib/pdf';
@@ -73,24 +79,28 @@ export function PlantDetail({ plantId, onBack, onDeleted }: PlantDetailProps) {
   const [panelsExpanded, setPanelsExpanded] = useState(false);
   const [inverters, setInverters] = useState<PlantInverter[]>([]);
   const [storages, setStorages] = useState<PlantStorage[]>([]);
+  const [chargers, setChargers] = useState<PlantCharger[]>([]);
   const [invertersExpanded, setInvertersExpanded] = useState(false);
   const [storagesExpanded, setStoragesExpanded] = useState(false);
+  const [chargersExpanded, setChargersExpanded] = useState(false);
 
   const loadAll = useCallback(async () => {
     setLoading(true);
     try {
-      const [p, pnl, pho, inv, sto] = await Promise.all([
+      const [p, pnl, pho, inv, sto, chg] = await Promise.all([
         fetchPlant(plantId),
         fetchPanels(plantId),
         fetchPhotos(plantId),
         fetchInverters(plantId),
         fetchStorages(plantId),
+        fetchChargers(plantId),
       ]);
       setPlant(p);
       setPanels(pnl);
       setPhotos(pho);
       setInverters(inv);
       setStorages(sto);
+      setChargers(chg);
 
       const urlMap: Record<string, string> = {};
       await Promise.all(
@@ -119,7 +129,7 @@ export function PlantDetail({ plantId, onBack, onDeleted }: PlantDetailProps) {
     if (!plant) return;
     setExporting(true);
     try {
-      await exportPlantArchive(plant, panels, photos, inverters, storages);
+      await exportPlantArchive(plant, panels, photos, inverters, storages, chargers);
     } catch {
       // skip
     } finally {
@@ -131,7 +141,7 @@ export function PlantDetail({ plantId, onBack, onDeleted }: PlantDetailProps) {
     if (!plant) return;
     setExportingPdf(true);
     try {
-      const blob = await generatePlantPdf(plant, panels, photos, undefined, inverters, storages);
+      const blob = await generatePlantPdf(plant, panels, photos, undefined, inverters, storages, chargers);
       const fileName = `${sanitizeFileName(plant.owner_name)}_${sanitizeFileName(plant.address)}.pdf`;
       saveAs(blob, fileName);
     } catch {
@@ -232,9 +242,6 @@ export function PlantDetail({ plantId, onBack, onDeleted }: PlantDetailProps) {
           <DetailRow label="Codice CENSIMP" value={plant.censimp_code} />
           <DetailRow label="Potenza Totale" value={plant.total_power_kw != null ? `${plant.total_power_kw} kW` : null} />
           <DetailRow label="Pannelli" value={plant.panel_brand_model} />
-          <DetailRow label="Marca Colonnina" value={plant.charger_brand} />
-          <DetailRow label="Modello Colonnina" value={plant.charger_model} />
-          <DetailRow label="Codice Colonnina" value={plant.charger_code} />
           <DetailRow label="Data Installazione" value={plant.installation_date ? plant.installation_date.slice(0, 10) : null} />
           <DetailRow label="Note" value={plant.notes} />
         </div>
@@ -310,6 +317,8 @@ export function PlantDetail({ plantId, onBack, onDeleted }: PlantDetailProps) {
                     { label: 'Marca', value: inv.brand },
                     { label: 'Modello', value: inv.model },
                     { label: 'Codice', value: inv.code }]}
+                  brandOptions={INVERTER_BRANDS}
+                  modelOptionsFor={(b) => INVERTER_MODELS[b] ?? []}
                   onChange={(fieldIndex, value) => {
                     setInverters((prev) => prev.map((it, i) => {
                       if (i !== index) return it;
@@ -377,6 +386,8 @@ export function PlantDetail({ plantId, onBack, onDeleted }: PlantDetailProps) {
                     { label: 'Marca', value: sto.brand },
                     { label: 'Modello', value: sto.model },
                     { label: 'Codice', value: sto.code }]}
+                  brandOptions={STORAGE_BRANDS}
+                  modelOptionsFor={(b) => STORAGE_MODELS[b] ?? []}
                   extraField={{ label: 'Potenza (kW)', value: sto.power_kw != null ? String(sto.power_kw) : '' }}
                   onChangeExtra={(value) => {
                     setStorages((prev) => prev.map((it, i) => i === index ? { ...it, power_kw: value === '' ? null : parseFloat(value) } : it));
@@ -402,6 +413,73 @@ export function PlantDetail({ plantId, onBack, onDeleted }: PlantDetailProps) {
                     const row = storages[index];
                     if (row.id) await deleteStorage(row.id);
                     setStorages((prev) => prev.filter((_, i) => i !== index));
+                  }}
+                />
+              ))
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Chargers section — collapsible */}
+      <div className="mb-6">
+        <div className="flex items-center justify-between mb-4">
+          <button
+            onClick={() => setChargersExpanded((v) => !v)}
+            className="flex items-center gap-2 font-semibold text-slate-900 hover:text-blue-900 transition-colors"
+          >
+            <PlugZap size={18} />
+            Colonnine ({chargers.length})
+            <ChevronDown
+              size={18}
+              className={`transition-transform ${chargersExpanded ? '' : '-rotate-90'}`}
+            />
+          </button>
+          <button
+            onClick={() => setChargers((prev) => [...prev, { id: '', plant_id: plantId, brand: '', model: '', code: '', sort_order: prev.length, created_at: '', updated_at: '' }])}
+            className="flex items-center gap-1.5 bg-blue-900 hover:bg-blue-800 text-white text-sm font-medium px-3 py-2 rounded-lg transition-colors"
+          >
+            <Plus size={16} />
+            Aggiungi
+          </button>
+        </div>
+        {chargersExpanded && (
+          <div className="space-y-3">
+            {chargers.length === 0 ? (
+              <div className="bg-white rounded-2xl border border-dashed border-slate-300 p-8 text-center">
+                <PlugZap className="mx-auto text-slate-300 mb-2" size={32} />
+                <p className="text-slate-500 text-sm">Nessuna colonnina registrata.</p>
+              </div>
+            ) : (
+              chargers.map((chg, index) => (
+                <EquipmentRow
+                  key={chg.id || `new-${index}`}
+                  index={index}
+                  fields={[
+                    { label: 'Marca', value: chg.brand },
+                    { label: 'Modello', value: chg.model },
+                    { label: 'Codice', value: chg.code }]}
+                  onChange={(fieldIndex, value) => {
+                    setChargers((prev) => prev.map((it, i) => {
+                      if (i !== index) return it;
+                      const keys = ['brand', 'model', 'code'] as const;
+                      return { ...it, [keys[fieldIndex]]: value };
+                    }));
+                  }}
+                  onSave={async () => {
+                    const row = chargers[index];
+                    if (!row.brand && !row.model && !row.code) return;
+                    if (row.id) {
+                      await updateCharger(row.id, { brand: row.brand, model: row.model, code: row.code });
+                    } else {
+                      const created = await createCharger({ plant_id: plantId, brand: row.brand, model: row.model, code: row.code, sort_order: index });
+                      setChargers((prev) => prev.map((it, i) => i === index ? created : it));
+                    }
+                  }}
+                  onDelete={async () => {
+                    const row = chargers[index];
+                    if (row.id) await deleteCharger(row.id);
+                    setChargers((prev) => prev.filter((_, i) => i !== index));
                   }}
                 />
               ))
@@ -559,6 +637,8 @@ function EquipmentRow({
   onChangeExtra,
   onSave,
   onDelete,
+  brandOptions,
+  modelOptionsFor,
 }: {
   index: number;
   fields: EquipmentField[];
@@ -567,6 +647,8 @@ function EquipmentRow({
   onChangeExtra?: (value: string) => void;
   onSave: () => Promise<void>;
   onDelete: () => Promise<void>;
+  brandOptions?: readonly string[];
+  modelOptionsFor?: (brand: string) => readonly string[];
 }) {
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -622,34 +704,80 @@ function EquipmentRow({
           </button>
         </div>
         <div className={`grid grid-cols-1 ${extraField ? 'sm:grid-cols-4' : 'sm:grid-cols-3'} gap-3`}>
-          {fields.map((f, i) => (
-            <div key={f.label}>
-              <label className="block text-xs font-medium text-slate-600 mb-1">{f.label}</label>
-              {f.label === 'Codice' ? (
-                <div className="flex gap-1">
+          {fields.map((f, i) => {
+            const isBrand = f.label === 'Marca' && brandOptions;
+            const isModel = f.label === 'Modello' && modelOptionsFor;
+            const currentBrand = fields.find((ff) => ff.label === 'Marca')?.value ?? '';
+            const models = isModel ? modelOptionsFor!(currentBrand) : [];
+            return (
+              <div key={f.label}>
+                <label className="block text-xs font-medium text-slate-600 mb-1">{f.label}</label>
+                {f.label === 'Codice' ? (
+                  <div className="flex gap-1">
+                    <input
+                      value={f.value}
+                      onChange={(e) => onChange(i, e.target.value.toUpperCase())}
+                      className="flex-1 px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm uppercase focus:outline-none focus:ring-2 focus:ring-red-400"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowScanner(true)}
+                      className="flex items-center justify-center px-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+                      title="Scansiona QR code"
+                    >
+                      <ScanLine size={18} />
+                    </button>
+                  </div>
+                ) : isBrand ? (
+                  <select
+                    value={f.value}
+                    onChange={(e) => onChange(i, e.target.value.toUpperCase())}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm uppercase focus:outline-none focus:ring-2 focus:ring-red-400"
+                  >
+                    <option value="">— Seleziona —</option>
+                    {brandOptions!.map((b) => (
+                      <option key={b} value={b}>{b}</option>
+                    ))}
+                    <option value="__custom">Altro...</option>
+                  </select>
+                ) : isModel && models.length > 0 ? (
+                  <select
+                    value={f.value}
+                    onChange={(e) => onChange(i, e.target.value.toUpperCase())}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm uppercase focus:outline-none focus:ring-2 focus:ring-red-400"
+                  >
+                    <option value="">— Seleziona —</option>
+                    {models.map((m) => (
+                      <option key={m} value={m}>{m}</option>
+                    ))}
+                    <option value="__custom">Altro...</option>
+                  </select>
+                ) : (
                   <input
                     value={f.value}
                     onChange={(e) => onChange(i, e.target.value.toUpperCase())}
-                    className="flex-1 px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm uppercase focus:outline-none focus:ring-2 focus:ring-red-400"
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm uppercase focus:outline-none focus:ring-2 focus:ring-red-400"
                   />
-                  <button
-                    type="button"
-                    onClick={() => setShowScanner(true)}
-                    className="flex items-center justify-center px-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
-                    title="Scansiona QR code"
-                  >
-                    <ScanLine size={18} />
-                  </button>
-                </div>
-              ) : (
-                <input
-                  value={f.value}
-                  onChange={(e) => onChange(i, e.target.value.toUpperCase())}
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm uppercase focus:outline-none focus:ring-2 focus:ring-red-400"
-                />
-              )}
-            </div>
-          ))}
+                )}
+                {isBrand && f.value === '__custom' && (
+                  <input
+                    value=""
+                    onChange={(e) => onChange(i, e.target.value.toUpperCase())}
+                    placeholder="Inserisci marca"
+                    className="w-full mt-1 px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm uppercase focus:outline-none focus:ring-2 focus:ring-red-400"
+                  />
+                )}
+                {isModel && f.value === '__custom' && (
+                  <input
+                    value=""
+                    onChange={(e) => onChange(i, e.target.value.toUpperCase())}
+                    placeholder="Inserisci modello"
+                    className="w-full mt-1 px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm uppercase focus:outline-none focus:ring-2 focus:ring-red-400"
+                  />
+                )}
+              </div>
+            );
+          })}
           {extraField && (
             <div>
               <label className="block text-xs font-medium text-slate-600 mb-1">{extraField.label}</label>

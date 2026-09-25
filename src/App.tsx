@@ -8,12 +8,14 @@ import { Dashboard } from '@/components/Dashboard';
 import { PlantEditor } from '@/components/PlantEditor';
 import { PlantDetail } from '@/components/PlantDetail';
 import { Login } from '@/components/Login';
+import { VehicleDashboard } from '@/components/VehicleDashboard';
 
 export type View =
   | { name: 'dashboard' }
   | { name: 'new-plant' }
   | { name: 'edit-plant'; plantId: string }
-  | { name: 'plant'; plantId: string };
+  | { name: 'plant'; plantId: string }
+  | { name: 'vehicles' };
 
 export default function App() {
   const [session, setSession] = useState<Session | null>(null);
@@ -147,6 +149,9 @@ export default function App() {
                 navigate({ name: 'dashboard' });
               }}
             />
+          )}
+          {view.name === 'vehicles' && (
+            <VehicleDashboard />
           )}
         </main>
       </div>
