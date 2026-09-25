@@ -168,7 +168,7 @@ export function PlantDetail({ plantId, onBack, onDeleted }: PlantDetailProps) {
         <PanelFormModal onClose={() => setShowPanelForm(false)}
           onSave={async (data) => {
             const created = await createPanel({ plant_id: plantId, serial_number: data.serial, position_label: null, notes: data.notes, brand: data.brand, power_wp: data.power_wp });
-            setPanels((current) => [...current, created]); setShowPanelForm(false);
+            setPanels((current) => [...current, created]);
           }}
         />
       )}

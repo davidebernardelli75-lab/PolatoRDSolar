@@ -23,10 +23,10 @@ export const STORAGE_BRANDS = ['HUAWEI'] as const;
 
 export const STORAGE_MODELS: Record<string, readonly string[]> = {
   HUAWEI: [
-    'LUNA2000-5KW',
-    'LUNA2000-7KW',
-    'LUNA2000-10KW',
-    'LUNA2000-15KW',
+    'LUNA2000-5KWH',
+    'LUNA2000-7KWH',
+    'LUNA2000-10KWH',
+    'LUNA2000-15KWH',
   ],
 };
 
