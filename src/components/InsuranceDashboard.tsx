@@ -167,6 +167,9 @@ function InsuranceCard({
           <div className="text-xs text-slate-500 truncate">
             {insurance.provider} {insurance.insured_item ? `· ${insurance.insured_item}` : ''}
           </div>
+          {insurance.notes && (
+            <div className="text-[11px] text-slate-400 truncate mt-0.5">{insurance.notes}</div>
+          )}
         </div>
         {expDays !== null && expDays <= 30 && (
           <div className="flex items-center gap-1 flex-shrink-0">
