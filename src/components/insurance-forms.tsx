@@ -1,4 +1,3 @@
-/* eslint-disable max-lines -- Existing shared insurance form and selector. */
 import { useState, useEffect, useRef } from 'react';
 import { X, ShieldCheck, FileText, Package, Euro, CalendarDays, StickyNote, User, Building2, ChevronDown, Check, type LucideIcon } from 'lucide-react';
 import type { Insurance, InsuranceInsert } from '@/lib/types';
@@ -246,18 +245,16 @@ export function InsuranceFormModal({
   );
 }
 
-export function CategoryMultiSelect({
+function CategoryMultiSelect({
   value,
-  options = INSURANCE_CATEGORIES,
   customCategories,
   onChange,
   onAddCustom,
 }: {
   value: string;
-  options?: readonly string[];
   customCategories: string[];
   onChange: (val: string) => void;
-  onAddCustom?: (val: string) => void;
+  onAddCustom: (val: string) => void;
 }) {
   const [open, setOpen] = useState(false);
   const [customMode, setCustomMode] = useState(false);
@@ -277,7 +274,7 @@ export function CategoryMultiSelect({
   }, []);
 
   const selected = parseCategories(value);
-  const allCategories = [...new Set([...options, ...customCategories, ...selected])];
+  const allCategories = [...INSURANCE_CATEGORIES, ...customCategories];
 
   function toggle(cat: string) {
     if (selected.includes(cat)) {
@@ -290,7 +287,7 @@ export function CategoryMultiSelect({
   function addCustom() {
     const trimmed = customInput.trim();
     if (!trimmed) return;
-    onAddCustom?.(trimmed);
+    onAddCustom(trimmed);
     toggle(trimmed);
     setCustomInput('');
     setCustomMode(false);
@@ -330,7 +327,7 @@ export function CategoryMultiSelect({
             );
           })}
 
-          {onAddCustom && (customMode ? (
+          {customMode ? (
             <div className="flex gap-1 p-2 border-t border-slate-100">
               <input
                 autoFocus
@@ -352,7 +349,7 @@ export function CategoryMultiSelect({
             >
               + Aggiungi categoria personalizzata
             </button>
-          ))}
+          )}
         </div>
       )}
     </div>

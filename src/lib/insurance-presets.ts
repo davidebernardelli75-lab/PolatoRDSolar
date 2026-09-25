@@ -69,21 +69,4 @@ export const INSURANCE_CATEGORIES = [
   'Previdenza',
   'Pensione Integrativa',
   'Rischi Diversi',
-  'Invalidità permanente', 'Non autosufficienza', 'Dread Disease',
-  'Temporanea caso morte', 'Protezione mutuo', 'Tutela reddito',
-  'RC capofamiglia', 'Tutela legale famiglia', 'Scuola e studenti',
-  'Viaggi e bagagli', 'Annullamento viaggio', 'Assistenza domestica',
-  'Terremoto', 'Eventi catastrofali', 'Danni da acqua',
-  'Responsabilità civile aziendale', 'RC dipendenti', 'Danni ai locali',
-  'Interruzione attività', 'Credito commerciale', 'Infortuni dipendenti',
-] as const;
-
-export const VEHICLE_INSURANCE_CATEGORIES = [
-  'RC Auto / Moto', 'Furto', 'Incendio', 'Cristalli', 'Kasko', 'Mini Kasko',
-  'Collisione', 'Eventi atmosferici', 'Eventi naturali', 'Atti vandalici',
-  'Eventi sociopolitici', 'Infortuni conducente', 'Tutela legale',
-  'Assistenza stradale', 'Soccorso stradale', 'Veicolo sostitutivo',
-  'Rinuncia alla rivalsa', 'Protezione bonus', 'Danni da animali',
-  'Danni da urto con animali selvatici', 'Bagagli e oggetti trasportati',
-  'Merci trasportate', 'Responsabilità trasportati', 'RC verso terzi da carico',
 ] as const;

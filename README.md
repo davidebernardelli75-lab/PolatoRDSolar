@@ -55,24 +55,12 @@ plants (impianti)
 
 vehicles (parco automezzi)           — tabella autonoma
 
-insurances (polizze generali)         — tabella autonoma
-
 equipment_catalog (marche/modelli)   — tabella autonoma, catalogo condiviso
 
 app_members                          — tabella di autorizzazione: mappa user_id → membri autorizzati
 ```
 
 Tutte le tabelle hanno **Row Level Security (RLS)** abilitata. L'accesso è consentito solo agli utenti autenticati presenti nella tabella `app_members` (policy `USING (EXISTS (SELECT 1 FROM app_members WHERE user_id = auth.uid()))`).
-
-La migrazione `add_vehicle_ownership_categories_and_costs` aggiunge a `vehicles`
-`owner_type` (Privato/Azienda), `insurance_categories` (più garanzie per polizza)
-e i costi `tax_cost`, `inspection_cost`, `service_cost`. Le scadenze di bollo
-e revisione restano colonne `date`: l'interfaccia salva il primo giorno del
-mese scelto e considera l'ultimo giorno del mese per gli avvisi.
-
-Il riepilogo annuale del menu usa l'anno della scadenza per premi, bollo e
-revisione e la data dell'ultimo tagliando per il suo costo. Mostra importi
-registrati o previsti, non pagamenti contabilizzati né lo storico degli interventi.
 
 Lo storage bucket `solar-archive` è privato e contiene le foto degli impianti (max 10 MB, formati JPEG/PNG/WebP/HEIC).
 
