@@ -192,7 +192,7 @@ function VehicleFormFields({
           </Field>
           <Field label="Marca" icon={Building2}>
             <select value={form.brand} onChange={(e) => update('brand', e.target.value.toUpperCase())} className={selectClass}>
-              <option value="">Seleziona marca</option>
+              <option value="">Marca</option>
               {VEHICLE_BRANDS.map((b) => <option key={b} value={b}>{b}</option>)}
               <option value="__custom">Altro...</option>
             </select>
@@ -236,7 +236,7 @@ function VehicleFormFields({
           </Field>
           <Field label="Compagnia assicurativa" icon={ShieldCheck}>
             <select value={form.insurance_company ?? ''} onChange={(e) => update('insurance_company', e.target.value)} className={selectClass}>
-              <option value="">Seleziona compagnia</option>
+              <option value="">Compagnia</option>
               {INSURANCE_COMPANIES.map((c) => <option key={c} value={c}>{c}</option>)}
               <option value="__custom">Altro...</option>
             </select>

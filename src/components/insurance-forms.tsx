@@ -21,13 +21,13 @@ export function InsuranceFormFields({
         <div className="grid gap-3 sm:grid-cols-2">
           <Field label="Categoria" icon={ShieldCheck}>
             <select value={form.category} onChange={(e) => update('category', e.target.value)} className={inputClass}>
-              <option value="">Seleziona categoria</option>
+              <option value="">Categoria</option>
               {INSURANCE_CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
             </select>
           </Field>
           <Field label="Compagnia" icon={ShieldCheck}>
             <select value={form.provider} onChange={(e) => update('provider', e.target.value)} className={selectClass}>
-              <option value="">Seleziona compagnia</option>
+              <option value="">Compagnia</option>
               {INSURANCE_COMPANIES.map((c) => <option key={c} value={c}>{c}</option>)}
               <option value="__custom">Altro...</option>
             </select>

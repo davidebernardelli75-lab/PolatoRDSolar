@@ -151,7 +151,7 @@ export function EquipmentRow({
                       }}
                       className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm uppercase focus:outline-none focus:ring-2 focus:ring-red-400"
                     >
-                      <option value="">— Seleziona —</option>
+                      <option value="">Marca</option>
                       {brandOptions!.map((b) => (
                         <option key={b} value={b}>{b}</option>
                       ))}
@@ -187,7 +187,7 @@ export function EquipmentRow({
                       }}
                       className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm uppercase focus:outline-none focus:ring-2 focus:ring-red-400"
                     >
-                      <option value="">— Seleziona —</option>
+                      <option value="">Modello</option>
                       {models.map((m) => (
                         <option key={m} value={m}>{m}</option>
                       ))}

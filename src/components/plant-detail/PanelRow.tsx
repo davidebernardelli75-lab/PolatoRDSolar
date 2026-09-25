@@ -51,7 +51,7 @@ export function PanelRow({
           ) : (
             <select value={brand} onChange={(e) => { const val = e.target.value.toUpperCase(); if (val === '__CUSTOM') { setBrand(''); setCustomBrand(true); } else setBrand(val); }}
               className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm uppercase focus:outline-none focus:ring-2 focus:ring-red-400">
-              <option value="">— Seleziona —</option>
+              <option value="">Marca</option>
               {PANEL_BRANDS.map((b) => <option key={b} value={b}>{b}</option>)}
               <option value="__custom">Altro...</option>
             </select>
@@ -61,7 +61,7 @@ export function PanelRow({
           <label className="block text-xs font-medium text-slate-600 mb-1">Potenza (Wp)</label>
           <select value={powerWp} onChange={(e) => setPowerWp(e.target.value)}
             className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-400">
-            <option value="">— Seleziona —</option>
+            <option value="">Potenza</option>
             {PANEL_POWERS.map((p) => <option key={p} value={p}>{p} Wp</option>)}
           </select>
         </div>
