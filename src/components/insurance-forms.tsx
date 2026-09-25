@@ -304,7 +304,7 @@ export function CategoryMultiSelect({
         className={`${inputClass} flex items-center justify-between text-left`}
       >
         <span className={selected.length === 0 ? 'text-slate-400' : 'text-slate-800'}>
-          {selected.length === 0 ? 'Seleziona categorie' : selected.length === 1 ? selected[0] : `${selected.length} categorie selezionate`}
+          {selected.length === 0 ? 'Seleziona categorie' : selected.join(' + ')}
         </span>
         <ChevronDown size={16} className={`text-slate-400 transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
