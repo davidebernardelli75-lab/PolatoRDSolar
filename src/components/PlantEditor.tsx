@@ -29,6 +29,7 @@ export function PlantEditor({ plantId, onSaved, onCancel }: PlantEditorProps) {
             phone: plant.phone ?? '', email: plant.email ?? '', pod: plant.pod ?? '',
             censimp_code: plant.censimp_code ?? '', total_power_kw: plant.total_power_kw,
             inverter_brand_model: plant.inverter_brand_model ?? '',
+            panel_brand_model: plant.panel_brand_model ?? '',
             inverter_brand: plant.inverter_brand ?? '', inverter_model: plant.inverter_model ?? '',
             inverter_code: plant.inverter_code ?? '', storage_power_kw: plant.storage_power_kw,
             storage_brand: plant.storage_brand ?? '', storage_model: plant.storage_model ?? '',

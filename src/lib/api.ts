@@ -381,6 +381,7 @@ export async function createVehicle(input: VehicleInsert): Promise<Vehicle> {
     .select()
     .single();
   if (error) throw error;
+  window.dispatchEvent(new Event('polato:data-changed'));
   return data;
 }
 
@@ -392,12 +393,14 @@ export async function updateVehicle(id: string, input: Partial<VehicleInsert>): 
     .select()
     .single();
   if (error) throw error;
+  window.dispatchEvent(new Event('polato:data-changed'));
   return data;
 }
 
 export async function deleteVehicle(id: string): Promise<void> {
   const { error } = await supabase.from('vehicles').delete().eq('id', id);
   if (error) throw error;
+  window.dispatchEvent(new Event('polato:data-changed'));
 }
 
 // ── Insurances (Assicurazioni Varie) ───────────────────────────────
@@ -418,6 +421,7 @@ export async function createInsurance(input: InsuranceInsert): Promise<Insurance
     .select()
     .single();
   if (error) throw error;
+  window.dispatchEvent(new Event('polato:data-changed'));
   return data;
 }
 
@@ -429,12 +433,14 @@ export async function updateInsurance(id: string, input: Partial<InsuranceInsert
     .select()
     .single();
   if (error) throw error;
+  window.dispatchEvent(new Event('polato:data-changed'));
   return data;
 }
 
 export async function deleteInsurance(id: string): Promise<void> {
   const { error } = await supabase.from('insurances').delete().eq('id', id);
   if (error) throw error;
+  window.dispatchEvent(new Event('polato:data-changed'));
 }
 
 // ── Equipment Catalog (custom brands/models) ──────────────────────

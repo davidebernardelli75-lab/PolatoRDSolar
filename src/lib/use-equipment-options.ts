@@ -32,7 +32,7 @@ export function useEquipmentOptions(category: EquipmentCategory): EquipmentOptio
   const customBrands = catalog
     .filter((e) => e.model === null)
     .map((e) => e.brand);
-  const allBrands = [...new Set([...presetBrands, ...customBrands])];
+  const allBrands: string[] = [...new Set<string>([...presetBrands, ...customBrands])];
 
   const customModelsByBrand: Record<string, string[]> = {};
   for (const entry of catalog) {
@@ -50,7 +50,7 @@ export function useEquipmentOptions(category: EquipmentCategory): EquipmentOptio
 
   const ensureBrand = async (brand: string) => {
     if (!brand || brand === '__custom') return;
-    if (presetBrands.includes(brand as string)) return;
+    if (allBrands.includes(brand) && !customBrands.includes(brand)) return;
     if (customBrands.includes(brand)) return;
     try {
       await addEquipmentBrand(category, brand);

@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react';
 import { Sun, LayoutGrid, LogOut, X, KeyRound, Eye, EyeOff, Car, AlertTriangle, ShieldCheck } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import type { View } from '@/App';
-import { fetchVehicles } from '@/lib/api';
+import { fetchVehicles, fetchInsurances } from '@/lib/api';
+import { calculateCosts, type CostSummary } from '@/lib/cost-summary';
 
 interface SidebarProps {
   open: boolean;
@@ -15,17 +16,20 @@ interface SidebarProps {
 export function Sidebar({ open, onClose, onNavigate, currentView, onSignOut }: SidebarProps) {
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [vehicleAlerts, setVehicleAlerts] = useState(0);
+  const [year, setYear] = useState(new Date().getFullYear());
+  const [costs, setCosts] = useState<CostSummary | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     const loadAlerts = async () => {
       try {
-        const vehicles = await fetchVehicles();
+        const [vehicles, policies] = await Promise.all([fetchVehicles(), fetchInsurances()]);
         if (cancelled) return;
+        setCosts(calculateCosts(vehicles, policies, year));
         const count = vehicles.filter((v) => {
           const insDays = v.insurance_expiry ? Math.round((new Date(v.insurance_expiry).getTime() - Date.now()) / 86400000) : null;
-          const inspDays = v.inspection_expiry ? Math.round((new Date(v.inspection_expiry).getTime() - Date.now()) / 86400000) : null;
-          const taxDays = v.tax_expiry ? Math.round((new Date(v.tax_expiry).getTime() - Date.now()) / 86400000) : null;
+          const inspDays = v.inspection_expiry ? Math.round((new Date(Number(v.inspection_expiry.slice(0, 4)), Number(v.inspection_expiry.slice(5, 7)), 0).getTime() - Date.now()) / 86400000) : null;
+          const taxDays = v.tax_expiry ? Math.round((new Date(Number(v.tax_expiry.slice(0, 4)), Number(v.tax_expiry.slice(5, 7)), 0).getTime() - Date.now()) / 86400000) : null;
           const gasDays = v.gas_cylinders_inspection_expiry ? Math.round((new Date(v.gas_cylinders_inspection_expiry).getTime() - Date.now()) / 86400000) : null;
           const methaneDays = v.methane_inspection_expiry ? Math.round((new Date(v.methane_inspection_expiry).getTime() - Date.now()) / 86400000) : null;
           const kmUntil = v.service_interval_km - (v.mileage_km - v.last_service_km);
@@ -38,8 +42,10 @@ export function Sidebar({ open, onClose, onNavigate, currentView, onSignOut }: S
     };
     loadAlerts();
     const interval = setInterval(loadAlerts, 60000);
-    return () => { cancelled = true; clearInterval(interval); };
-  }, []);
+    window.addEventListener('polato:data-changed', loadAlerts);
+    window.addEventListener('focus', loadAlerts);
+    return () => { cancelled = true; clearInterval(interval); window.removeEventListener('polato:data-changed', loadAlerts); window.removeEventListener('focus', loadAlerts); };
+  }, [year, currentView.name]);
 
   const items = [
     { id: 'dashboard' as const, label: 'Impianti FV', icon: LayoutGrid },
@@ -80,7 +86,7 @@ export function Sidebar({ open, onClose, onNavigate, currentView, onSignOut }: S
           </button>
         </div>
 
-        <nav className="flex-1 px-3 py-4 space-y-1">
+        <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-1">
           {items.map((item) => {
             const Icon = item.icon;
             const active =
@@ -111,6 +117,21 @@ export function Sidebar({ open, onClose, onNavigate, currentView, onSignOut }: S
               </button>
             );
           })}
+          <div className="mt-5 rounded-xl border border-blue-700 bg-blue-800/70 p-3 text-xs">
+            <div className="mb-2 flex items-center justify-between gap-2 font-semibold">
+              <span>Costi per anno</span>
+              <select aria-label="Anno dei costi" value={year} onChange={(e) => setYear(Number(e.target.value))}
+                className="rounded bg-blue-900 px-1 py-1 text-white outline-none">
+                {Array.from({ length: 11 }, (_, i) => new Date().getFullYear() - 5 + i).map((y) => <option key={y}>{y}</option>)}
+              </select>
+            </div>
+            {costs ? <>
+              {([['Assicurazioni', costs.insurances], ['Tagliandi', costs.services], ['Bolli', costs.taxes], ['Revisioni', costs.inspections]] as const).map(([label, value]) =>
+                <div key={label} className="flex justify-between gap-2 py-1 text-blue-100"><span>{label}</span><span>{value.toLocaleString('it-IT', { style: 'currency', currency: 'EUR' })}</span></div>)}
+              <div className="mt-2 flex justify-between gap-2 border-t border-blue-600 pt-2 font-bold"><span>Totale {year}</span><span>{costs.total.toLocaleString('it-IT', { style: 'currency', currency: 'EUR' })}</span></div>
+              <p className="mt-2 text-[10px] leading-snug text-blue-200">Importi registrati per anno di scadenza; tagliandi per data dell’ultimo intervento.</p>
+            </> : <p className="text-blue-200">Costi non disponibili</p>}
+          </div>
         </nav>
 
         <div className="px-5 py-4 border-t border-blue-800">
