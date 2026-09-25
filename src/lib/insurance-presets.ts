@@ -76,6 +76,12 @@ export const INSURANCE_CATEGORIES = [
   'Terremoto', 'Eventi catastrofali', 'Danni da acqua',
   'Responsabilità civile aziendale', 'RC dipendenti', 'Danni ai locali',
   'Interruzione attività', 'Credito commerciale', 'Infortuni dipendenti',
+  'Responsabilità civile amministratori (D&O)', 'RC locativa',
+  'RC conduzione immobili', 'RC committenza', 'Responsabilità ambientale',
+  'Tutela legale aziendale', 'Cyber e protezione dati', 'Guasti elettronici',
+  'Trasporti e spedizioni', 'Fideiussioni', 'Decesso', 'Long Term Care',
+  'Spese mediche', 'Protezione famiglia', 'Protezione animali domestici',
+  'Responsabilità civile proprietà immobili', 'Danni da grandine',
 ] as const;
 
 export const VEHICLE_INSURANCE_CATEGORIES = [
@@ -86,4 +92,11 @@ export const VEHICLE_INSURANCE_CATEGORIES = [
   'Rinuncia alla rivalsa', 'Protezione bonus', 'Danni da animali',
   'Danni da urto con animali selvatici', 'Bagagli e oggetti trasportati',
   'Merci trasportate', 'Responsabilità trasportati', 'RC verso terzi da carico',
+  'RC rimorchio', 'RC trasporto persone', 'RC carico e scarico',
+  'Guasti meccanici', 'Protezione pneumatici', 'Protezione chiavi',
+  'Protezione franchigia', 'Protezione rivalsa', 'Danni da grandine',
+  'Danni da alluvione', 'Danni da incendio doloso', 'Furto parziale',
+  'Rapina', 'Assistenza conducente', 'Assistenza passeggeri',
+  'Casco e abbigliamento moto', 'Danni casco motociclista',
+  'Traino e recupero', 'Assistenza in viaggio all’estero',
 ] as const;
