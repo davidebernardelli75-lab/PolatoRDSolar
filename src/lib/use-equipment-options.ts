@@ -50,7 +50,7 @@ export function useEquipmentOptions(category: EquipmentCategory): EquipmentOptio
 
   const ensureBrand = async (brand: string) => {
     if (!brand || brand === '__custom') return;
-    if (presetBrands.includes(brand as any)) return;
+    if (presetBrands.includes(brand as string)) return;
     if (customBrands.includes(brand)) return;
     try {
       await addEquipmentBrand(category, brand);
