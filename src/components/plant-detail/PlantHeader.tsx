@@ -63,7 +63,7 @@ export function PlantHeader({ plant }: { plant: Plant }) {
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mt-5 pt-5 border-t border-blue-800">
         {plant.total_power_kw != null && (
-          <InfoChip icon={Zap} label="Potenza" value={`${plant.total_power_kw} kW`} />
+          <InfoChip icon={Zap} label="Potenza" value={`${plant.total_power_kw} kWh`} />
         )}
         {plant.installation_date && (
           <InfoChip icon={Calendar} label="Installazione" value={plant.installation_date.slice(0, 10)} />
@@ -86,7 +86,7 @@ export function PlantTechnicalDetails({ plant }: { plant: Plant }) {
         <DetailRow label="Regione" value={plant.region} />
         <DetailRow label="POD" value={plant.pod} />
         <DetailRow label="Codice CENSIMP" value={plant.censimp_code} />
-        <DetailRow label="Potenza Totale" value={plant.total_power_kw != null ? `${plant.total_power_kw} kW` : null} />
+        <DetailRow label="Potenza Totale" value={plant.total_power_kw != null ? `${plant.total_power_kw} kWh` : null} />
         <DetailRow label="Pannelli" value={plant.panel_brand_model} />
         <DetailRow label="Data Installazione" value={plant.installation_date ? plant.installation_date.slice(0, 10) : null} />
         <DetailRow label="Note" value={plant.notes} />

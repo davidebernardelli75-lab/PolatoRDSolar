@@ -2,7 +2,7 @@ import { ChevronDown, Plus, type LucideIcon } from 'lucide-react';
 import { EquipmentRow } from './EquipmentRow';
 import type { EquipmentField } from './EquipmentRow';
 
-interface EquipmentSectionProps<T extends { id: string; brand: string; model: string; code: string }> {
+interface EquipmentSectionProps<T extends { id: string; brand: string; model: string }> {
   title: string;
   icon: LucideIcon;
   items: T[];
@@ -24,7 +24,7 @@ interface EquipmentSectionProps<T extends { id: string; brand: string; model: st
   emptyLabel: string;
 }
 
-export function EquipmentSection<T extends { id: string; brand: string; model: string; code: string }>({
+export function EquipmentSection<T extends { id: string; brand: string; model: string }>({
   title,
   icon: Icon,
   items,

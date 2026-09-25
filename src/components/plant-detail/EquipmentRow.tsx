@@ -261,7 +261,7 @@ export function EquipmentRow({
               </span>
             ))}
             {extraField && extraField.value && (
-              <span className="text-slate-500 ml-1.5">· {extraField.value} kW</span>
+              <span className="text-slate-500 ml-1.5">· {extraField.value} kWh</span>
             )}
           </div>
         ) : (

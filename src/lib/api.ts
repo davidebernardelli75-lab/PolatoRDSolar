@@ -1,5 +1,5 @@
 import { supabase, STORAGE_BUCKET } from './supabase';
-import type { Plant, Panel, PanelPhoto, PlantInsert, PlantUpdate, PanelInsert, RoadmapTask, PlantInverter, PlantStorage, PlantCharger, PlantInverterInsert, PlantStorageInsert, PlantChargerInsert, Vehicle, VehicleInsert, EquipmentCatalogEntry, EquipmentCategory } from './types';
+import type { Plant, Panel, PanelPhoto, PlantInsert, PlantUpdate, PanelInsert, RoadmapTask, PlantInverter, PlantStorage, PlantCharger, PlantInverterInsert, PlantStorageInsert, PlantChargerInsert, PlantPowerMeter, PlantPowerMeterInsert, Vehicle, VehicleInsert, EquipmentCatalogEntry, EquipmentCategory } from './types';
 
 export async function fetchPlants(): Promise<Plant[]> {
   const { data, error } = await supabase
@@ -322,6 +322,44 @@ export async function updateCharger(id: string, input: Partial<PlantChargerInser
 
 export async function deleteCharger(id: string): Promise<void> {
   const { error } = await supabase.from('plant_chargers').delete().eq('id', id);
+  if (error) throw error;
+}
+
+// ── Power Meters ──────────────────────────────────────────────────
+
+export async function fetchPowerMeters(plantId: string): Promise<PlantPowerMeter[]> {
+  const { data, error } = await supabase
+    .from('plant_power_meters')
+    .select('*')
+    .eq('plant_id', plantId)
+    .order('sort_order', { ascending: true });
+  if (error) throw error;
+  return data ?? [];
+}
+
+export async function createPowerMeter(input: PlantPowerMeterInsert): Promise<PlantPowerMeter> {
+  const { data, error } = await supabase
+    .from('plant_power_meters')
+    .insert(input)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+export async function updatePowerMeter(id: string, input: Partial<PlantPowerMeterInsert>): Promise<PlantPowerMeter> {
+  const { data, error } = await supabase
+    .from('plant_power_meters')
+    .update({ ...input, updated_at: new Date().toISOString() })
+    .eq('id', id)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+export async function deletePowerMeter(id: string): Promise<void> {
+  const { error } = await supabase.from('plant_power_meters').delete().eq('id', id);
   if (error) throw error;
 }
 

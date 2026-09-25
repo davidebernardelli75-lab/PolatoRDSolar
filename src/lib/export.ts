@@ -35,7 +35,7 @@ function buildPlantTextFile(plant: Plant, panels: Panel[], inverters: PlantInver
   lines.push('---------------------------------');
   lines.push(`POD: ${plant.pod || 'N/D'}`);
   lines.push(`Codice CENSIMP: ${plant.censimp_code || 'N/D'}`);
-  lines.push(`Potenza Totale (kW): ${plant.total_power_kw ?? 'N/D'}`);
+  lines.push(`Potenza Totale (kWh): ${plant.total_power_kw ?? 'N/D'}`);
   lines.push(`Marca/Modello Pannelli: ${plant.panel_brand_model || 'N/D'}`);
   lines.push(`Colonnina - Marca: ${plant.charger_brand || 'N/D'}`);
   lines.push(`Colonnina - Modello: ${plant.charger_model || 'N/D'}`);
@@ -63,7 +63,7 @@ function buildPlantTextFile(plant: Plant, panels: Panel[], inverters: PlantInver
       lines.push(`  Marca: ${sto.brand || 'N/D'}`);
       lines.push(`  Modello: ${sto.model || 'N/D'}`);
       lines.push(`  Codice: ${sto.code || 'N/D'}`);
-      lines.push(`  Potenza (kW): ${sto.power_kw ?? 'N/D'}`);
+      lines.push(`  Potenza (kWh): ${sto.power_kw ?? 'N/D'}`);
     });
   }
 
@@ -87,6 +87,8 @@ function buildPlantTextFile(plant: Plant, panels: Panel[], inverters: PlantInver
   } else {
     panels.forEach((panel, index) => {
       lines.push(`Pannello ${index + 1}:`);
+      lines.push(`  Marca: ${panel.brand || 'N/D'}`);
+      lines.push(`  Potenza: ${panel.power_wp != null ? `${panel.power_wp} Wp` : 'N/D'}`);
       lines.push(`  Matricola/Barcode: ${panel.serial_number}`);
       lines.push(`  Posizione: ${panel.position_label || 'N/D'}`);
       lines.push(`  Note: ${panel.notes || 'Nessuna'}`);

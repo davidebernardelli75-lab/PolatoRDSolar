@@ -317,7 +317,7 @@ export async function generatePlantPdf(
   y = addRows(doc, [
     ['POD', orNa(plant.pod)],
     ['Codice CENSIMP', orNa(plant.censimp_code)],
-    ['Potenza Totale', plant.total_power_kw != null ? `${plant.total_power_kw} kW` : 'N/D'],
+    ['Potenza Totale', plant.total_power_kw != null ? `${plant.total_power_kw} kWh` : 'N/D'],
     ['Marca/Modello Pannelli', orNa(plant.panel_brand_model)],
     ['Colonnina - Marca', orNa(plant.charger_brand)],
     ['Colonnina - Modello', orNa(plant.charger_model)],
@@ -344,7 +344,7 @@ export async function generatePlantPdf(
         [`Accumulo ${i + 1} - Marca`, orNa(sto.brand)],
         [`Accumulo ${i + 1} - Modello`, orNa(sto.model)],
         [`Accumulo ${i + 1} - Codice`, orNa(sto.code)],
-        [`Accumulo ${i + 1} - Potenza`, sto.power_kw != null ? `${sto.power_kw} kW` : 'N/D'],
+        [`Accumulo ${i + 1} - Potenza`, sto.power_kw != null ? `${sto.power_kw} kWh` : 'N/D'],
       ], y);
     });
   }

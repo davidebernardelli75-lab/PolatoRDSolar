@@ -38,6 +38,8 @@ export interface Panel {
   serial_number: string;
   position_label: string | null;
   notes: string | null;
+  brand: string | null;
+  power_wp: number | null;
   created_at: string;
 }
 
@@ -108,6 +110,18 @@ export interface PlantCharger {
 export type PlantInverterInsert = Omit<PlantInverter, 'id' | 'created_at' | 'updated_at'>;
 export type PlantStorageInsert = Omit<PlantStorage, 'id' | 'created_at' | 'updated_at'>;
 export type PlantChargerInsert = Omit<PlantCharger, 'id' | 'created_at' | 'updated_at'>;
+
+export interface PlantPowerMeter {
+  id: string;
+  plant_id: string;
+  brand: string;
+  model: string;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export type PlantPowerMeterInsert = Omit<PlantPowerMeter, 'id' | 'created_at' | 'updated_at'>;
 
 export type EquipmentCategory = 'inverter' | 'storage';
 

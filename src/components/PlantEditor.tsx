@@ -114,7 +114,7 @@ export function PlantEditor({ plantId, onSaved, onCancel }: PlantEditorProps) {
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1.5">Potenza Totale (kW)</label>
+                <label className="block text-sm font-medium text-slate-700 mb-1.5">Potenza Totale (kWh)</label>
                 <input type="number" step="0.01" min="0" value={form.total_power_kw ?? ''}
                   onChange={(e) => update('total_power_kw', e.target.value === '' ? null : parseFloat(e.target.value))}
                   className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-red-400 focus:border-transparent" />
@@ -127,14 +127,6 @@ export function PlantEditor({ plantId, onSaved, onCancel }: PlantEditorProps) {
               </div>
             </div>
             <Field label="Marca/Modello Pannelli" value={form.panel_brand_model ?? ''} onChange={(v) => update('panel_brand_model', v)} upper />
-            <div className="pt-2">
-              <h3 className="text-sm font-semibold text-blue-900 mb-3">Colonnine di ricarica</h3>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <Field label="Marca" value={form.charger_brand ?? ''} onChange={(v) => update('charger_brand', v)} upper />
-                <Field label="Modello" value={form.charger_model ?? ''} onChange={(v) => update('charger_model', v)} upper />
-                <Field label="Codice" value={form.charger_code ?? ''} onChange={(v) => update('charger_code', v)} upper />
-              </div>
-            </div>
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1.5">Note</label>
               <textarea value={form.notes ?? ''} onChange={(e) => update('notes', e.target.value)} rows={3}

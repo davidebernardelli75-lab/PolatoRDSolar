@@ -159,7 +159,7 @@ export function Dashboard({ plants, loading, roadmapProgress, onOpenPlant, onNew
                 {plant.total_power_kw != null && (
                   <div className="flex items-center gap-1 text-slate-400 text-xs">
                     <Zap size={12} />
-                    <span>{plant.total_power_kw} kW</span>
+                    <span>{plant.total_power_kw} kWh</span>
                   </div>
                 )}
 

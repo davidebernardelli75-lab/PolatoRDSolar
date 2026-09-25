@@ -29,3 +29,38 @@ export const STORAGE_MODELS: Record<string, readonly string[]> = {
     'LUNA2000-15KW',
   ],
 };
+
+export const PANEL_BRANDS = [
+  'JA SOLAR',
+  'TRINA SOLAR',
+  'AIKO',
+  'LONGI',
+  '3SUN',
+  'MEYER BURGER',
+] as const;
+
+export const PANEL_POWERS: number[] = Array.from(
+  { length: (700 - 470) / 5 + 1 },
+  (_, i) => 470 + i * 5,
+);
+
+export const CHARGER_BRANDS = ['DAZE'] as const;
+
+export const CHARGER_MODELS: Record<string, readonly string[]> = {
+  DAZE: [
+    'DT01IT32M5',
+    'DT01IT32M7',
+    'DT01IT32T5',
+    'DT01IT32T7',
+    'DT04IT32M5C',
+    'DT04IT32M7C',
+    'DT04IT32T5C',
+    'DT04IT32T7C',
+  ],
+};
+
+export const POWER_METER_BRANDS = ['DAZE'] as const;
+
+export const POWER_METER_MODELS: Record<string, readonly string[]> = {
+  DAZE: ['PM02M', 'PM02T'],
+};
