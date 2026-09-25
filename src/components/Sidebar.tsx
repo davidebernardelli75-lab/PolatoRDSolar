@@ -3,7 +3,6 @@ import { Sun, LayoutGrid, LogOut, X, KeyRound, Eye, EyeOff, Car, AlertTriangle }
 import { supabase } from '@/lib/supabase';
 import type { View } from '@/App';
 import { fetchVehicles } from '@/lib/api';
-import type { Vehicle } from '@/lib/types';
 
 interface SidebarProps {
   open: boolean;
