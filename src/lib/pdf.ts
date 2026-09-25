@@ -489,6 +489,7 @@ export async function generateVehiclePdf(vehicle: Vehicle): Promise<Blob> {
   y = addSectionTitle(doc, 'DATI VEICOLO', y);
   y = addRows(doc, [
     ['Tipo', vehicle.type],
+    ['Intestazione', vehicle.owner_type === 'Privato' ? 'Privato' : 'Aziendale'],
     ['Targa', vehicle.plate || 'N/D'],
     ['Marca', orNa(vehicle.brand)],
     ['Modello', orNa(vehicle.model)],
@@ -501,6 +502,7 @@ export async function generateVehiclePdf(vehicle: Vehicle): Promise<Blob> {
     ['Intervallo tagliando', `${vehicle.service_interval_km.toLocaleString('it-IT')} km`],
     ['Km ultimo tagliando', `${vehicle.last_service_km.toLocaleString('it-IT')} km`],
     ['Data ultimo tagliando', formatDate(vehicle.last_service_date)],
+    ['Costo ultimo tagliando', vehicle.service_cost != null ? `€ ${Number(vehicle.service_cost).toFixed(2)}` : 'N/D'],
   ], y);
 
   y = addSectionTitle(doc, 'DOCUMENTI E SCADENZE', y + 3);
@@ -508,15 +510,18 @@ export async function generateVehiclePdf(vehicle: Vehicle): Promise<Blob> {
     ['Assicurazione - Scadenza', formatDate(vehicle.insurance_expiry)],
     ['Assicurazione - Compagnia', orNa(vehicle.insurance_company)],
     ['Assicurazione - Premio', vehicle.insurance_premium != null ? `€ ${vehicle.insurance_premium.toLocaleString('it-IT', { minimumFractionDigits: 2 })}` : 'N/D'],
+    ['Garanzie', vehicle.insurance_categories?.join(', ') || 'N/D'],
     ['Bollo - Scadenza', formatMonthYear(vehicle.tax_expiry)],
-    ['Revisione - Scadenza', formatDate(vehicle.inspection_expiry)],
+    ['Bollo - Costo', vehicle.tax_cost != null ? `€ ${Number(vehicle.tax_cost).toFixed(2)}` : 'N/D'],
+    ['Revisione - Scadenza', formatMonthYear(vehicle.inspection_expiry)],
+    ['Revisione - Costo', vehicle.inspection_cost != null ? `€ ${Number(vehicle.inspection_cost).toFixed(2)}` : 'N/D'],
     ['Revisione bombole gas', formatDate(vehicle.gas_cylinders_inspection_expiry)],
     ['Revisione metano', formatDate(vehicle.methane_inspection_expiry)],
   ], y);
 
   if (vehicle.notes) {
     y = addSectionTitle(doc, 'NOTE', y + 3);
-    y = addRows(doc, [['Note', vehicle.notes]], y);
+    addRows(doc, [['Note', vehicle.notes]], y);
   }
 
   addFooters(doc);
@@ -569,7 +574,7 @@ export async function generateInsurancePdf(insurance: Insurance): Promise<Blob> 
 
   if (insurance.notes) {
     y = addSectionTitle(doc, 'NOTE', y + 3);
-    y = addRows(doc, [['Note', insurance.notes]], y);
+    addRows(doc, [['Note', insurance.notes]], y);
   }
 
   addFooters(doc);
