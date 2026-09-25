@@ -374,27 +374,60 @@ export async function fetchVehicles(): Promise<Vehicle[]> {
   return data ?? [];
 }
 
+// The production project may not yet have the optional columns added in
+// 20260925211343. Retry only when PostgREST explicitly identifies one of
+// those missing columns AND no user-entered extension data would be lost.
+const OPTIONAL_VEHICLE_COLUMNS = [
+  'owner_type', 'insurance_categories', 'tax_cost', 'inspection_cost', 'service_cost',
+] as const;
+
+function missingOptionalVehicleColumn(error: { code?: string; message?: string } | null): boolean {
+  if (!error || !['42703', 'PGRST204'].includes(error.code ?? '')) return false;
+  return OPTIONAL_VEHICLE_COLUMNS.some((column) => error.message?.includes(column));
+}
+
+function legacyVehiclePayload(input: Partial<VehicleInsert>): Partial<VehicleInsert> {
+  const hasExtensionData =
+    (input.owner_type !== undefined && input.owner_type !== 'Azienda') ||
+    (input.insurance_categories?.length ?? 0) > 0 ||
+    input.tax_cost != null ||
+    input.inspection_cost != null ||
+    input.service_cost != null;
+  if (hasExtensionData) {
+    throw new Error(
+      'Salvataggio non eseguito: il database collegato non supporta ancora ' +
+      'intestazione privata, garanzie o nuovi costi. Nessun dato è stato salvato. ' +
+      'Non cancellare i valori inseriti: occorre allineare il database corretto.'
+    );
+  }
+
+  const { owner_type, insurance_categories, tax_cost, inspection_cost, service_cost, ...legacy } = input;
+  return legacy;
+}
+
 export async function createVehicle(input: VehicleInsert): Promise<Vehicle> {
-  const { data, error } = await supabase
-    .from('vehicles')
-    .insert(input)
-    .select()
-    .single();
+  let { data, error } = await supabase.from('vehicles').insert(input).select().single();
+  if (missingOptionalVehicleColumn(error)) {
+    const safeInput = legacyVehiclePayload(input);
+    ({ data, error } = await supabase.from('vehicles').insert(safeInput).select().single());
+  }
   if (error) throw error;
   window.dispatchEvent(new Event('polato:data-changed'));
-  return data;
+  return data as Vehicle;
 }
 
 export async function updateVehicle(id: string, input: Partial<VehicleInsert>): Promise<Vehicle> {
-  const { data, error } = await supabase
-    .from('vehicles')
-    .update({ ...input, updated_at: new Date().toISOString() })
-    .eq('id', id)
-    .select()
-    .single();
+  const write = (payload: Partial<VehicleInsert>) =>
+    supabase.from('vehicles').update({ ...payload, updated_at: new Date().toISOString() })
+      .eq('id', id).select().single();
+  let { data, error } = await write(input);
+  if (missingOptionalVehicleColumn(error)) {
+    const safeInput = legacyVehiclePayload(input);
+    ({ data, error } = await write(safeInput));
+  }
   if (error) throw error;
   window.dispatchEvent(new Event('polato:data-changed'));
-  return data;
+  return data as Vehicle;
 }
 
 export async function deleteVehicle(id: string): Promise<void> {
