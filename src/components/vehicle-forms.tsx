@@ -227,13 +227,13 @@ function VehicleFormFields({
         </div>
         <div className="grid gap-3 sm:grid-cols-2">
           <Field label="Chilometri attuali" icon={Gauge}>
-            <input type="number" min="0" value={form.mileage_km} onChange={(e) => update('mileage_km', parseInt(e.target.value) || 0)} className={inputClass} />
+            <input type="number" min="0" value={form.mileage_km} onChange={(e) => update('mileage_km', parseFloat(e.target.value) || 0)} className={inputClass} />
           </Field>
           <Field label="Intervallo tagliando (km)" icon={Wrench}>
-            <input type="number" min="1000" step="1000" value={form.service_interval_km} onChange={(e) => update('service_interval_km', parseInt(e.target.value) || 20000)} className={inputClass} />
+            <input type="number" min="1000" step="1000" value={form.service_interval_km} onChange={(e) => update('service_interval_km', parseFloat(e.target.value) || 20000)} className={inputClass} />
           </Field>
           <Field label="Km ultimo tagliando" icon={Wrench}>
-            <input type="number" min="0" value={form.last_service_km} onChange={(e) => update('last_service_km', parseInt(e.target.value) || 0)} className={inputClass} />
+            <input type="number" min="0" value={form.last_service_km} onChange={(e) => update('last_service_km', parseFloat(e.target.value) || 0)} className={inputClass} />
           </Field>
           <Field label="Data ultimo tagliando" icon={CalendarDays}>
             <input type="date" value={form.last_service_date ?? ''} onChange={(e) => update('last_service_date', e.target.value)} className={inputClass} />
