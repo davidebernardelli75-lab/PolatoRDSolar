@@ -510,7 +510,7 @@ export async function generateVehiclePdf(vehicle: Vehicle): Promise<Blob> {
     ['Assicurazione - Scadenza', formatDate(vehicle.insurance_expiry)],
     ['Assicurazione - Compagnia', orNa(vehicle.insurance_company)],
     ['Assicurazione - Premio', vehicle.insurance_premium != null ? `€ ${vehicle.insurance_premium.toLocaleString('it-IT', { minimumFractionDigits: 2 })}` : 'N/D'],
-    ['Garanzie', vehicle.insurance_categories?.join(', ') || 'N/D'],
+    ['Garanzie', vehicle.insurance_categories?.join(' + ') || 'N/D'],
     ['Bollo - Scadenza', formatMonthYear(vehicle.tax_expiry)],
     ['Bollo - Costo', vehicle.tax_cost != null ? `€ ${Number(vehicle.tax_cost).toFixed(2)}` : 'N/D'],
     ['Revisione - Scadenza', formatMonthYear(vehicle.inspection_expiry)],
