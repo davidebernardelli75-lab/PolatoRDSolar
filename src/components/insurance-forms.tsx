@@ -158,7 +158,9 @@ export function InsuranceEditCard({
   const handleSave = async () => {
     setSaving(true);
     try {
-      if (customCategory && form.category.trim()) saveCustomCategory(form.category.trim());
+      if (form.category.trim() && !INSURANCE_CATEGORIES.includes(form.category as typeof INSURANCE_CATEGORIES[number])) {
+        saveCustomCategory(form.category.trim());
+      }
       await onSave({
         ...form,
         policy_number: form.policy_number || null,
@@ -206,7 +208,9 @@ export function InsuranceFormModal({
   const handleSave = async () => {
     setSaving(true);
     try {
-      if (customCategory && form.category.trim()) saveCustomCategory(form.category.trim());
+      if (form.category.trim() && !INSURANCE_CATEGORIES.includes(form.category as typeof INSURANCE_CATEGORIES[number])) {
+        saveCustomCategory(form.category.trim());
+      }
       await onSave({
         ...form,
         policy_number: form.policy_number || null,
