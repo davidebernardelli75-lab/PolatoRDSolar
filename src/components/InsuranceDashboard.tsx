@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { ShieldCheck, Plus, Trash2, FileText, Loader2, ChevronDown, AlertTriangle } from 'lucide-react';
+import { ShieldCheck, Plus, Trash2, FileText, Loader2, ChevronDown, AlertTriangle, User, Building2 } from 'lucide-react';
 import type { Insurance, InsuranceInsert } from '@/lib/types';
 import { fetchInsurances, createInsurance, updateInsurance, deleteInsurance } from '@/lib/api';
 import { INSURANCE_CATEGORIES } from '@/lib/insurance-presets';
@@ -157,11 +157,20 @@ function InsuranceCard({
     <div className={`bg-white rounded-2xl border ${cfg.border} p-4`}>
       <div className="flex items-center gap-3">
         <div className={`inline-flex items-center justify-center w-10 h-10 rounded-lg flex-shrink-0 ${cfg.bg} ${cfg.text}`}>
-          <ShieldCheck size={20} />
+          {insurance.insurance_type === 'Aziendale' ? <Building2 size={20} /> : <User size={20} />}
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
             <span className="font-bold text-slate-900 text-sm">{insurance.category}</span>
+            {insurance.insurance_type && (
+              <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${
+                insurance.insurance_type === 'Aziendale'
+                  ? 'bg-blue-100 text-blue-700'
+                  : 'bg-emerald-100 text-emerald-700'
+              }`}>
+                {insurance.insurance_type}
+              </span>
+            )}
             <span className={`w-2.5 h-2.5 rounded-full ${cfg.dot} flex-shrink-0`} />
           </div>
           <div className="text-xs text-slate-500 truncate">
@@ -186,6 +195,10 @@ function InsuranceCard({
       {expanded && (
         <div className="mt-4 pt-4 border-t border-slate-100 space-y-3">
           <div className="grid grid-cols-2 gap-3 text-sm">
+            <div>
+              <div className="text-slate-400 text-xs mb-0.5">Tipo</div>
+              <div className="text-slate-900 font-medium">{insurance.insurance_type || 'N/D'}</div>
+            </div>
             <div>
               <div className="text-slate-400 text-xs mb-0.5">Compagnia</div>
               <div className="text-slate-900 font-medium">{insurance.provider || 'N/D'}</div>

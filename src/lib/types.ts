@@ -161,6 +161,7 @@ export interface Insurance {
   id: string;
   category: string;
   provider: string;
+  insurance_type: 'Privata' | 'Aziendale' | null;
   policy_number: string | null;
   insured_item: string | null;
   premium_amount: number | null;

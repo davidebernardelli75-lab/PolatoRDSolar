@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { X, ShieldCheck, FileText, Package, Euro, CalendarDays, StickyNote, type LucideIcon } from 'lucide-react';
+import { X, ShieldCheck, FileText, Package, Euro, CalendarDays, StickyNote, User, Building2, type LucideIcon } from 'lucide-react';
 import type { Insurance, InsuranceInsert } from '@/lib/types';
 import { INSURANCE_CATEGORIES, INSURANCE_COMPANIES } from '@/lib/insurance-presets';
 
@@ -18,6 +18,19 @@ export function InsuranceFormFields({
       <section className="rounded-xl border border-slate-200 bg-slate-50/70 p-3">
         <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
           <ShieldCheck size={14} className="text-blue-900" /> Polizza
+        </div>
+        <div className="mb-3 grid grid-cols-2 gap-2">
+          {(['Privata', 'Aziendale'] as const).map((t) => {
+            const Icon = t === 'Privata' ? User : Building2;
+            return (
+              <button key={t} type="button" onClick={() => update('insurance_type', t)}
+                className={`flex items-center justify-center gap-1.5 rounded-lg border px-2 py-2 text-xs font-semibold transition-colors ${
+                  form.insurance_type === t ? 'border-blue-900 bg-blue-900 text-white shadow-sm' : 'border-slate-200 bg-white text-slate-600 hover:border-blue-200 hover:bg-blue-50'
+                }`}>
+                <Icon size={15} /> {t}
+              </button>
+            );
+          })}
         </div>
         <div className="grid gap-3 sm:grid-cols-2">
           <Field label="Categoria" icon={ShieldCheck}>
@@ -97,6 +110,7 @@ export function InsuranceEditCard({
 }) {
   const [form, setForm] = useState<InsuranceInsert>({
     category: insurance.category, provider: insurance.provider,
+    insurance_type: insurance.insurance_type,
     policy_number: insurance.policy_number, insured_item: insurance.insured_item,
     premium_amount: insurance.premium_amount, start_date: insurance.start_date,
     expiry_date: insurance.expiry_date, notes: insurance.notes,
@@ -145,7 +159,7 @@ export function InsuranceFormModal({
   onSave: (input: InsuranceInsert) => Promise<void>;
 }) {
   const [form, setForm] = useState<InsuranceInsert>({
-    category: '', provider: '', policy_number: '', insured_item: '',
+    category: '', provider: '', insurance_type: 'Privata', policy_number: '', insured_item: '',
     premium_amount: null, start_date: '', expiry_date: '', notes: '',
   });
   const [saving, setSaving] = useState(false);
