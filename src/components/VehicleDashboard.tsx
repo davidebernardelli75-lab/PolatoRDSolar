@@ -1,14 +1,15 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Car, Truck, Bike, Plus, Trash2, FileText, Loader2, ChevronDown, AlertTriangle, Calendar, Wrench, Shield, Receipt, Flame, FileDown } from 'lucide-react';
+import { Car, Truck, Bike, Plus, Trash2, FileText, Loader2, ChevronDown, AlertTriangle, Calendar, Wrench, Shield, Receipt, Flame, FileDown, User, Building2 } from 'lucide-react';
 import type { Vehicle, VehicleInsert } from '@/lib/types';
 import { fetchVehicles, createVehicle, updateVehicle, deleteVehicle } from '@/lib/api';
 import { DetailItem, VehicleEditCard, VehicleFormModal, formatMonthYear } from './vehicle-forms';
 import { generateVehiclePdf } from '@/lib/pdf';
 import { saveAs } from 'file-saver';
+import { calculateVehicleCosts } from '@/lib/vehicle-cost-summary';
 
-function daysUntil(dateStr: string | null): number | null {
+function daysUntil(dateStr: string | null, monthOnly = false): number | null {
   if (!dateStr) return null;
-  const target = new Date(dateStr);
+  const target = monthOnly ? new Date(Number(dateStr.slice(0, 4)), Number(dateStr.slice(5, 7)), 0) : new Date(`${dateStr}T00:00:00`);
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   target.setHours(0, 0, 0, 0);
@@ -28,8 +29,8 @@ interface VehicleAlert {
 function getVehicleAlerts(v: Vehicle): VehicleAlert[] {
   const alerts: VehicleAlert[] = [];
   const insDays = daysUntil(v.insurance_expiry);
-  const inspDays = daysUntil(v.inspection_expiry);
-  const taxDays = daysUntil(v.tax_expiry);
+  const inspDays = daysUntil(v.inspection_expiry, true);
+  const taxDays = daysUntil(v.tax_expiry, true);
   const kmSinceService = v.mileage_km - v.last_service_km;
   const kmUntilService = v.service_interval_km - kmSinceService;
 
@@ -75,6 +76,8 @@ export function VehicleDashboard() {
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [reportYear, setReportYear] = useState(new Date().getFullYear());
+  const report = calculateVehicleCosts(vehicles, reportYear);
 
   const loadVehicles = useCallback(async () => {
     setLoading(true);
@@ -107,6 +110,41 @@ export function VehicleDashboard() {
           </div>
         </div>
       </div>
+
+      <section aria-label="Rendiconto annuale automezzi" className="mb-6 rounded-2xl border border-slate-200 bg-white p-4 lg:p-5">
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
+          <h2 className="font-semibold text-slate-900">Rendiconto automezzi</h2>
+          <label className="flex items-center gap-2 text-sm text-slate-700">Anno
+            <select aria-label="Anno rendiconto automezzi" value={reportYear}
+              onChange={(e) => setReportYear(Number(e.target.value))}
+              className="rounded-lg border border-slate-300 bg-white px-3 py-2">
+              {Array.from({ length: 11 }, (_, i) => new Date().getFullYear() - 5 + i)
+                .map((year) => <option key={year} value={year}>{year}</option>)}
+            </select>
+          </label>
+        </div>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          {([
+            ['Assicurazioni veicoli', report.insurances],
+            ['Revisioni', report.inspections],
+            ['Bolli', report.taxes],
+            ['Tagliandi', report.services],
+          ] as const).map(([label, amount]) => (
+            <div key={label} className="rounded-xl bg-slate-50 p-3">
+              <div className="text-xs text-slate-500">{label}</div>
+              <div className="mt-1 font-semibold text-slate-900">{amount.toLocaleString('it-IT', { style: 'currency', currency: 'EUR' })}</div>
+            </div>
+          ))}
+        </div>
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-slate-200 pt-3 font-bold text-blue-900">
+          <span>Totale {reportYear}</span>
+          <span>{report.total.toLocaleString('it-IT', { style: 'currency', currency: 'EUR' })}</span>
+        </div>
+        <p className="mt-2 text-xs text-slate-500">
+          Importi registrati o previsti: assicurazioni, bolli e revisioni per anno di scadenza;
+          tagliandi per data dell'ultimo intervento. Non è una contabilità dei pagamenti.
+        </p>
+      </section>
 
       <div className="flex items-center justify-between mb-4">
         <h2 className="font-semibold text-slate-900">Veicoli</h2>
@@ -196,6 +234,11 @@ function VehicleCard({
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
             <span className="font-bold text-slate-900 text-sm uppercase tracking-wide">{vehicle.plate || 'SENZA TARGA'}</span>
+            <span title={vehicle.owner_type === 'Privato' ? 'Privato' : 'Aziendale'} aria-label={vehicle.owner_type === 'Privato' ? 'Veicolo privato' : 'Veicolo aziendale'}
+              className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-700">
+              {vehicle.owner_type === 'Privato' ? <User size={12} /> : <Building2 size={12} />}
+              {vehicle.owner_type === 'Privato' ? 'Privato' : 'Aziendale'}
+            </span>
             <span className={`w-2.5 h-2.5 rounded-full ${cfg.dot} flex-shrink-0`} title={status === 'ok' ? 'Tutto a posto' : 'Interventi necessari'} />
           </div>
           <div className="text-xs text-slate-500 truncate">
@@ -233,11 +276,16 @@ function VehicleCard({
             <DetailItem icon={Calendar} label="Ultimo tagliando" value={formatDate(vehicle.last_service_date)} />
             <DetailItem icon={Shield} label="Assicurazione" value={formatDate(vehicle.insurance_expiry)} />
             <DetailItem icon={Receipt} label="Bollo" value={formatMonthYear(vehicle.tax_expiry)} />
-            <DetailItem icon={Calendar} label="Scad. revisione" value={formatDate(vehicle.inspection_expiry)} />
+            <DetailItem icon={Calendar} label="Scad. revisione" value={formatMonthYear(vehicle.inspection_expiry)} />
             <DetailItem icon={Flame} label="Revisione bombole gas" value={formatDate(vehicle.gas_cylinders_inspection_expiry)} />
             <DetailItem icon={Flame} label="Revisione metano" value={formatDate(vehicle.methane_inspection_expiry)} />
             <DetailItem icon={Shield} label="Compagnia" value={vehicle.insurance_company || 'N/D'} />
             <DetailItem icon={Shield} label="Premio assicurativo" value={vehicle.insurance_premium != null ? `€ ${vehicle.insurance_premium.toLocaleString('it-IT', { minimumFractionDigits: 2 })}` : 'N/D'} />
+            <DetailItem icon={vehicle.owner_type === 'Privato' ? User : Building2} label="Intestazione" value={vehicle.owner_type === 'Privato' ? 'Privato' : 'Aziendale'} />
+            <DetailItem icon={Shield} label="Garanzie" value={vehicle.insurance_categories?.join(' + ') || 'N/D'} />
+            <DetailItem icon={Receipt} label="Costo bollo" value={vehicle.tax_cost != null ? `€ ${Number(vehicle.tax_cost).toLocaleString('it-IT', { minimumFractionDigits: 2 })}` : 'N/D'} />
+            <DetailItem icon={Calendar} label="Costo revisione" value={vehicle.inspection_cost != null ? `€ ${Number(vehicle.inspection_cost).toLocaleString('it-IT', { minimumFractionDigits: 2 })}` : 'N/D'} />
+            <DetailItem icon={Wrench} label="Costo tagliando" value={vehicle.service_cost != null ? `€ ${Number(vehicle.service_cost).toLocaleString('it-IT', { minimumFractionDigits: 2 })}` : 'N/D'} />
             <DetailItem icon={Wrench} label="Intervallo tagliando" value={`${vehicle.service_interval_km.toLocaleString('it-IT')} km`} />
             <DetailItem icon={Car} label="Tipo" value={vehicle.type} />
           </div>
