@@ -7,6 +7,13 @@ import { CategoryMultiSelect } from './insurance-forms';
 
 export const VEHICLE_TYPES: VehicleType[] = ['Auto', 'Furgone', 'Motoveicolo'];
 
+function saveErrorMessage(err: unknown): string {
+  if (err && typeof err === 'object' && 'message' in err && typeof err.message === 'string') {
+    return err.message;
+  }
+  return 'Errore durante il salvataggio. Verifica la connessione e riprova.';
+}
+
 const MONTHS = [
   { value: '01', label: 'Gennaio' },
   { value: '02', label: 'Febbraio' },
@@ -134,7 +141,7 @@ export function VehicleEditCard({
         notes: form.notes || null,
       });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Errore durante il salvataggio');
+      setError(saveErrorMessage(err));
     } finally {
       setSaving(false);
     }
@@ -204,7 +211,7 @@ export function VehicleFormModal({
         notes: form.notes || null,
       });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Errore durante il salvataggio');
+      setError(saveErrorMessage(err));
     } finally {
       setSaving(false);
     }
