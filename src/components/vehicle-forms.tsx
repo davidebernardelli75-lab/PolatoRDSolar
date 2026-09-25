@@ -1,7 +1,9 @@
+/* eslint-disable max-lines -- Existing shared create/edit form; keep both paths consistent. */
 import { useState } from 'react';
-import { Car, Truck, Bike, X, CalendarDays, ClipboardCheck, Gauge, ReceiptText, ShieldCheck, Tag, Wrench, StickyNote, Building2, Flame, Euro, ChevronDown, Check, type LucideIcon } from 'lucide-react';
+import { Car, Truck, Bike, X, CalendarDays, ClipboardCheck, Gauge, ReceiptText, ShieldCheck, Tag, Wrench, StickyNote, Building2, Flame, Euro, User, type LucideIcon } from 'lucide-react';
 import type { Vehicle, VehicleInsert, VehicleType } from '@/lib/types';
-import { INSURANCE_COMPANIES } from '@/lib/insurance-presets';
+import { INSURANCE_COMPANIES, VEHICLE_INSURANCE_CATEGORIES } from '@/lib/insurance-presets';
+import { CategoryMultiSelect } from './insurance-forms';
 
 export const VEHICLE_TYPES: VehicleType[] = ['Auto', 'Furgone', 'Motoveicolo'];
 
@@ -21,7 +23,7 @@ const MONTHS = [
 ] as const;
 
 const CURRENT_YEAR = new Date().getFullYear();
-const TAX_YEARS = Array.from({ length: 11 }, (_, i) => String(CURRENT_YEAR + i));
+const TAX_YEARS = Array.from({ length: 26 }, (_, i) => String(CURRENT_YEAR - 10 + i));
 
 export function formatMonthYear(dateStr: string | null): string {
   if (!dateStr) return 'N/D';
@@ -85,6 +87,7 @@ export function VehicleEditCard({
 }) {
   const [form, setForm] = useState<VehicleInsert>({
     type: vehicle.type,
+    owner_type: vehicle.owner_type ?? 'Azienda',
     plate: vehicle.plate,
     brand: vehicle.brand,
     model: vehicle.model,
@@ -95,6 +98,10 @@ export function VehicleEditCard({
     insurance_expiry: vehicle.insurance_expiry ?? '',
     insurance_company: vehicle.insurance_company ?? '',
     insurance_premium: vehicle.insurance_premium,
+    insurance_categories: vehicle.insurance_categories ?? [],
+    tax_cost: vehicle.tax_cost,
+    inspection_cost: vehicle.inspection_cost,
+    service_cost: vehicle.service_cost,
     inspection_expiry: vehicle.inspection_expiry ?? '',
     gas_cylinders_inspection_expiry: vehicle.gas_cylinders_inspection_expiry ?? '',
     methane_inspection_expiry: vehicle.methane_inspection_expiry ?? '',
@@ -165,9 +172,10 @@ export function VehicleFormModal({
   onSave: (input: VehicleInsert) => Promise<void>;
 }) {
   const [form, setForm] = useState<VehicleInsert>({
-    type: 'Auto', plate: '', brand: '', model: '', mileage_km: 0,
+    type: 'Auto', owner_type: 'Azienda', plate: '', brand: '', model: '', mileage_km: 0,
     service_interval_km: 20000, last_service_km: 0, last_service_date: '',
     insurance_expiry: '', insurance_company: '', insurance_premium: null, inspection_expiry: '',
+    insurance_categories: [], tax_cost: null, inspection_cost: null, service_cost: null,
     gas_cylinders_inspection_expiry: '', methane_inspection_expiry: '',
     tax_expiry: '', vehicle_category: '', notes: '',
   });
@@ -242,6 +250,15 @@ function VehicleFormFields({
         <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
           <Car size={14} className="text-blue-900" /> Identificazione veicolo
         </div>
+        <div className="mb-3 grid grid-cols-2 gap-2">
+          {(['Privato', 'Azienda'] as const).map((owner) => {
+            const Icon = owner === 'Privato' ? User : Building2;
+            return <button key={owner} type="button" onClick={() => update('owner_type', owner)}
+              className={`flex items-center justify-center gap-1.5 rounded-lg border px-2 py-2 text-xs font-semibold ${form.owner_type === owner ? 'border-blue-900 bg-blue-900 text-white' : 'border-slate-200 bg-white text-slate-600 hover:bg-blue-50'}`}>
+              <Icon size={15} /> {owner === 'Azienda' ? 'Aziendale' : owner}
+            </button>;
+          })}
+        </div>
         <div className="grid grid-cols-3 gap-2">
           {VEHICLE_TYPES.map((t) => {
             const Icon = t === 'Furgone' ? Truck : t === 'Motoveicolo' ? Bike : Car;
@@ -298,6 +315,9 @@ function VehicleFormFields({
           <Field label="Data ultimo tagliando" icon={CalendarDays}>
             <input type="date" value={form.last_service_date ?? ''} onChange={(e) => update('last_service_date', e.target.value)} className={inputClass} />
           </Field>
+          <Field label="Costo ultimo tagliando (€)" icon={Euro}>
+            <input type="number" min="0" step="0.01" value={form.service_cost ?? ''} onChange={(e) => update('service_cost', e.target.value === '' ? null : Number(e.target.value))} className={inputClass} />
+          </Field>
         </div>
       </section>
 
@@ -328,11 +348,22 @@ function VehicleFormFields({
           <Field label="Premio assicurativo (€)" icon={Euro}>
             <input type="number" step="0.01" min="0" value={form.insurance_premium ?? ''} onChange={(e) => update('insurance_premium', e.target.value === '' ? null : parseFloat(e.target.value))} placeholder="0.00" className={inputClass} />
           </Field>
+          <Field label="Garanzie della polizza" icon={ShieldCheck}>
+            <CategoryMultiSelect value={form.insurance_categories.join(', ')} options={VEHICLE_INSURANCE_CATEGORIES}
+              customCategories={[]}
+              onChange={(value) => update('insurance_categories', value.split(',').map((s) => s.trim()).filter(Boolean))} />
+          </Field>
           <Field label="Scadenza bollo" icon={ReceiptText}>
             <MonthYearPicker value={form.tax_expiry ?? ''} onChange={(v) => update('tax_expiry', v)} />
           </Field>
+          <Field label="Costo bollo (€)" icon={Euro}>
+            <input type="number" min="0" step="0.01" value={form.tax_cost ?? ''} onChange={(e) => update('tax_cost', e.target.value === '' ? null : Number(e.target.value))} className={inputClass} />
+          </Field>
           <Field label="Scadenza revisione" icon={ClipboardCheck}>
-            <input type="date" value={form.inspection_expiry ?? ''} onChange={(e) => update('inspection_expiry', e.target.value)} className={inputClass} />
+            <MonthYearPicker value={form.inspection_expiry ?? ''} onChange={(v) => update('inspection_expiry', v)} />
+          </Field>
+          <Field label="Costo revisione (€)" icon={Euro}>
+            <input type="number" min="0" step="0.01" value={form.inspection_cost ?? ''} onChange={(e) => update('inspection_cost', e.target.value === '' ? null : Number(e.target.value))} className={inputClass} />
           </Field>
           <Field label="Revisione bombole gas (10 anni)" icon={Flame}>
             <input type="date" value={form.gas_cylinders_inspection_expiry ?? ''} onChange={(e) => update('gas_cylinders_inspection_expiry', e.target.value)} className={inputClass} />
