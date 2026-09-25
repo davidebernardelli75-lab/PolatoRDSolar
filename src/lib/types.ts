@@ -137,7 +137,6 @@ export type VehicleType = 'Auto' | 'Furgone' | 'Motoveicolo';
 
 export interface Vehicle {
   id: string;
-  owner_type: OwnerType;
   type: VehicleType;
   plate: string;
   brand: string;
@@ -149,10 +148,6 @@ export interface Vehicle {
   insurance_expiry: string | null;
   insurance_company: string | null;
   insurance_premium: number | null;
-  insurance_categories: string[];
-  tax_cost: number | null;
-  inspection_cost: number | null;
-  service_cost: number | null;
   inspection_expiry: string | null;
   gas_cylinders_inspection_expiry: string | null;
   methane_inspection_expiry: string | null;
