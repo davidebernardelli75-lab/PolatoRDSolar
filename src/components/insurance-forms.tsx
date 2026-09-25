@@ -1,7 +1,25 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { X, ShieldCheck, FileText, Package, Euro, CalendarDays, StickyNote, User, Building2, type LucideIcon } from 'lucide-react';
 import type { Insurance, InsuranceInsert } from '@/lib/types';
 import { INSURANCE_CATEGORIES, INSURANCE_COMPANIES } from '@/lib/insurance-presets';
+
+const CUSTOM_CATEGORIES_KEY = 'polato_custom_insurance_categories';
+
+function loadCustomCategories(): string[] {
+  try {
+    const stored = localStorage.getItem(CUSTOM_CATEGORIES_KEY);
+    return stored ? JSON.parse(stored) : [];
+  } catch { return []; }
+}
+
+function saveCustomCategory(value: string) {
+  if (!value.trim()) return;
+  const existing = loadCustomCategories();
+  if (!existing.includes(value)) {
+    existing.push(value);
+    localStorage.setItem(CUSTOM_CATEGORIES_KEY, JSON.stringify(existing));
+  }
+}
 
 export function InsuranceFormFields({
   form, update,
@@ -10,8 +28,12 @@ export function InsuranceFormFields({
   update: <K extends keyof InsuranceInsert>(key: K, value: InsuranceInsert[K]) => void;
 }) {
   const [customProvider, setCustomProvider] = useState(false);
+  const [customCategory, setCustomCategory] = useState(false);
+  const [customCategories, setCustomCategories] = useState<string[]>([]);
   const inputClass = 'w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-red-400 focus:ring-2 focus:ring-red-100';
   const selectClass = `${inputClass} uppercase`;
+
+  useEffect(() => { setCustomCategories(loadCustomCategories()); }, []);
 
   return (
     <div className="space-y-4">
@@ -34,10 +56,25 @@ export function InsuranceFormFields({
         </div>
         <div className="grid gap-3 sm:grid-cols-2">
           <Field label="Categoria" icon={ShieldCheck}>
-            <select value={form.category} onChange={(e) => update('category', e.target.value)} className={inputClass}>
-              <option value="">Categoria</option>
-              {INSURANCE_CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
-            </select>
+            {customCategory ? (
+              <div className="flex gap-1">
+                <input autoFocus value={form.category} onChange={(e) => update('category', e.target.value)} placeholder="Inserisci categoria" className={inputClass} />
+                <button type="button" onClick={() => { setCustomCategory(false); update('category', ''); }} className="flex items-center justify-center px-2.5 bg-slate-200 hover:bg-slate-300 text-slate-600 rounded-lg transition-colors">
+                  <X size={16} />
+                </button>
+              </div>
+            ) : (
+              <select value={form.category} onChange={(e) => {
+                const val = e.target.value;
+                if (val === '__custom') { setCustomCategory(true); update('category', ''); }
+                else update('category', val);
+              }} className={inputClass}>
+                <option value="">Categoria</option>
+                {INSURANCE_CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+                {customCategories.map((c) => <option key={c} value={c}>{c}</option>)}
+                <option value="__custom">Altro...</option>
+              </select>
+            )}
           </Field>
           <Field label="Compagnia" icon={ShieldCheck}>
             {customProvider ? (
@@ -121,6 +158,7 @@ export function InsuranceEditCard({
   const handleSave = async () => {
     setSaving(true);
     try {
+      if (customCategory && form.category.trim()) saveCustomCategory(form.category.trim());
       await onSave({
         ...form,
         policy_number: form.policy_number || null,
@@ -168,6 +206,7 @@ export function InsuranceFormModal({
   const handleSave = async () => {
     setSaving(true);
     try {
+      if (customCategory && form.category.trim()) saveCustomCategory(form.category.trim());
       await onSave({
         ...form,
         policy_number: form.policy_number || null,
