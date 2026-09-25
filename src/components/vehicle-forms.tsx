@@ -51,6 +51,7 @@ export function VehicleEditCard({
     notes: vehicle.notes ?? '',
   });
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const update = <K extends keyof VehicleInsert>(key: K, value: VehicleInsert[K]) => {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -58,6 +59,7 @@ export function VehicleEditCard({
 
   const handleSave = async () => {
     setSaving(true);
+    setError(null);
     try {
       await onSave({
         ...form,
@@ -71,8 +73,8 @@ export function VehicleEditCard({
         vehicle_category: form.vehicle_category || null,
         notes: form.notes || null,
       });
-    } catch {
-      // skip
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Errore durante il salvataggio');
     } finally {
       setSaving(false);
     }
@@ -87,6 +89,7 @@ export function VehicleEditCard({
         </button>
       </div>
       <VehicleFormFields form={form} update={update} />
+      {error && <div className="text-sm text-red-600 bg-red-50 rounded-lg p-2">{error}</div>}
       <div className="flex gap-2">
         <button onClick={handleSave} disabled={saving}
           className="flex-1 bg-blue-900 hover:bg-blue-800 text-white text-sm font-medium py-2 rounded-lg transition-colors">
@@ -116,6 +119,7 @@ export function VehicleFormModal({
     tax_expiry: '', vehicle_category: '', notes: '',
   });
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const update = <K extends keyof VehicleInsert>(key: K, value: VehicleInsert[K]) => {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -123,6 +127,7 @@ export function VehicleFormModal({
 
   const handleSave = async () => {
     setSaving(true);
+    setError(null);
     try {
       await onSave({
         ...form,
@@ -136,8 +141,8 @@ export function VehicleFormModal({
         vehicle_category: form.vehicle_category || null,
         notes: form.notes || null,
       });
-    } catch {
-      // skip
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Errore durante il salvataggio');
     } finally {
       setSaving(false);
     }
@@ -154,6 +159,7 @@ export function VehicleFormModal({
         </div>
         <div className="space-y-3">
           <VehicleFormFields form={form} update={update} />
+          {error && <div className="text-sm text-red-600 bg-red-50 rounded-lg p-2">{error}</div>}
           <button onClick={handleSave} disabled={saving}
             className="w-full bg-blue-900 hover:bg-blue-800 text-white text-sm font-medium py-2.5 rounded-lg transition-colors">
             {saving ? 'Salvataggio...' : 'Salva Veicolo'}
@@ -227,13 +233,13 @@ function VehicleFormFields({
         </div>
         <div className="grid gap-3 sm:grid-cols-2">
           <Field label="Chilometri attuali" icon={Gauge}>
-            <input type="number" min="0" value={form.mileage_km} onChange={(e) => update('mileage_km', parseFloat(e.target.value) || 0)} className={inputClass} />
+            <input type="number" min="0" value={form.mileage_km} onChange={(e) => update('mileage_km', Math.round(parseFloat(e.target.value) || 0))} className={inputClass} />
           </Field>
           <Field label="Intervallo tagliando (km)" icon={Wrench}>
-            <input type="number" min="1000" step="1000" value={form.service_interval_km} onChange={(e) => update('service_interval_km', parseFloat(e.target.value) || 20000)} className={inputClass} />
+            <input type="number" min="1000" step="1000" value={form.service_interval_km} onChange={(e) => update('service_interval_km', Math.round(parseFloat(e.target.value) || 20000))} className={inputClass} />
           </Field>
           <Field label="Km ultimo tagliando" icon={Wrench}>
-            <input type="number" min="0" value={form.last_service_km} onChange={(e) => update('last_service_km', parseFloat(e.target.value) || 0)} className={inputClass} />
+            <input type="number" min="0" value={form.last_service_km} onChange={(e) => update('last_service_km', Math.round(parseFloat(e.target.value) || 0))} className={inputClass} />
           </Field>
           <Field label="Data ultimo tagliando" icon={CalendarDays}>
             <input type="date" value={form.last_service_date ?? ''} onChange={(e) => update('last_service_date', e.target.value)} className={inputClass} />
