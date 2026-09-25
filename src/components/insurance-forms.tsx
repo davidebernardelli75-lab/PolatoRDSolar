@@ -9,6 +9,7 @@ export function InsuranceFormFields({
   form: InsuranceInsert;
   update: <K extends keyof InsuranceInsert>(key: K, value: InsuranceInsert[K]) => void;
 }) {
+  const [customProvider, setCustomProvider] = useState(false);
   const inputClass = 'w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-red-400 focus:ring-2 focus:ring-red-100';
   const selectClass = `${inputClass} uppercase`;
 
@@ -26,16 +27,22 @@ export function InsuranceFormFields({
             </select>
           </Field>
           <Field label="Compagnia" icon={ShieldCheck}>
-            <select value={form.provider} onChange={(e) => update('provider', e.target.value)} className={selectClass}>
-              <option value="">Compagnia</option>
-              {INSURANCE_COMPANIES.map((c) => <option key={c} value={c}>{c}</option>)}
-              <option value="__custom">Altro...</option>
-            </select>
+            {customProvider ? (
+              <div className="flex gap-1">
+                <input autoFocus value={form.provider} onChange={(e) => update('provider', e.target.value.toUpperCase())} placeholder="Inserisci compagnia" className={selectClass} />
+                <button type="button" onClick={() => { setCustomProvider(false); update('provider', ''); }} className="flex items-center justify-center px-2.5 bg-slate-200 hover:bg-slate-300 text-slate-600 rounded-lg transition-colors">
+                  <X size={16} />
+                </button>
+              </div>
+            ) : (
+              <select value={form.provider} onChange={(e) => { const val = e.target.value; if (val === '__custom') { setCustomProvider(true); update('provider', ''); } else update('provider', val); }} className={selectClass}>
+                <option value="">Compagnia</option>
+                {INSURANCE_COMPANIES.map((c) => <option key={c} value={c}>{c}</option>)}
+                <option value="__custom">Altro...</option>
+              </select>
+            )}
           </Field>
         </div>
-        {form.provider === '__custom' && (
-          <input value="" onChange={(e) => update('provider', e.target.value.toUpperCase())} placeholder="Inserisci compagnia personalizzata" className={`${selectClass} mt-3`} />
-        )}
       </section>
 
       <section className="rounded-xl border border-slate-200 bg-slate-50/70 p-3">

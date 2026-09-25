@@ -164,6 +164,8 @@ function VehicleFormFields({
   form: VehicleInsert;
   update: <K extends keyof VehicleInsert>(key: K, value: VehicleInsert[K]) => void;
 }) {
+  const [customBrand, setCustomBrand] = useState(false);
+  const [customInsurance, setCustomInsurance] = useState(false);
   const inputClass = 'w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-red-400 focus:ring-2 focus:ring-red-100';
   const selectClass = `${inputClass} uppercase`;
 
@@ -191,19 +193,25 @@ function VehicleFormFields({
             <input value={form.plate} onChange={(e) => update('plate', e.target.value.toUpperCase())} placeholder="AB123CD" className={selectClass} />
           </Field>
           <Field label="Marca" icon={Building2}>
-            <select value={form.brand} onChange={(e) => update('brand', e.target.value.toUpperCase())} className={selectClass}>
-              <option value="">Marca</option>
-              {VEHICLE_BRANDS.map((b) => <option key={b} value={b}>{b}</option>)}
-              <option value="__custom">Altro...</option>
-            </select>
+            {customBrand ? (
+              <div className="flex gap-1">
+                <input autoFocus value={form.brand} onChange={(e) => update('brand', e.target.value.toUpperCase())} placeholder="Inserisci marca" className={selectClass} />
+                <button type="button" onClick={() => { setCustomBrand(false); update('brand', ''); }} className="flex items-center justify-center px-2.5 bg-slate-200 hover:bg-slate-300 text-slate-600 rounded-lg transition-colors">
+                  <X size={16} />
+                </button>
+              </div>
+            ) : (
+              <select value={form.brand} onChange={(e) => { const val = e.target.value.toUpperCase(); if (val === '__CUSTOM') { setCustomBrand(true); update('brand', ''); } else update('brand', val); }} className={selectClass}>
+                <option value="">Marca</option>
+                {VEHICLE_BRANDS.map((b) => <option key={b} value={b}>{b}</option>)}
+                <option value="__custom">Altro...</option>
+              </select>
+            )}
           </Field>
           <Field label="Modello" icon={Car}>
             <input value={form.model} onChange={(e) => update('model', e.target.value.toUpperCase())} placeholder="Modello" className={selectClass} />
           </Field>
         </div>
-        {form.brand === '__custom' && (
-          <input value="" onChange={(e) => update('brand', e.target.value.toUpperCase())} placeholder="Inserisci marca personalizzata" className={`${selectClass} mt-3`} />
-        )}
       </section>
 
       <section className="rounded-xl border border-slate-200 bg-slate-50/70 p-3">
@@ -235,11 +243,20 @@ function VehicleFormFields({
             <input type="date" value={form.insurance_expiry ?? ''} onChange={(e) => update('insurance_expiry', e.target.value)} className={inputClass} />
           </Field>
           <Field label="Compagnia assicurativa" icon={ShieldCheck}>
-            <select value={form.insurance_company ?? ''} onChange={(e) => update('insurance_company', e.target.value)} className={selectClass}>
-              <option value="">Compagnia</option>
-              {INSURANCE_COMPANIES.map((c) => <option key={c} value={c}>{c}</option>)}
-              <option value="__custom">Altro...</option>
-            </select>
+            {customInsurance ? (
+              <div className="flex gap-1">
+                <input autoFocus value={form.insurance_company ?? ''} onChange={(e) => update('insurance_company', e.target.value.toUpperCase())} placeholder="Inserisci compagnia" className={selectClass} />
+                <button type="button" onClick={() => { setCustomInsurance(false); update('insurance_company', ''); }} className="flex items-center justify-center px-2.5 bg-slate-200 hover:bg-slate-300 text-slate-600 rounded-lg transition-colors">
+                  <X size={16} />
+                </button>
+              </div>
+            ) : (
+              <select value={form.insurance_company ?? ''} onChange={(e) => { const val = e.target.value; if (val === '__custom') { setCustomInsurance(true); update('insurance_company', ''); } else update('insurance_company', val); }} className={selectClass}>
+                <option value="">Compagnia</option>
+                {INSURANCE_COMPANIES.map((c) => <option key={c} value={c}>{c}</option>)}
+                <option value="__custom">Altro...</option>
+              </select>
+            )}
           </Field>
           <Field label="Scadenza bollo" icon={ReceiptText}>
             <input type="date" value={form.tax_expiry ?? ''} onChange={(e) => update('tax_expiry', e.target.value)} className={inputClass} />
@@ -248,9 +265,6 @@ function VehicleFormFields({
             <input type="date" value={form.inspection_expiry ?? ''} onChange={(e) => update('inspection_expiry', e.target.value)} className={inputClass} />
           </Field>
         </div>
-        {form.insurance_company === '__custom' && (
-          <input value="" onChange={(e) => update('insurance_company', e.target.value.toUpperCase())} placeholder="Inserisci compagnia personalizzata" className={`${selectClass} mt-3`} />
-        )}
       </section>
 
       <Field label="Note" icon={StickyNote}>

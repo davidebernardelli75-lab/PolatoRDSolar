@@ -34,6 +34,7 @@ export const INSURANCE_COMPANIES = [
   'CHUBB',
   'AIG',
   'LLOYD\'S',
+  'VITTORIA',
 ] as const;
 
 export const INSURANCE_CATEGORIES = [
