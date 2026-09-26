@@ -52,13 +52,13 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON public.vehicles, public.insurances TO au
 
 CREATE POLICY vehicles_admin_only
   ON public.vehicles FOR ALL TO authenticated
-  USING ((SELECT private.is_polato_admin()))
-  WITH CHECK ((SELECT private.is_polato_admin()));
+  USING ((SELECT polato_internal.is_polato_admin()))
+  WITH CHECK ((SELECT polato_internal.is_polato_admin()));
 
 CREATE POLICY insurances_admin_only
   ON public.insurances FOR ALL TO authenticated
-  USING ((SELECT private.is_polato_admin()))
-  WITH CHECK ((SELECT private.is_polato_admin()));
+  USING ((SELECT polato_internal.is_polato_admin()))
+  WITH CHECK ((SELECT polato_internal.is_polato_admin()));
 
 NOTIFY pgrst, 'reload schema';
 COMMIT;
