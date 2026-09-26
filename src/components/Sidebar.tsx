@@ -161,8 +161,8 @@ function ChangePasswordModal({ onClose }: { onClose: () => void }) {
     event.preventDefault();
     setError(null);
 
-    if (newPassword.length < 8) {
-      setError('La nuova password deve avere almeno 8 caratteri.');
+    if (newPassword.length < 12) {
+      setError('La nuova password deve avere almeno 12 caratteri.');
       return;
     }
     if (newPassword !== confirmPassword) {
@@ -253,7 +253,7 @@ function ChangePasswordModal({ onClose }: { onClose: () => void }) {
                 {showNew ? <EyeOff size={18} /> : <Eye size={18} />}
               </button>
             </div>
-            <p className="mt-1 text-xs text-slate-500">Minimo 8 caratteri</p>
+            <p className="mt-1 text-xs text-slate-500">Minimo 12 caratteri</p>
           </label>
           <label className="block text-sm font-medium text-slate-700">Conferma nuova password
             <div className="relative mt-1.5">
