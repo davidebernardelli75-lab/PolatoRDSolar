@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Sun, LayoutGrid, LogOut, X, KeyRound, Eye, EyeOff, Car, AlertTriangle, ShieldCheck } from 'lucide-react';
+import { Sun, LayoutGrid, LogOut, X, KeyRound, Eye, EyeOff, Car, AlertTriangle, ShieldCheck, GraduationCap } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import type { View } from '@/App';
 import { fetchVehicles } from '@/lib/api';
@@ -9,14 +9,19 @@ interface SidebarProps {
   onClose: () => void;
   onNavigate: (view: View) => void;
   currentView: View;
+  isAdmin: boolean;
   onSignOut: () => void;
 }
 
-export function Sidebar({ open, onClose, onNavigate, currentView, onSignOut }: SidebarProps) {
+export function Sidebar({ open, onClose, onNavigate, currentView, isAdmin, onSignOut }: SidebarProps) {
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [vehicleAlerts, setVehicleAlerts] = useState(0);
 
   useEffect(() => {
+    if (!isAdmin) {
+      setVehicleAlerts(0);
+      return;
+    }
     let cancelled = false;
     const loadAlerts = async () => {
       try {
@@ -39,12 +44,15 @@ export function Sidebar({ open, onClose, onNavigate, currentView, onSignOut }: S
     loadAlerts();
     const interval = setInterval(loadAlerts, 60000);
     return () => { cancelled = true; clearInterval(interval); };
-  }, []);
+  }, [isAdmin]);
 
   const items = [
     { id: 'dashboard' as const, label: 'Impianti FV', icon: LayoutGrid },
-    { id: 'vehicles' as const, label: 'Parco Automezzi', icon: Car, badge: vehicleAlerts },
-    { id: 'insurances' as const, label: 'Assicurazioni', icon: ShieldCheck },
+    ...(isAdmin ? [
+      { id: 'vehicles' as const, label: 'Parco Automezzi', icon: Car, badge: vehicleAlerts },
+      { id: 'insurances' as const, label: 'Assicurazioni', icon: ShieldCheck },
+      { id: 'training' as const, label: 'Formazione personale', icon: GraduationCap },
+    ] : []),
   ];
 
   return (
@@ -86,7 +94,8 @@ export function Sidebar({ open, onClose, onNavigate, currentView, onSignOut }: S
             const active =
               (item.id === 'dashboard' && currentView.name === 'dashboard') ||
               (item.id === 'vehicles' && currentView.name === 'vehicles') ||
-              (item.id === 'insurances' && currentView.name === 'insurances');
+              (item.id === 'insurances' && currentView.name === 'insurances') ||
+              (item.id === 'training' && currentView.name === 'training');
             const badge = 'badge' in item && item.badge ? item.badge : 0;
             return (
               <button
@@ -152,8 +161,8 @@ function ChangePasswordModal({ onClose }: { onClose: () => void }) {
     event.preventDefault();
     setError(null);
 
-    if (newPassword.length < 8) {
-      setError('La nuova password deve avere almeno 8 caratteri.');
+    if (newPassword.length < 12) {
+      setError('La nuova password deve avere almeno 12 caratteri.');
       return;
     }
     if (newPassword !== confirmPassword) {
@@ -244,7 +253,7 @@ function ChangePasswordModal({ onClose }: { onClose: () => void }) {
                 {showNew ? <EyeOff size={18} /> : <Eye size={18} />}
               </button>
             </div>
-            <p className="mt-1 text-xs text-slate-500">Minimo 8 caratteri</p>
+            <p className="mt-1 text-xs text-slate-500">Minimo 12 caratteri</p>
           </label>
           <label className="block text-sm font-medium text-slate-700">Conferma nuova password
             <div className="relative mt-1.5">
