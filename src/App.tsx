@@ -10,6 +10,7 @@ import { PlantDetail } from '@/components/PlantDetail';
 import { Login } from '@/components/Login';
 import { VehicleDashboard } from '@/components/VehicleDashboard';
 import { InsuranceDashboard } from '@/components/InsuranceDashboard';
+import { TrainingDashboard } from '@/components/TrainingDashboard';
 
 export type View =
   | { name: 'dashboard' }
@@ -17,7 +18,8 @@ export type View =
   | { name: 'edit-plant'; plantId: string }
   | { name: 'plant'; plantId: string }
   | { name: 'vehicles' }
-  | { name: 'insurances' };
+  | { name: 'insurances' }
+  | { name: 'training' };
 
 export default function App() {
   const [session, setSession] = useState<Session | null>(null);
@@ -157,6 +159,9 @@ export default function App() {
           )}
           {view.name === 'insurances' && (
             <InsuranceDashboard />
+          )}
+          {view.name === 'training' && (
+            <TrainingDashboard />
           )}
         </main>
       </div>
