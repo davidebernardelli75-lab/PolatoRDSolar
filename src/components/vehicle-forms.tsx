@@ -43,6 +43,11 @@ export function formatMonthYear(dateStr: string | null): string {
 function MonthYearPicker({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   const month = value ? value.slice(5, 7) : '';
   const year = value ? value.slice(0, 4) : '';
+  // Include legacy years outside the usual picker range so existing vehicle
+  // records are still editable without losing their original month/year.
+  const years = year && !TAX_YEARS.includes(year)
+    ? [...TAX_YEARS, year].sort((a, b) => Number(a) - Number(b))
+    : TAX_YEARS;
   const inputClass = 'w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-red-400 focus:ring-2 focus:ring-red-100';
   return (
     <div className="flex gap-2">
@@ -59,7 +64,7 @@ function MonthYearPicker({ value, onChange }: { value: string; onChange: (v: str
         onChange(y ? `${y}-${month || '01'}-01` : '');
       }} className={inputClass}>
         <option value="">Anno</option>
-        {TAX_YEARS.map((y) => <option key={y} value={y}>{y}</option>)}
+        {years.map((y) => <option key={y} value={y}>{y}</option>)}
       </select>
     </div>
   );
@@ -372,11 +377,11 @@ function VehicleFormFields({
           <Field label="Costo revisione (€)" icon={Euro}>
             <input type="number" min="0" step="0.01" value={form.inspection_cost ?? ''} onChange={(e) => update('inspection_cost', e.target.value === '' ? null : Number(e.target.value))} className={inputClass} />
           </Field>
-          <Field label="Revisione bombole gas (10 anni)" icon={Flame}>
-            <input type="date" value={form.gas_cylinders_inspection_expiry ?? ''} onChange={(e) => update('gas_cylinders_inspection_expiry', e.target.value)} className={inputClass} />
+          <Field label="Revisione bombole gas (mese/anno)" icon={Flame}>
+            <MonthYearPicker value={form.gas_cylinders_inspection_expiry ?? ''} onChange={(v) => update('gas_cylinders_inspection_expiry', v)} />
           </Field>
-          <Field label="Revisione metano" icon={Flame}>
-            <input type="date" value={form.methane_inspection_expiry ?? ''} onChange={(e) => update('methane_inspection_expiry', e.target.value)} className={inputClass} />
+          <Field label="Revisione metano (mese/anno)" icon={Flame}>
+            <MonthYearPicker value={form.methane_inspection_expiry ?? ''} onChange={(v) => update('methane_inspection_expiry', v)} />
           </Field>
         </div>
       </section>
