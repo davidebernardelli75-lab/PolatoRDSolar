@@ -1,0 +1,36 @@
+name: Check personnel training
+on:
+  pull_request:
+    paths:
+      - 'src/components/TrainingDashboard.tsx'
+      - 'src/lib/training-*.ts'
+      - 'src/App.tsx'
+      - 'src/components/Sidebar.tsx'
+      - '.github/workflows/check-training-dashboard.yml'
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+      - run: npm ci --ignore-scripts
+      - name: Typecheck excluding two known unrelated main-branch errors
+        shell: bash
+        run: |
+          set +e
+          npm run typecheck 2>&1 | tee /tmp/tsc.log
+          code=${PIPESTATUS[0]}
+          set -e
+          if [ "$code" -ne 0 ]; then
+            grep -E 'error TS[0-9]+' /tmp/tsc.log > /tmp/ts-errors.log || true
+            if [ ! -s /tmp/ts-errors.log ]; then exit 1; fi
+            grep -Ev 'src/components/PlantEditor\.tsx\([0-9]+,[0-9]+\): error TS2345|src/lib/use-equipment-options\.ts\([0-9]+,[0-9]+\): error TS2345' /tmp/ts-errors.log > /tmp/unexpected.log || true
+            if [ -s /tmp/unexpected.log ]; then cat /tmp/unexpected.log; exit 1; fi
+            echo '::warning::Two known pre-existing TS errors in unrelated files; no new errors.'
+          fi
+      - run: npm run build
