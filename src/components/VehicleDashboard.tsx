@@ -1,11 +1,11 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Car, Truck, Bike, Plus, Trash2, FileText, Loader2, ChevronDown, AlertTriangle, Calendar, Wrench, Shield, Receipt, Flame, FileDown, User, Building2 } from 'lucide-react';
+import { Car, Truck, Bike, Plus, Trash2, FileText, Loader2, ChevronDown, AlertTriangle, Calendar, Wrench, Shield, Receipt, Flame, FileDown, User, Building2, RefreshCw } from 'lucide-react';
 import type { Vehicle, VehicleInsert } from '@/lib/types';
 import { fetchVehicles, createVehicle, updateVehicle, deleteVehicle } from '@/lib/api';
 import { DetailItem, VehicleEditCard, VehicleFormModal, formatMonthYear } from './vehicle-forms';
 import { generateVehiclePdf } from '@/lib/pdf';
 import { saveAs } from 'file-saver';
-import { calculateVehicleCosts } from '@/lib/vehicle-cost-summary';
+import { calculateVehicleCosts, calculateRegisteredVehicleCosts } from '@/lib/vehicle-cost-summary';
 
 function daysUntil(dateStr: string | null, monthOnly = false): number | null {
   if (!dateStr) return null;
@@ -76,13 +76,22 @@ export function VehicleDashboard() {
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [reportYear, setReportYear] = useState(new Date().getFullYear());
   const report = calculateVehicleCosts(vehicles, reportYear);
+  const registered = calculateRegisteredVehicleCosts(vehicles);
 
   const loadVehicles = useCallback(async () => {
     setLoading(true);
-    try { const data = await fetchVehicles(); setVehicles(data); }
-    catch { /* skip */ } finally { setLoading(false); }
+    try {
+      const data = await fetchVehicles();
+      setVehicles(data);
+      setLoadError(null);
+    } catch (error) {
+      setLoadError(error instanceof Error ? error.message : 'Impossibile aggiornare gli automezzi.');
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => { loadVehicles(); }, [loadVehicles]);
@@ -111,9 +120,48 @@ export function VehicleDashboard() {
         </div>
       </div>
 
+      {loadError && (
+        <div role="alert" className="mb-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+          Errore caricamento automezzi: {loadError}
+          <button type="button" onClick={() => { void loadVehicles(); }}
+            className="ml-3 underline">Riprova</button>
+        </div>
+      )}
+
+      <section aria-label="Totale spese automezzi registrate" className="mb-4 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 lg:p-5">
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
+          <div>
+            <h2 className="font-semibold text-slate-900">Spese di gestione registrate</h2>
+            <p className="text-xs text-slate-600">Ultimi importi inseriti nelle anagrafiche: si aggiornano al salvataggio, indipendentemente dalle scadenze.</p>
+          </div>
+          <button type="button" onClick={() => { void loadVehicles(); }} aria-label="Aggiorna rendiconto automezzi"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-300 bg-white px-3 py-2 text-xs font-medium text-emerald-900 hover:bg-emerald-100">
+            <RefreshCw size={14} /> Aggiorna
+          </button>
+        </div>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          {([
+            ['Assicurazioni veicoli', registered.insurances],
+            ['Revisioni', registered.inspections],
+            ['Bolli', registered.taxes],
+            ['Tagliandi', registered.services],
+          ] as const).map(([label, amount]) => (
+            <div key={label} className="rounded-xl bg-white p-3">
+              <div className="text-xs text-slate-500">{label}</div>
+              <div className="mt-1 font-semibold text-slate-900">{amount.toLocaleString('it-IT', { style: 'currency', currency: 'EUR' })}</div>
+            </div>
+          ))}
+        </div>
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-emerald-200 pt-3 font-bold text-emerald-900">
+          <span>Totale importi registrati</span>
+          <span>{registered.total.toLocaleString('it-IT', { style: 'currency', currency: 'EUR' })}</span>
+        </div>
+        <p className="mt-2 text-xs text-slate-600">Fotografia degli ultimi costi per veicolo, non somma delle fatture pagate nell'anno.</p>
+      </section>
+
       <section aria-label="Rendiconto annuale automezzi" className="mb-6 rounded-2xl border border-slate-200 bg-white p-4 lg:p-5">
         <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
-          <h2 className="font-semibold text-slate-900">Rendiconto automezzi</h2>
+          <h2 className="font-semibold text-slate-900">Riepilogo per anno di riferimento</h2>
           <label className="flex items-center gap-2 text-sm text-slate-700">Anno
             <select aria-label="Anno rendiconto automezzi" value={reportYear}
               onChange={(e) => setReportYear(Number(e.target.value))}
@@ -141,8 +189,10 @@ export function VehicleDashboard() {
           <span>{report.total.toLocaleString('it-IT', { style: 'currency', currency: 'EUR' })}</span>
         </div>
         <p className="mt-2 text-xs text-slate-500">
-          Importi registrati o previsti: assicurazioni, bolli e revisioni per anno di scadenza;
-          tagliandi per data dell'ultimo intervento. Non è una contabilità dei pagamenti.
+          Questa vista include solo i costi con data di riferimento nell'anno selezionato:
+          scadenza per polizze, bolli e revisioni; ultimo intervento per tagliandi.
+          Un importo appena inserito può non comparire qui se la scadenza è in un altro anno.
+          Lo storico effettivo dei pagamenti richiederà registrazioni di spesa datate.
         </p>
       </section>
 
@@ -166,8 +216,14 @@ export function VehicleDashboard() {
           {vehicles.map((v) => (
             <VehicleCard key={v.id} vehicle={v} expanded={expandedId === v.id}
               onToggle={() => setExpandedId(expandedId === v.id ? null : v.id)}
-              onUpdate={async (input) => { await updateVehicle(v.id, input); loadVehicles(); }}
-              onDelete={async () => { await deleteVehicle(v.id); loadVehicles(); }}
+              onUpdate={async (input) => {
+                const saved = await updateVehicle(v.id, input);
+                setVehicles((prev) => prev.map((row) => row.id === v.id ? saved : row));
+              }}
+              onDelete={async () => {
+                await deleteVehicle(v.id);
+                setVehicles((prev) => prev.filter((row) => row.id !== v.id));
+              }}
             />
           ))}
         </div>
@@ -175,7 +231,11 @@ export function VehicleDashboard() {
 
       {showForm && (
         <VehicleFormModal onClose={() => setShowForm(false)}
-          onSave={async (input) => { await createVehicle(input); loadVehicles(); setShowForm(false); }}
+          onSave={async (input) => {
+            const saved = await createVehicle(input);
+            setVehicles((prev) => [saved, ...prev]);
+            setShowForm(false);
+          }}
         />
       )}
     </div>
