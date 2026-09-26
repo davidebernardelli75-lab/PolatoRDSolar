@@ -19,7 +19,7 @@ CREATE POLICY app_user_roles_self_read
   USING ((SELECT auth.uid()) = user_id);
 
 -- Keep SECURITY DEFINER helper in a schema not exposed by PostgREST.
-CREATE SCHEMA IF NOT EXISTS private;
+CREATE SCHEMA IF NOT EXISTS polato_internal;
 REVOKE ALL ON SCHEMA polato_internal FROM PUBLIC, anon;
 GRANT USAGE ON SCHEMA polato_internal TO authenticated;
 
