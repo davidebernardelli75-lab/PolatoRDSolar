@@ -168,7 +168,7 @@ export default function App() {
           )}
           {currentView.name === 'edit-plant' && (
             <PlantEditor
-              plantId={view.plantId}
+              plantId={currentView.plantId}
               onSaved={(id) => {
                 loadPlants();
                 navigate({ name: 'plant', plantId: id });
@@ -178,7 +178,7 @@ export default function App() {
           )}
           {currentView.name === 'plant' && (
             <PlantDetail
-              plantId={view.plantId}
+              plantId={currentView.plantId}
               onBack={() => {
                 loadPlants();
                 navigate({ name: 'dashboard' });
