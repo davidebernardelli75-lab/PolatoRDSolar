@@ -9,6 +9,7 @@ import { Dashboard } from '@/components/Dashboard';
 import { PlantEditor } from '@/components/PlantEditor';
 import { PlantDetail } from '@/components/PlantDetail';
 import { Login } from '@/components/Login';
+import { PasswordRecovery } from '@/components/PasswordRecovery';
 import { VehicleDashboard } from '@/components/VehicleDashboard';
 import { InsuranceDashboard } from '@/components/InsuranceDashboard';
 import { TrainingDashboard } from '@/components/TrainingDashboard';
@@ -25,6 +26,7 @@ export type View =
 export default function App() {
   const [session, setSession] = useState<Session | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
+  const [passwordRecovery, setPasswordRecovery] = useState(false);
   const [access, setAccess] = useState<{ userId: string; role: AppRole } | null>(null);
   const [accessError, setAccessError] = useState<string | null>(null);
   const [view, setView] = useState<View>({ name: 'dashboard' });
@@ -54,7 +56,10 @@ export default function App() {
       setSession(data.session);
       setAuthLoading(false);
     });
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, nextSession) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        setPasswordRecovery(true);
+      }
       setAccess(null);
       setSession(nextSession);
       setAuthLoading(false);
@@ -92,6 +97,15 @@ export default function App() {
   }, [loadPlants, session]);
 
   if (authLoading) return <div className="min-h-screen bg-slate-100 flex items-center justify-center text-sm text-slate-600">Verifica accesso…</div>;
+  // Supabase emits PASSWORD_RECOVERY after validating the emailed link.
+  // Never treat its temporary session as a normal dashboard sign-in.
+  if (passwordRecovery) return (
+    <PasswordRecovery onComplete={() => {
+      setPasswordRecovery(false);
+      setView({ name: 'dashboard' });
+      window.history.replaceState(null, '', window.location.pathname);
+    }} />
+  );
   if (!session) return <Login />;
 
   const isAdmin = access?.userId === session.user.id && access.role === 'admin';
