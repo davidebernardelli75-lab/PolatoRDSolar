@@ -27,12 +27,86 @@ Distinguere formazione, addestramento, nomina/abilitazione e aggiornamento.
 Non si raccolgono codice fiscale, data di nascita o dati sanitari.
 Il pulsante disattiva dipendente, non elimina anagrafiche.
 
-## Privilegi
-Le tre tabelle hanno RLS attiva, nessun permesso alla role anon;
-gli utenti autenticati dell'app aziendale possono leggere/gestire i record,
-come nell'attuale app monazienda. Se si vuole una segregazione tra
-responsabile HR e altri dipendenti, aggiungere ruoli con policy specifiche
-PRIMA di applicare la migrazione.
+## Accessi e pubblicazione (ruoli gestiti lato database)
+**Personale operativo:** tutti gli utenti già autenticati nell'app possono accedere
+agli impianti FV e alle relative funzioni già autorizzate dalle policy esistenti.
+Non si modifica la RLS di plants, panels, panel_photos, roadmap o Storage.
+
+**Amministrazione:** solo gli utenti cui è stata attribuita esplicitamente
+la voce `admin` in `public.app_user_roles` possono leggere o modificare
+Parco Automezzi, Assicurazioni e Formazione personale.
+Senza un ruolo esplicito si è considerati `operator`.
+Il menu è nascosto e App blocca il routing, ma soprattutto il DB applica
+RLS a tutte le operazioni SELECT/INSERT/UPDATE/DELETE.
+I dati del personale, inclusi nomi e scadenze degli attestati, non sono
+accessibili agli altri utenti autenticati nemmeno interrogando le API.
+Non affidarsi a nascondere i pulsanti come unica protezione.
+
+### Rollout SICURO, obbligatorio prima di unire/dispiegare la PR
+Usare solo il progetto originale `fjmrfxjvqsdrwjucgzla`, dopo backup:
+1. Prima controllare le policy esistenti di `public.vehicles` e
+   `public.insurances` e verificare che nessuna integrazione legittima
+   usi quelle tabelle con account non amministrativi. Esempio di
+   interrogazione di sola lettura:
+
+   ```sql
+   SELECT schemaname, tablename, policyname, permissive, roles, cmd, qual
+   FROM pg_policies
+   WHERE schemaname = 'public' AND tablename IN ('vehicles', 'insurances');
+   ```
+
+2. Eseguire `supabase/migrations/20260926100000_app_admin_roles.sql`:
+   crea i ruoli e la funzione `polato_internal.is_polato_admin()`,
+   ma non modifica ancora l'accesso alle dashboard esistenti.
+
+3. **Assegnare il ruolo PRIMA di attivare la restrizione.**
+   Scegliere un account già esistente in Supabase Authentication -> Users,
+   verificare che l'email sia corretta, poi sostituire il segnaposto seguente
+   nello SQL Editor (NON inserire password nel codice o in chat):
+
+   ```sql
+   SELECT id, email FROM auth.users
+   WHERE lower(email) = lower('EMAIL_AMMINISTRATORE_DA_SOSTITUIRE');
+
+   INSERT INTO public.app_user_roles (user_id, role)
+   SELECT id, 'admin' FROM auth.users
+   WHERE lower(email) = lower('EMAIL_AMMINISTRATORE_DA_SOSTITUIRE')
+   ON CONFLICT (user_id) DO UPDATE SET role = 'admin';
+
+   SELECT u.email, r.role FROM public.app_user_roles r
+   JOIN auth.users u ON u.id = r.user_id WHERE r.role = 'admin';
+   ```
+   La query finale deve mostrare almeno un amministratore CORRETTO.
+   Gli operatori non richiedono un record: l'assenza di ruolo equivale a operator.
+
+4. Eseguire `supabase/migrations/20260926110000_personnel_training.sql`:
+   crea le tabelle corsi con RLS amministrativa fin dalla prima apertura.
+5. Subito prima della pubblicazione, eseguire
+   `supabase/migrations/20260926120000_restrict_admin_dashboards.sql`.
+   È transazionale e si interrompe se non esiste un admin o mancano le
+   tabelle precedenti. Sostituisce intenzionalmente eventuali vecchie policy
+   troppo permissive su vehicles/insurances. Prima verificarle come al punto 1.
+6. Dopo la revisione e i test, unire la PR, eseguire `polato-update` e
+   distribuire la nuova build. Il codice non contiene chiavi service_role.
+
+### Test di accettazione obbligatori (due account diversi)
+- Utente operativo: può registrare/modificare un impianto FV e gestire i
+  dati degli impianti autorizzati. Non vede le tre dashboard amministrative.
+  Una richiesta API con il suo JWT a `vehicles`, `insurances` e
+  `employees` non deve restituire righe private, né poterle modificare.
+- Amministratore: accede a tutte e quattro le sezioni, vede i dati preesistenti
+  (7 automezzi e 10 assicurazioni alla verifica del 26 settembre) e può
+  creare/modificare dipendenti e corsi.
+- Se la verifica del ruolo fallisce, l'interfaccia resta utilizzabile per gli
+  impianti FV ma non mostra le dashboard amministrative. Una sessione nuova
+  deve riflettere il ruolo assegnato.
+- Gli account Supabase che usano `service_role` bypassano RLS: non esporre mai
+  tale chiave nel browser o nelle variabili `VITE_*`.
+
+Rischi residui: se gli utenti di campo possono aprire direttamente lo Storage
+originale e questo contiene documenti amministrativi, occorre separare
+anche i relativi bucket/policy. Qui NON cambiamo la RLS degli impianti e
+delle fotografie per non interrompere le attività FV.
 
 ## Riferimenti per selezione catalogo (verificati 26 settembre 2026)
 - Accordo Stato-Regioni formazione sicurezza 17 aprile 2025 (G.U. 119/2025):
