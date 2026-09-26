@@ -108,6 +108,44 @@ originale e questo contiene documenti amministrativi, occorre separare
 anche i relativi bucket/policy. Qui NON cambiamo la RLS degli impianti e
 delle fotografie per non interrompere le attività FV.
 
+## Account e recupero password
+- **Amministrazione:** `amministrazione@polatord.it` è l'account già esistente e
+  va verificato in Supabase Auth prima di assegnargli `admin`.
+- **Impianti FV:** nome account condiviso concordato `impiantiFV@polatord.it`
+  (Supabase normalizza la ricerca senza distinzione maiuscole/minuscole).
+  È un *account ancora da creare*: non assumere che la mailbox esista,
+  che sia configurata o che riceva già email.
+- Gli utenti che condividono l'account FV non hanno un audit nominativo:
+  ogni loro operazione apparirà associata all'identità condivisa.
+- Nessuna password va hardcoded nel repository, nelle migration, in chat,
+  in `.env` o nei log. Password iniziali impostate tramite invito privato
+  o reset verso una casella realmente presidiata dall'azienda.
+- Il recupero password è già presente nella schermata di login; questa
+  branch aggiunge il form dedicato alla nuova password dopo l'evento
+  Supabase `PASSWORD_RECOVERY`, con conferma, controllo lunghezza,
+  errori espliciti e nuovo accesso dopo il cambio.
+- **Configurazione manuale da verificare in Supabase Auth del progetto
+  originale:** Site URL = URL pubblico Cloudflare effettivamente usato
+  dall'azienda; Redirect URLs includono
+  `https://<dominio-cloudflare-attivo>/?auth=recovery` ed eventuale
+  dominio personalizzato realmente utilizzato; servizio email/SMTP,
+  template di recupero e ricezione effettiva su entrambe le caselle.
+  Non pubblicare o dichiarare funzionante il recupero senza test reale
+  end-to-end via email (anche su smartphone) per entrambi gli account.
+- Le password dell'account FV condiviso possono essere ripristinate
+  **solo da chi controlla la casella impiantiFV@polatord.it**. Non tutti
+  gli operativi dovrebbero accedere a quella casella: l'amministrazione
+  conserva il controllo del reset e distribuisce la nuova password con
+  un canale aziendale sicuro. Un reset invalida la password conosciuta
+  dagli altri utilizzatori e richiede coordinamento.
+- Non abilitare registrazione pubblica di nuovi account: la creazione
+  dell'utente FV va svolta dall'amministratore Supabase tramite Auth
+  Users / invito, evitando di esporre nel frontend chiavi privilegiate.
+- Verificare con due browser distinti: reset admin, reset FV, link
+  scaduto/riutilizzato, redirect autorizzato, login successivo e
+  impossibilità per l'account FV di consultare direttamente le
+  tabelle amministrative via API.
+
 ## Riferimenti per selezione catalogo (verificati 26 settembre 2026)
 - Accordo Stato-Regioni formazione sicurezza 17 aprile 2025 (G.U. 119/2025):
   https://www.gazzettaufficiale.it/atto/vediMenuHTML?atto.codiceRedazionale=25A03080&atto.dataPubblicazioneGazzetta=2025-05-24&tipoSerie=serie_generale&tipoVigenza=originario
