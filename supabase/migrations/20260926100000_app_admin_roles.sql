@@ -20,10 +20,10 @@ CREATE POLICY app_user_roles_self_read
 
 -- Keep SECURITY DEFINER helper in a schema not exposed by PostgREST.
 CREATE SCHEMA IF NOT EXISTS private;
-REVOKE ALL ON SCHEMA private FROM PUBLIC, anon;
-GRANT USAGE ON SCHEMA private TO authenticated;
+REVOKE ALL ON SCHEMA polato_internal FROM PUBLIC, anon;
+GRANT USAGE ON SCHEMA polato_internal TO authenticated;
 
-CREATE OR REPLACE FUNCTION private.is_polato_admin()
+CREATE OR REPLACE FUNCTION polato_internal.is_polato_admin()
 RETURNS boolean
 LANGUAGE sql
 STABLE
@@ -35,8 +35,8 @@ AS $$
     WHERE r.user_id = (SELECT auth.uid()) AND r.role = 'admin'
   );
 $$;
-REVOKE ALL ON FUNCTION private.is_polato_admin() FROM PUBLIC, anon;
-GRANT EXECUTE ON FUNCTION private.is_polato_admin() TO authenticated;
+REVOKE ALL ON FUNCTION polato_internal.is_polato_admin() FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION polato_internal.is_polato_admin() TO authenticated;
 
 NOTIFY pgrst, 'reload schema';
 COMMIT;
