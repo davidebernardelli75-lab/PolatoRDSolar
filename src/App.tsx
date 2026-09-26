@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
+import { fetchAppRole, type AppRole } from '@/lib/access';
 import type { Plant } from '@/lib/types';
 import { fetchPlants, deletePlant, fetchAllRoadmapProgress } from '@/lib/api';
 import { Sidebar } from '@/components/Sidebar';
@@ -24,6 +25,8 @@ export type View =
 export default function App() {
   const [session, setSession] = useState<Session | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
+  const [access, setAccess] = useState<{ userId: string; role: AppRole } | null>(null);
+  const [accessError, setAccessError] = useState<string | null>(null);
   const [view, setView] = useState<View>({ name: 'dashboard' });
   const [plants, setPlants] = useState<Plant[]>([]);
   const [roadmapProgress, setRoadmapProgress] = useState<Record<string, number>>({});
@@ -47,15 +50,41 @@ export default function App() {
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
+      setAccess(null);
       setSession(data.session);
       setAuthLoading(false);
     });
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+      setAccess(null);
       setSession(nextSession);
       setAuthLoading(false);
     });
     return () => subscription.unsubscribe();
   }, []);
+
+  useEffect(() => {
+    let active = true;
+    if (!session?.user.id) {
+      setAccess(null);
+      setAccessError(null);
+      return;
+    }
+    setAccess(null);
+    setAccessError(null);
+    const userId = session.user.id;
+    void fetchAppRole(userId)
+      .then((role) => {
+        if (active) setAccess({ userId, role });
+      })
+      .catch(() => {
+        // Fail closed for administration: staff can still work in FV.
+        if (active) {
+          setAccess(null);
+          setAccessError('Impossibile verificare i permessi amministrativi. Solo la sezione impianti è disponibile; riprova ad accedere.');
+        }
+      });
+    return () => { active = false; };
+  }, [session?.user.id]);
 
   useEffect(() => {
     if (session) loadPlants();
@@ -65,8 +94,12 @@ export default function App() {
   if (authLoading) return <div className="min-h-screen bg-slate-100 flex items-center justify-center text-sm text-slate-600">Verifica accesso…</div>;
   if (!session) return <Login />;
 
+  const isAdmin = access?.userId === session.user.id && access.role === 'admin';
+  const restricted = (v: View) => v.name === 'vehicles' || v.name === 'insurances' || v.name === 'training';
+  const currentView: View = !isAdmin && restricted(view) ? { name: 'dashboard' } : view;
   const navigate = (v: View) => {
-    setView(v);
+    // Navigation is secondary. Supabase RLS is the real permission boundary.
+    setView(!isAdmin && restricted(v) ? { name: 'dashboard' } : v);
     setSidebarOpen(false);
   };
 
@@ -85,7 +118,8 @@ export default function App() {
         open={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
         onNavigate={navigate}
-        currentView={view}
+        currentView={currentView}
+        isAdmin={isAdmin}
         onSignOut={() => supabase.auth.signOut()}
       />
 
@@ -106,12 +140,13 @@ export default function App() {
         </header>
 
         <main className="flex-1 overflow-y-auto">
-          {error && (
-            <div className="mx-4 mt-4 p-4 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm">
-              {error}
+          {(error || accessError) && (
+            <div role="alert" className="mx-4 mt-4 p-4 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm">
+              {error && <p>{error}</p>}
+              {accessError && <p>{accessError}</p>}
             </div>
           )}
-          {view.name === 'dashboard' && (
+          {currentView.name === 'dashboard' && (
             <Dashboard
               plants={plants}
               loading={loading}
@@ -122,7 +157,7 @@ export default function App() {
               onDeletePlant={handleDeletePlant}
             />
           )}
-          {view.name === 'new-plant' && (
+          {currentView.name === 'new-plant' && (
             <PlantEditor
               onSaved={(id) => {
                 loadPlants();
@@ -131,7 +166,7 @@ export default function App() {
               onCancel={() => navigate({ name: 'dashboard' })}
             />
           )}
-          {view.name === 'edit-plant' && (
+          {currentView.name === 'edit-plant' && (
             <PlantEditor
               plantId={view.plantId}
               onSaved={(id) => {
@@ -141,7 +176,7 @@ export default function App() {
               onCancel={() => navigate({ name: 'dashboard' })}
             />
           )}
-          {view.name === 'plant' && (
+          {currentView.name === 'plant' && (
             <PlantDetail
               plantId={view.plantId}
               onBack={() => {
@@ -154,13 +189,13 @@ export default function App() {
               }}
             />
           )}
-          {view.name === 'vehicles' && (
+          {isAdmin && currentView.name === 'vehicles' && (
             <VehicleDashboard />
           )}
-          {view.name === 'insurances' && (
+          {isAdmin && currentView.name === 'insurances' && (
             <InsuranceDashboard />
           )}
-          {view.name === 'training' && (
+          {isAdmin && currentView.name === 'training' && (
             <TrainingDashboard />
           )}
         </main>
