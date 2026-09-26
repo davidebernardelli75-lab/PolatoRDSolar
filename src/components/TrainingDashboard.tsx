@@ -12,7 +12,7 @@ const inputClass = 'w-full rounded-lg border border-slate-200 bg-white px-3 py-2
 const euroFreeDate = (date: string | null) => date ? date.split('-').reverse().join('/') : 'Non indicata';
 const dayString = () => { const d = new Date(); return [d.getFullYear(), String(d.getMonth() + 1).padStart(2, '0'), String(d.getDate()).padStart(2, '0')].join('-'); };
 const expiry = (row: EmployeeCourse): 'expired' | 'soon' | 'ok' | 'untracked' => {
-  if (!row.expires_on) return 'untracked';
+  if (!row.completed_on || !row.expires_on) return 'untracked';
   if (row.expires_on < dayString()) return 'expired';
   const due = new Date(row.expires_on + 'T12:00:00').getTime();
   return due <= Date.now() + 60 * 86400000 ? 'soon' : 'ok';
@@ -84,9 +84,10 @@ export function TrainingDashboard() {
   const handleCustomCourse = async (employeeId: string, title: string) => {
     const normalized = title.trim();
     if (!normalized) return;
-    const isKnown = [...TRAINING_COURSE_TITLES, ...customCourses].some((c) => c.toLowerCase() === normalized.toLowerCase());
-    if (isKnown) {
-      await handleToggleCourse(employeeId, normalized);
+    const knownTitle = [...TRAINING_COURSE_TITLES, ...customCourses]
+      .find((c) => c.toLocaleLowerCase('it') === normalized.toLocaleLowerCase('it'));
+    if (knownTitle) {
+      await handleToggleCourse(employeeId, knownTitle);
       return;
     }
     try {
@@ -329,6 +330,10 @@ function CourseRecord({ record, onSave }: {
   const state = expiry(record);
   const save = async () => {
     setFeedback(null);
+    if (!completedOn && expiresOn) {
+      setFeedback('Indica la data di completamento prima della scadenza.');
+      return;
+    }
     if (completedOn && expiresOn && expiresOn < completedOn) {
       setFeedback('La scadenza non può precedere la data di completamento.');
       return;
