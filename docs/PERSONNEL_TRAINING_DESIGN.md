@@ -60,17 +60,15 @@ Usare solo il progetto originale `fjmrfxjvqsdrwjucgzla`, dopo backup:
    ma non modifica ancora l'accesso alle dashboard esistenti.
 
 3. **Assegnare il ruolo PRIMA di attivare la restrizione.**
-   Scegliere un account già esistente in Supabase Authentication -> Users,
-   verificare che l'email sia corretta, poi sostituire il segnaposto seguente
-   nello SQL Editor (NON inserire password nel codice o in chat):
+   Verificare in Supabase Authentication -> Users che l'account amministrativo già in uso esista e corrisponda all'indirizzo seguente. Non inserire password nel codice o in chat:
 
    ```sql
    SELECT id, email FROM auth.users
-   WHERE lower(email) = lower('EMAIL_AMMINISTRATORE_DA_SOSTITUIRE');
+   WHERE lower(email) = lower('amministrazione@polatord.it');
 
    INSERT INTO public.app_user_roles (user_id, role)
    SELECT id, 'admin' FROM auth.users
-   WHERE lower(email) = lower('EMAIL_AMMINISTRATORE_DA_SOSTITUIRE')
+   WHERE lower(email) = lower('amministrazione@polatord.it')
    ON CONFLICT (user_id) DO UPDATE SET role = 'admin';
 
    SELECT u.email, r.role FROM public.app_user_roles r
