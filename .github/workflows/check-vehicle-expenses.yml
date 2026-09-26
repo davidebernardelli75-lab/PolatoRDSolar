@@ -3,6 +3,9 @@ on:
   pull_request:
     paths:
       - 'src/components/VehicleDashboard.tsx'
+      - 'src/components/vehicle-forms.tsx'
+      - 'src/components/Sidebar.tsx'
+      - 'src/lib/pdf.ts'
       - 'src/lib/vehicle-cost-summary.ts'
       - '.github/workflows/check-vehicle-expenses.yml'
 jobs:
