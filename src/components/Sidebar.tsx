@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Sun, LayoutGrid, LogOut, X, KeyRound, Eye, EyeOff, Car, AlertTriangle, ShieldCheck } from 'lucide-react';
+import { Sun, LayoutGrid, LogOut, X, KeyRound, Eye, EyeOff, Car, AlertTriangle, ShieldCheck, GraduationCap } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import type { View } from '@/App';
 import { fetchVehicles } from '@/lib/api';
@@ -45,6 +45,7 @@ export function Sidebar({ open, onClose, onNavigate, currentView, onSignOut }: S
     { id: 'dashboard' as const, label: 'Impianti FV', icon: LayoutGrid },
     { id: 'vehicles' as const, label: 'Parco Automezzi', icon: Car, badge: vehicleAlerts },
     { id: 'insurances' as const, label: 'Assicurazioni', icon: ShieldCheck },
+    { id: 'training' as const, label: 'Formazione personale', icon: GraduationCap },
   ];
 
   return (
@@ -86,7 +87,8 @@ export function Sidebar({ open, onClose, onNavigate, currentView, onSignOut }: S
             const active =
               (item.id === 'dashboard' && currentView.name === 'dashboard') ||
               (item.id === 'vehicles' && currentView.name === 'vehicles') ||
-              (item.id === 'insurances' && currentView.name === 'insurances');
+              (item.id === 'insurances' && currentView.name === 'insurances') ||
+              (item.id === 'training' && currentView.name === 'training');
             const badge = 'badge' in item && item.badge ? item.badge : 0;
             return (
               <button
