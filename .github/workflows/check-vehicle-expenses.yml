@@ -1,0 +1,21 @@
+name: Check vehicle expenses
+on:
+  pull_request:
+    paths:
+      - 'src/components/VehicleDashboard.tsx'
+      - 'src/lib/vehicle-cost-summary.ts'
+      - '.github/workflows/check-vehicle-expenses.yml'
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+      - run: npm ci --ignore-scripts
+      - run: npm run typecheck
+      - run: npm run build
