@@ -16,9 +16,18 @@ export function Login() {
     setLoading(true);
     setError(null);
     setInfo(null);
-    const { error: signInError } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
-    if (signInError) {
-      setError('Credenziali non valide. Controlla email e password.');
+    try {
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: email.trim().toLowerCase(), password,
+      });
+      if (signInError) {
+        setError(signInError.status === 429
+          ? 'Troppi tentativi di accesso. Attendi prima di riprovare.'
+          : 'Impossibile accedere. Controlla le credenziali e la connessione.');
+      }
+    } catch {
+      setError('Servizio non raggiungibile. Controlla la connessione e riprova.');
+    } finally {
       setLoading(false);
     }
   };
@@ -31,14 +40,22 @@ export function Login() {
     setRecovering(true);
     setError(null);
     setInfo(null);
-    const { error: recoverError } = await supabase.auth.resetPasswordForEmail(email.trim(), {
-      redirectTo: window.location.origin,
-    });
-    setRecovering(false);
-    if (recoverError) {
-      setError('Impossibile inviare l\'email di recupero. Riprova piu\' tardi.');
-    } else {
-      setInfo('Email di recupero inviata. Controlla la tua casella di posta per reimpostare la password.');
+    try {
+      const { error: recoverError } = await supabase.auth.resetPasswordForEmail(email.trim().toLowerCase(), {
+        redirectTo: window.location.origin + '/?auth=recovery',
+      });
+      if (recoverError) {
+        setError(recoverError.status === 429
+          ? 'Sono state inviate troppe richieste. Attendi prima di riprovare.'
+          : 'Impossibile richiedere il recupero. Riprova più tardi.');
+      } else {
+        // Do not reveal whether the address exists in Auth.
+        setInfo('Se l’indirizzo è registrato, riceverai un link per reimpostare la password. Controlla anche lo spam. Il link viene inviato alla casella associata all’account.');
+      }
+    } catch {
+      setError('Servizio non raggiungibile. Controlla la connessione e riprova.');
+    } finally {
+      setRecovering(false);
     }
   };
 
