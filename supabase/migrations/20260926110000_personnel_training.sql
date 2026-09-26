@@ -55,25 +55,25 @@ GRANT SELECT, INSERT ON TABLE public.training_custom_courses TO authenticated;
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.employee_courses TO authenticated;
 
 DROP POLICY IF EXISTS employees_select ON public.employees;
-CREATE POLICY employees_select ON public.employees FOR SELECT TO authenticated USING ((SELECT private.is_polato_admin()));
+CREATE POLICY employees_select ON public.employees FOR SELECT TO authenticated USING ((SELECT polato_internal.is_polato_admin()));
 DROP POLICY IF EXISTS employees_insert ON public.employees;
-CREATE POLICY employees_insert ON public.employees FOR INSERT TO authenticated WITH CHECK ((SELECT private.is_polato_admin()));
+CREATE POLICY employees_insert ON public.employees FOR INSERT TO authenticated WITH CHECK ((SELECT polato_internal.is_polato_admin()));
 DROP POLICY IF EXISTS employees_update ON public.employees;
-CREATE POLICY employees_update ON public.employees FOR UPDATE TO authenticated USING ((SELECT private.is_polato_admin())) WITH CHECK ((SELECT private.is_polato_admin()));
+CREATE POLICY employees_update ON public.employees FOR UPDATE TO authenticated USING ((SELECT polato_internal.is_polato_admin())) WITH CHECK ((SELECT polato_internal.is_polato_admin()));
 
 DROP POLICY IF EXISTS custom_courses_select ON public.training_custom_courses;
-CREATE POLICY custom_courses_select ON public.training_custom_courses FOR SELECT TO authenticated USING ((SELECT private.is_polato_admin()));
+CREATE POLICY custom_courses_select ON public.training_custom_courses FOR SELECT TO authenticated USING ((SELECT polato_internal.is_polato_admin()));
 DROP POLICY IF EXISTS custom_courses_insert ON public.training_custom_courses;
-CREATE POLICY custom_courses_insert ON public.training_custom_courses FOR INSERT TO authenticated WITH CHECK ((SELECT private.is_polato_admin()));
+CREATE POLICY custom_courses_insert ON public.training_custom_courses FOR INSERT TO authenticated WITH CHECK ((SELECT polato_internal.is_polato_admin()));
 
 DROP POLICY IF EXISTS employee_courses_select ON public.employee_courses;
-CREATE POLICY employee_courses_select ON public.employee_courses FOR SELECT TO authenticated USING ((SELECT private.is_polato_admin()));
+CREATE POLICY employee_courses_select ON public.employee_courses FOR SELECT TO authenticated USING ((SELECT polato_internal.is_polato_admin()));
 DROP POLICY IF EXISTS employee_courses_insert ON public.employee_courses;
-CREATE POLICY employee_courses_insert ON public.employee_courses FOR INSERT TO authenticated WITH CHECK ((SELECT private.is_polato_admin()));
+CREATE POLICY employee_courses_insert ON public.employee_courses FOR INSERT TO authenticated WITH CHECK ((SELECT polato_internal.is_polato_admin()));
 DROP POLICY IF EXISTS employee_courses_update ON public.employee_courses;
-CREATE POLICY employee_courses_update ON public.employee_courses FOR UPDATE TO authenticated USING ((SELECT private.is_polato_admin())) WITH CHECK ((SELECT private.is_polato_admin()));
+CREATE POLICY employee_courses_update ON public.employee_courses FOR UPDATE TO authenticated USING ((SELECT polato_internal.is_polato_admin())) WITH CHECK ((SELECT polato_internal.is_polato_admin()));
 DROP POLICY IF EXISTS employee_courses_delete ON public.employee_courses;
-CREATE POLICY employee_courses_delete ON public.employee_courses FOR DELETE TO authenticated USING ((SELECT private.is_polato_admin()));
+CREATE POLICY employee_courses_delete ON public.employee_courses FOR DELETE TO authenticated USING ((SELECT polato_internal.is_polato_admin()));
 
 NOTIFY pgrst, 'reload schema';
 COMMIT;
