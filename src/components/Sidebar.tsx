@@ -4,6 +4,16 @@ import { supabase } from '@/lib/supabase';
 import type { View } from '@/App';
 import { fetchVehicles } from '@/lib/api';
 
+// Dates stored as YYYY-MM-DD, including records created before month/year
+// pickers existed. Month-only inspection deadlines expire at month's end.
+function daysUntilMonthEnd(value: string | null): number | null {
+  if (!value) return null;
+  const target = new Date(Number(value.slice(0, 4)), Number(value.slice(5, 7)), 0);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return Math.round((target.getTime() - today.getTime()) / 86400000);
+}
+
 interface SidebarProps {
   open: boolean;
   onClose: () => void;
@@ -24,10 +34,10 @@ export function Sidebar({ open, onClose, onNavigate, currentView, onSignOut }: S
         if (cancelled) return;
         const count = vehicles.filter((v) => {
           const insDays = v.insurance_expiry ? Math.round((new Date(v.insurance_expiry).getTime() - Date.now()) / 86400000) : null;
-          const inspDays = v.inspection_expiry ? Math.round((new Date(v.inspection_expiry).getTime() - Date.now()) / 86400000) : null;
-          const taxDays = v.tax_expiry ? Math.round((new Date(v.tax_expiry).getTime() - Date.now()) / 86400000) : null;
-          const gasDays = v.gas_cylinders_inspection_expiry ? Math.round((new Date(v.gas_cylinders_inspection_expiry).getTime() - Date.now()) / 86400000) : null;
-          const methaneDays = v.methane_inspection_expiry ? Math.round((new Date(v.methane_inspection_expiry).getTime() - Date.now()) / 86400000) : null;
+          const inspDays = daysUntilMonthEnd(v.inspection_expiry);
+          const taxDays = daysUntilMonthEnd(v.tax_expiry);
+          const gasDays = daysUntilMonthEnd(v.gas_cylinders_inspection_expiry);
+          const methaneDays = daysUntilMonthEnd(v.methane_inspection_expiry);
           const kmUntil = v.service_interval_km - (v.mileage_km - v.last_service_km);
           return (insDays !== null && insDays <= 30) || (inspDays !== null && inspDays <= 30) || (taxDays !== null && taxDays <= 30) || (gasDays !== null && gasDays <= 30) || (methaneDays !== null && methaneDays <= 30) || kmUntil <= 2000;
         }).length;
