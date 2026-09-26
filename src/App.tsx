@@ -60,7 +60,9 @@ export default function App() {
       if (event === 'PASSWORD_RECOVERY') {
         setPasswordRecovery(true);
       }
-      setAccess(null);
+      // TOKEN_REFRESHED and USER_UPDATED must not wipe a verified role:
+      // the role-loading effect is keyed to user ID, not the token.
+      if (event === 'SIGNED_OUT') setAccess(null);
       setSession(nextSession);
       setAuthLoading(false);
     });
