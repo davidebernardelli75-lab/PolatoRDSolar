@@ -515,8 +515,8 @@ export async function generateVehiclePdf(vehicle: Vehicle): Promise<Blob> {
     ['Bollo - Costo', vehicle.tax_cost != null ? `€ ${Number(vehicle.tax_cost).toFixed(2)}` : 'N/D'],
     ['Revisione - Scadenza', formatMonthYear(vehicle.inspection_expiry)],
     ['Revisione - Costo', vehicle.inspection_cost != null ? `€ ${Number(vehicle.inspection_cost).toFixed(2)}` : 'N/D'],
-    ['Revisione bombole gas', formatDate(vehicle.gas_cylinders_inspection_expiry)],
-    ['Revisione metano', formatDate(vehicle.methane_inspection_expiry)],
+    ['Revisione bombole gas', formatMonthYear(vehicle.gas_cylinders_inspection_expiry)],
+    ['Revisione metano', formatMonthYear(vehicle.methane_inspection_expiry)],
   ], y);
 
   if (vehicle.notes) {
