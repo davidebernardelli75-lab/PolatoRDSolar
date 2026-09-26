@@ -9,14 +9,19 @@ interface SidebarProps {
   onClose: () => void;
   onNavigate: (view: View) => void;
   currentView: View;
+  isAdmin: boolean;
   onSignOut: () => void;
 }
 
-export function Sidebar({ open, onClose, onNavigate, currentView, onSignOut }: SidebarProps) {
+export function Sidebar({ open, onClose, onNavigate, currentView, isAdmin, onSignOut }: SidebarProps) {
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [vehicleAlerts, setVehicleAlerts] = useState(0);
 
   useEffect(() => {
+    if (!isAdmin) {
+      setVehicleAlerts(0);
+      return;
+    }
     let cancelled = false;
     const loadAlerts = async () => {
       try {
@@ -39,13 +44,15 @@ export function Sidebar({ open, onClose, onNavigate, currentView, onSignOut }: S
     loadAlerts();
     const interval = setInterval(loadAlerts, 60000);
     return () => { cancelled = true; clearInterval(interval); };
-  }, []);
+  }, [isAdmin]);
 
   const items = [
     { id: 'dashboard' as const, label: 'Impianti FV', icon: LayoutGrid },
-    { id: 'vehicles' as const, label: 'Parco Automezzi', icon: Car, badge: vehicleAlerts },
-    { id: 'insurances' as const, label: 'Assicurazioni', icon: ShieldCheck },
-    { id: 'training' as const, label: 'Formazione personale', icon: GraduationCap },
+    ...(isAdmin ? [
+      { id: 'vehicles' as const, label: 'Parco Automezzi', icon: Car, badge: vehicleAlerts },
+      { id: 'insurances' as const, label: 'Assicurazioni', icon: ShieldCheck },
+      { id: 'training' as const, label: 'Formazione personale', icon: GraduationCap },
+    ] : []),
   ];
 
   return (
