@@ -1,7 +1,7 @@
 -- Install only on the original Polato R&D Solar Supabase project.
 -- Non-destructive: creates three new tables; does not touch plant/vehicle data.
--- Confirm who should access staff data: policies below match the current
--- single-company app and permit all signed-in application users.
+-- STEP 2 / 3: requires 20260926100000_app_admin_roles.sql first.
+-- Access is administrative ONLY, including direct Supabase API requests.
 BEGIN;
 
 CREATE TABLE IF NOT EXISTS public.employees (
@@ -55,25 +55,25 @@ GRANT SELECT, INSERT ON TABLE public.training_custom_courses TO authenticated;
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.employee_courses TO authenticated;
 
 DROP POLICY IF EXISTS employees_select ON public.employees;
-CREATE POLICY employees_select ON public.employees FOR SELECT TO authenticated USING (true);
+CREATE POLICY employees_select ON public.employees FOR SELECT TO authenticated USING ((SELECT private.is_polato_admin()));
 DROP POLICY IF EXISTS employees_insert ON public.employees;
-CREATE POLICY employees_insert ON public.employees FOR INSERT TO authenticated WITH CHECK (true);
+CREATE POLICY employees_insert ON public.employees FOR INSERT TO authenticated WITH CHECK ((SELECT private.is_polato_admin()));
 DROP POLICY IF EXISTS employees_update ON public.employees;
-CREATE POLICY employees_update ON public.employees FOR UPDATE TO authenticated USING (true) WITH CHECK (true);
+CREATE POLICY employees_update ON public.employees FOR UPDATE TO authenticated USING ((SELECT private.is_polato_admin())) WITH CHECK ((SELECT private.is_polato_admin()));
 
 DROP POLICY IF EXISTS custom_courses_select ON public.training_custom_courses;
-CREATE POLICY custom_courses_select ON public.training_custom_courses FOR SELECT TO authenticated USING (true);
+CREATE POLICY custom_courses_select ON public.training_custom_courses FOR SELECT TO authenticated USING ((SELECT private.is_polato_admin()));
 DROP POLICY IF EXISTS custom_courses_insert ON public.training_custom_courses;
-CREATE POLICY custom_courses_insert ON public.training_custom_courses FOR INSERT TO authenticated WITH CHECK (true);
+CREATE POLICY custom_courses_insert ON public.training_custom_courses FOR INSERT TO authenticated WITH CHECK ((SELECT private.is_polato_admin()));
 
 DROP POLICY IF EXISTS employee_courses_select ON public.employee_courses;
-CREATE POLICY employee_courses_select ON public.employee_courses FOR SELECT TO authenticated USING (true);
+CREATE POLICY employee_courses_select ON public.employee_courses FOR SELECT TO authenticated USING ((SELECT private.is_polato_admin()));
 DROP POLICY IF EXISTS employee_courses_insert ON public.employee_courses;
-CREATE POLICY employee_courses_insert ON public.employee_courses FOR INSERT TO authenticated WITH CHECK (true);
+CREATE POLICY employee_courses_insert ON public.employee_courses FOR INSERT TO authenticated WITH CHECK ((SELECT private.is_polato_admin()));
 DROP POLICY IF EXISTS employee_courses_update ON public.employee_courses;
-CREATE POLICY employee_courses_update ON public.employee_courses FOR UPDATE TO authenticated USING (true) WITH CHECK (true);
+CREATE POLICY employee_courses_update ON public.employee_courses FOR UPDATE TO authenticated USING ((SELECT private.is_polato_admin())) WITH CHECK ((SELECT private.is_polato_admin()));
 DROP POLICY IF EXISTS employee_courses_delete ON public.employee_courses;
-CREATE POLICY employee_courses_delete ON public.employee_courses FOR DELETE TO authenticated USING (true);
+CREATE POLICY employee_courses_delete ON public.employee_courses FOR DELETE TO authenticated USING ((SELECT private.is_polato_admin()));
 
 NOTIFY pgrst, 'reload schema';
 COMMIT;
