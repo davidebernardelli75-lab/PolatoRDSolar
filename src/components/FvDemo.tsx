@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ArrowLeft, CarFront, CheckCircle2, ClipboardList, HardHat, LockKeyhole, PanelsTopLeft, ShieldAlert } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, ClipboardList, LockKeyhole, PanelsTopLeft, ShieldAlert } from 'lucide-react';
 
 export function FvDemo({ onExit }: { onExit: () => void }) {
   const [expanded, setExpanded] = useState(false);
