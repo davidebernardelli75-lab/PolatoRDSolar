@@ -21,14 +21,14 @@ Sul Mac, nella cartella locale del progetto, senza usare `polato-update` (che sc
 ```bash
 git status
 git fetch origin
-git switch -c demo/dual-portal-training-20260927 --track origin/demo/dual-portal-training-20260927
+git switch -c demo/dual-portal-training-main-20260927 --track origin/demo/dual-portal-training-main-20260927
 npm ci
 npm run build
 ```
 
 Se il ramo esiste già in locale:
 ```bash
-git switch demo/dual-portal-training-20260927
+git switch demo/dual-portal-training-main-20260927
 git pull --ff-only
 npm ci
 npm run build
