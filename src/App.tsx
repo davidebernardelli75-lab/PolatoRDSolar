@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
+import { fetchAppRole, type AppRole } from '@/lib/access';
 import type { Plant } from '@/lib/types';
 import { fetchPlants, deletePlant, fetchAllRoadmapProgress } from '@/lib/api';
 import { Sidebar } from '@/components/Sidebar';
@@ -8,8 +9,11 @@ import { Dashboard } from '@/components/Dashboard';
 import { PlantEditor } from '@/components/PlantEditor';
 import { PlantDetail } from '@/components/PlantDetail';
 import { Login } from '@/components/Login';
+import { FvDemo } from '@/components/FvDemo';
+import { PasswordRecovery } from '@/components/PasswordRecovery';
 import { VehicleDashboard } from '@/components/VehicleDashboard';
 import { InsuranceDashboard } from '@/components/InsuranceDashboard';
+import { TrainingDashboard } from '@/components/TrainingDashboard';
 
 export type View =
   | { name: 'dashboard' }
@@ -17,11 +21,17 @@ export type View =
   | { name: 'edit-plant'; plantId: string }
   | { name: 'plant'; plantId: string }
   | { name: 'vehicles' }
-  | { name: 'insurances' };
+  | { name: 'insurances' }
+  | { name: 'training' };
 
 export default function App() {
   const [session, setSession] = useState<Session | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
+  const [passwordRecovery, setPasswordRecovery] = useState(false);
+  const [fvDemo, setFvDemo] = useState(false);
+  const [legacyDemoAccess, setLegacyDemoAccess] = useState(false);
+  const [access, setAccess] = useState<{ userId: string; role: AppRole } | null>(null);
+  const [accessError, setAccessError] = useState<string | null>(null);
   const [view, setView] = useState<View>({ name: 'dashboard' });
   const [plants, setPlants] = useState<Plant[]>([]);
   const [roadmapProgress, setRoadmapProgress] = useState<Record<string, number>>({});
@@ -45,10 +55,17 @@ export default function App() {
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
+      setAccess(null);
       setSession(data.session);
       setAuthLoading(false);
     });
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, nextSession) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        setPasswordRecovery(true);
+      }
+      // TOKEN_REFRESHED and USER_UPDATED must not wipe a verified role:
+      // the role-loading effect is keyed to user ID, not the token.
+      if (event === 'SIGNED_OUT') setAccess(null);
       setSession(nextSession);
       setAuthLoading(false);
     });
@@ -56,15 +73,64 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    let active = true;
+    if (!session?.user.id) {
+      setAccess(null);
+      setAccessError(null);
+      return;
+    }
+    setAccess(null);
+    setAccessError(null);
+    setLegacyDemoAccess(false);
+    const userId = session.user.id;
+    void fetchAppRole(userId)
+      .then((role) => {
+        if (active) setAccess({ userId, role });
+      })
+      .catch((err: unknown) => {
+        if (!active) return;
+        // Demo-only compatibility for the EXISTING administrator while the
+        // roles table has not yet been installed. Never grant privileges on
+        // an arbitrary network error or to a new FV login.
+        const missingRolesTable = err !== null && typeof err === 'object'
+          && 'code' in err && (err.code === 'PGRST205' || err.code === '42P01');
+        const existingAdmin = session.user.email?.toLowerCase() === 'amministrazione@polatord.it';
+        if (missingRolesTable && existingAdmin) {
+          setAccess({ userId, role: 'admin' });
+          setLegacyDemoAccess(true);
+          setAccessError(null);
+        } else {
+          setAccess(null);
+          setAccessError('Impossibile verificare i permessi amministrativi. Solo la sezione impianti è disponibile; riprova ad accedere.');
+        }
+      });
+    return () => { active = false; };
+  }, [session?.user.id]);
+
+  useEffect(() => {
     if (session) loadPlants();
     else { setPlants([]); setLoading(false); }
   }, [loadPlants, session]);
 
   if (authLoading) return <div className="min-h-screen bg-slate-100 flex items-center justify-center text-sm text-slate-600">Verifica accesso…</div>;
-  if (!session) return <Login />;
+  // Supabase emits PASSWORD_RECOVERY after validating the emailed link.
+  // Never treat its temporary session as a normal dashboard sign-in.
+  if (passwordRecovery) return (
+    <PasswordRecovery onComplete={() => {
+      setPasswordRecovery(false);
+      setView({ name: 'dashboard' });
+      window.history.replaceState(null, '', window.location.pathname);
+    }} />
+  );
+  if (fvDemo && !session) return <FvDemo onExit={() => setFvDemo(false)} />;
+  if (!session) return <Login onFvDemo={() => setFvDemo(true)} />;
 
+  const isAdmin = access?.userId === session.user.id && access.role === 'admin';
+  const restricted = (v: View) => v.name === 'vehicles' || v.name === 'insurances' || v.name === 'training';
+  const currentView: View = !isAdmin && restricted(view) ? { name: 'dashboard' } : view;
   const navigate = (v: View) => {
-    setView(v);
+    // Navigation is secondary. Supabase RLS is the real permission boundary.
+    setView(!isAdmin && restricted(v) ? { name: 'dashboard' } : v);
     setSidebarOpen(false);
   };
 
@@ -83,7 +149,8 @@ export default function App() {
         open={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
         onNavigate={navigate}
-        currentView={view}
+        currentView={currentView}
+        isAdmin={isAdmin}
         onSignOut={() => supabase.auth.signOut()}
       />
 
@@ -104,12 +171,20 @@ export default function App() {
         </header>
 
         <main className="flex-1 overflow-y-auto">
-          {error && (
-            <div className="mx-4 mt-4 p-4 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm">
-              {error}
+          {legacyDemoAccess && (
+            <div role="status" className="mx-4 mt-4 rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+              Modalità dimostrativa: le nuove regole di accesso non sono ancora applicate al database.
+              L'account FV reale deve rimanere disattivato finché non saranno completate le migrazioni e i test RLS.
+              La gestione della formazione sarà operativa dopo la creazione delle relative tabelle.
             </div>
           )}
-          {view.name === 'dashboard' && (
+          {(error || accessError) && (
+            <div role="alert" className="mx-4 mt-4 p-4 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm">
+              {error && <p>{error}</p>}
+              {accessError && <p>{accessError}</p>}
+            </div>
+          )}
+          {currentView.name === 'dashboard' && (
             <Dashboard
               plants={plants}
               loading={loading}
@@ -120,7 +195,7 @@ export default function App() {
               onDeletePlant={handleDeletePlant}
             />
           )}
-          {view.name === 'new-plant' && (
+          {currentView.name === 'new-plant' && (
             <PlantEditor
               onSaved={(id) => {
                 loadPlants();
@@ -129,9 +204,9 @@ export default function App() {
               onCancel={() => navigate({ name: 'dashboard' })}
             />
           )}
-          {view.name === 'edit-plant' && (
+          {currentView.name === 'edit-plant' && (
             <PlantEditor
-              plantId={view.plantId}
+              plantId={currentView.plantId}
               onSaved={(id) => {
                 loadPlants();
                 navigate({ name: 'plant', plantId: id });
@@ -139,9 +214,9 @@ export default function App() {
               onCancel={() => navigate({ name: 'dashboard' })}
             />
           )}
-          {view.name === 'plant' && (
+          {currentView.name === 'plant' && (
             <PlantDetail
-              plantId={view.plantId}
+              plantId={currentView.plantId}
               onBack={() => {
                 loadPlants();
                 navigate({ name: 'dashboard' });
@@ -152,11 +227,14 @@ export default function App() {
               }}
             />
           )}
-          {view.name === 'vehicles' && (
+          {isAdmin && currentView.name === 'vehicles' && (
             <VehicleDashboard />
           )}
-          {view.name === 'insurances' && (
+          {isAdmin && currentView.name === 'insurances' && (
             <InsuranceDashboard />
+          )}
+          {isAdmin && currentView.name === 'training' && (
+            <TrainingDashboard />
           )}
         </main>
       </div>
