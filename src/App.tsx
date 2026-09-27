@@ -9,6 +9,7 @@ import { Dashboard } from '@/components/Dashboard';
 import { PlantEditor } from '@/components/PlantEditor';
 import { PlantDetail } from '@/components/PlantDetail';
 import { Login } from '@/components/Login';
+import { FvDemo } from '@/components/FvDemo';
 import { PasswordRecovery } from '@/components/PasswordRecovery';
 import { VehicleDashboard } from '@/components/VehicleDashboard';
 import { InsuranceDashboard } from '@/components/InsuranceDashboard';
@@ -27,6 +28,8 @@ export default function App() {
   const [session, setSession] = useState<Session | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [passwordRecovery, setPasswordRecovery] = useState(false);
+  const [fvDemo, setFvDemo] = useState(false);
+  const [legacyDemoAccess, setLegacyDemoAccess] = useState(false);
   const [access, setAccess] = useState<{ userId: string; role: AppRole } | null>(null);
   const [accessError, setAccessError] = useState<string | null>(null);
   const [view, setView] = useState<View>({ name: 'dashboard' });
@@ -78,14 +81,25 @@ export default function App() {
     }
     setAccess(null);
     setAccessError(null);
+    setLegacyDemoAccess(false);
     const userId = session.user.id;
     void fetchAppRole(userId)
       .then((role) => {
         if (active) setAccess({ userId, role });
       })
-      .catch(() => {
-        // Fail closed for administration: staff can still work in FV.
-        if (active) {
+      .catch((err: unknown) => {
+        if (!active) return;
+        // Demo-only compatibility for the EXISTING administrator while the
+        // roles table has not yet been installed. Never grant privileges on
+        // an arbitrary network error or to a new FV login.
+        const missingRolesTable = err !== null && typeof err === 'object'
+          && 'code' in err && (err.code === 'PGRST205' || err.code === '42P01');
+        const existingAdmin = session.user.email?.toLowerCase() === 'amministrazione@polatord.it';
+        if (missingRolesTable && existingAdmin) {
+          setAccess({ userId, role: 'admin' });
+          setLegacyDemoAccess(true);
+          setAccessError(null);
+        } else {
           setAccess(null);
           setAccessError('Impossibile verificare i permessi amministrativi. Solo la sezione impianti è disponibile; riprova ad accedere.');
         }
@@ -108,7 +122,8 @@ export default function App() {
       window.history.replaceState(null, '', window.location.pathname);
     }} />
   );
-  if (!session) return <Login />;
+  if (fvDemo && !session) return <FvDemo onExit={() => setFvDemo(false)} />;
+  if (!session) return <Login onFvDemo={() => setFvDemo(true)} />;
 
   const isAdmin = access?.userId === session.user.id && access.role === 'admin';
   const restricted = (v: View) => v.name === 'vehicles' || v.name === 'insurances' || v.name === 'training';
@@ -156,6 +171,13 @@ export default function App() {
         </header>
 
         <main className="flex-1 overflow-y-auto">
+          {legacyDemoAccess && (
+            <div role="status" className="mx-4 mt-4 rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+              Modalità dimostrativa: le nuove regole di accesso non sono ancora applicate al database.
+              L'account FV reale deve rimanere disattivato finché non saranno completate le migrazioni e i test RLS.
+              La gestione della formazione sarà operativa dopo la creazione delle relative tabelle.
+            </div>
+          )}
           {(error || accessError) && (
             <div role="alert" className="mx-4 mt-4 p-4 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm">
               {error && <p>{error}</p>}
