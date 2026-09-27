@@ -3,6 +3,11 @@ on:
   pull_request:
     paths:
       - 'src/components/TrainingDashboard.tsx'
+      - 'src/components/TrainingPreview.tsx'
+      - 'src/components/FvDemo.tsx'
+      - 'src/components/Login.tsx'
+      - 'src/components/PasswordRecovery.tsx'
+      - 'src/lib/access.ts'
       - 'src/lib/training-*.ts'
       - 'src/App.tsx'
       - 'src/components/Sidebar.tsx'
