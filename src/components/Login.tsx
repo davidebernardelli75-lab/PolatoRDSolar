@@ -1,11 +1,11 @@
 import { useState, type FormEvent } from 'react';
-import { Building2, HardHat, LockKeyhole, Mail, Eye, EyeOff, ArrowLeft, ShieldCheck, MonitorPlay } from 'lucide-react';
+import { Building2, HardHat, LockKeyhole, Mail, Eye, EyeOff, ArrowLeft } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 
-interface LoginProps { onFvDemo: () => void; }
+interface LoginProps { signedIn?: boolean; onSignedIn?: (area: Portal) => void; onSelectArea?: (area: Portal) => void; }
 type Portal = 'admin' | 'fv';
 
-export function Login({ onFvDemo }: LoginProps) {
+export function Login({ signedIn = false, onSignedIn, onSelectArea }: LoginProps) {
   const [portal, setPortal] = useState<Portal | null>(null);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -16,6 +16,7 @@ export function Login({ onFvDemo }: LoginProps) {
   const [error, setError] = useState<string | null>(null);
 
   const select = (choice: Portal) => {
+    if (signedIn) { onSelectArea?.(choice); return; }
     setPortal(choice);
     setEmail(choice === 'admin' ? 'amministrazione@polatord.it' : 'impiantiFV@polatord.it');
     setPassword('');
@@ -30,6 +31,7 @@ export function Login({ onFvDemo }: LoginProps) {
         email: email.trim().toLowerCase(), password,
       });
       if (authError) setError('Accesso non riuscito. Verifica email e password.');
+      else onSignedIn?.(portal ?? 'admin');
     } catch {
       setError('Impossibile collegarsi al servizio. Riprova.');
     } finally { setBusy(false); }
@@ -64,14 +66,14 @@ export function Login({ onFvDemo }: LoginProps) {
               <span className="mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-blue-900 text-white"><Building2 size={32} /></span>
               <h2 className="text-xl font-bold text-blue-900">Amministrazione</h2>
               <p className="mt-2 text-sm leading-relaxed text-slate-600">Impianti FV, automezzi, assicurazioni e formazione del personale.</p>
-              <span className="mt-6 inline-flex items-center rounded-lg bg-blue-900 px-5 py-2.5 text-sm font-semibold text-white group-hover:bg-blue-800">Accedi all'area</span>
+              <span className="mt-6 inline-flex items-center rounded-lg bg-blue-900 px-5 py-2.5 text-sm font-semibold text-white group-hover:bg-blue-800">{signedIn ? 'Apri amministrazione' : 'Accedi all’area'}</span>
             </button>
             <button type="button" onClick={() => select('fv')}
               className="group rounded-2xl border-2 border-slate-200 bg-white p-6 text-left transition hover:border-red-500 hover:shadow-lg focus-visible:outline focus-visible:outline-4 focus-visible:outline-red-400">
               <span className="mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-red-500 text-white"><HardHat size={32} /></span>
               <h2 className="text-xl font-bold text-blue-900">Impianti fotovoltaici</h2>
               <p className="mt-2 text-sm leading-relaxed text-slate-600">Area dedicata alle attività sugli impianti, anche da smartphone.</p>
-              <span className="mt-6 inline-flex items-center rounded-lg bg-red-500 px-5 py-2.5 text-sm font-semibold text-white group-hover:bg-red-600">Accedi all'area</span>
+              <span className="mt-6 inline-flex items-center rounded-lg bg-red-500 px-5 py-2.5 text-sm font-semibold text-white group-hover:bg-red-600">{signedIn ? 'Apri impianti FV' : 'Accesso riservato'}</span>
             </button>
           </div>
         ) : (
@@ -109,16 +111,7 @@ export function Login({ onFvDemo }: LoginProps) {
               className="flex w-full items-center justify-center gap-2 text-sm font-medium text-blue-800 disabled:opacity-50">
               <Mail size={16} />{recovering ? 'Invio in corso...' : 'Password dimenticata?'}
             </button>
-            {portal === 'fv' && (
-              <section className="rounded-xl border-2 border-dashed border-amber-300 bg-amber-50 p-4">
-                <div className="mb-2 flex items-center gap-2 font-semibold text-amber-900"><MonitorPlay size={18} />Anteprima per la dimostrazione</div>
-                <p className="mb-3 text-xs leading-relaxed text-amber-900">L'email impiantiFV@polatord.it è proposta ma non è ancora attiva. Puoi aprire una simulazione con dati inventati, isolata dal database aziendale. Nessuna credenziale fittizia viene inviata a Supabase.</p>
-                <button type="button" onClick={onFvDemo}
-                  className="flex w-full items-center justify-center gap-2 rounded-lg bg-red-500 px-4 py-3 text-sm font-semibold text-white hover:bg-red-600">
-                  <ShieldCheck size={17} />Accedi alla demo FV
-                </button>
-              </section>
-            )}
+
           </div>
         )}
         <footer className="border-t border-slate-200 px-6 py-4 text-center text-xs text-slate-500">Accesso aziendale protetto · Polato R&D</footer>
