@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Car, Truck, Bike, Plus, Trash2, FileText, Loader2, ChevronDown, AlertTriangle, Calendar, Wrench, Shield, Receipt, Flame, FileDown, User, Building2, RefreshCw } from 'lucide-react';
+import { Car, Truck, Bike, Plus, Trash2, FileText, Loader2, ChevronDown, AlertTriangle, Calendar, Wrench, Shield, Receipt, Flame, FileDown, User, Building2, RefreshCw, StickyNote } from 'lucide-react';
 import type { Vehicle, VehicleInsert } from '@/lib/types';
 import { fetchVehicles, createVehicle, updateVehicle, deleteVehicle } from '@/lib/api';
 import { DetailItem, VehicleEditCard, VehicleFormModal, formatMonthYear } from './vehicle-forms';
@@ -46,12 +46,12 @@ function getVehicleAlerts(v: Vehicle): VehicleAlert[] {
     if (inspDays < 0) alerts.push({ level: 'danger', label: 'Revisione scaduta' });
     else if (inspDays <= 30) alerts.push({ level: 'warning', label: `Revisione in ${inspDays}g` });
   }
-  const gasDays = daysUntil(v.gas_cylinders_inspection_expiry);
+  const gasDays = daysUntil(v.gas_cylinders_inspection_expiry, true);
   if (gasDays !== null) {
     if (gasDays < 0) alerts.push({ level: 'danger', label: 'Revisione bombole gas scaduta' });
     else if (gasDays <= 30) alerts.push({ level: 'warning', label: `Bombole gas in ${gasDays}g` });
   }
-  const methaneDays = daysUntil(v.methane_inspection_expiry);
+  const methaneDays = daysUntil(v.methane_inspection_expiry, true);
   if (methaneDays !== null) {
     if (methaneDays < 0) alerts.push({ level: 'danger', label: 'Revisione metano scaduta' });
     else if (methaneDays <= 30) alerts.push({ level: 'warning', label: `Metano in ${methaneDays}g` });
@@ -327,6 +327,17 @@ function VehicleCard({
         </div>
       )}
 
+      {vehicle.notes?.trim() && (
+        <div aria-label={`Note veicolo ${vehicle.plate || 'senza targa'}`}
+          className="mt-3 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-slate-800">
+          <StickyNote size={16} className="mt-0.5 shrink-0 text-amber-700" />
+          <div className="min-w-0">
+            <p className="text-xs font-semibold text-amber-900">Note</p>
+            <p className="whitespace-pre-wrap break-words">{vehicle.notes}</p>
+          </div>
+        </div>
+      )}
+
       {expanded && (
         <div className="mt-4 pt-4 border-t border-slate-100 space-y-3">
           <div className="grid grid-cols-2 gap-3 text-sm">
@@ -337,8 +348,8 @@ function VehicleCard({
             <DetailItem icon={Shield} label="Assicurazione" value={formatDate(vehicle.insurance_expiry)} />
             <DetailItem icon={Receipt} label="Bollo" value={formatMonthYear(vehicle.tax_expiry)} />
             <DetailItem icon={Calendar} label="Scad. revisione" value={formatMonthYear(vehicle.inspection_expiry)} />
-            <DetailItem icon={Flame} label="Revisione bombole gas" value={formatDate(vehicle.gas_cylinders_inspection_expiry)} />
-            <DetailItem icon={Flame} label="Revisione metano" value={formatDate(vehicle.methane_inspection_expiry)} />
+            <DetailItem icon={Flame} label="Revisione bombole gas" value={formatMonthYear(vehicle.gas_cylinders_inspection_expiry)} />
+            <DetailItem icon={Flame} label="Revisione metano" value={formatMonthYear(vehicle.methane_inspection_expiry)} />
             <DetailItem icon={Shield} label="Compagnia" value={vehicle.insurance_company || 'N/D'} />
             <DetailItem icon={Shield} label="Premio assicurativo" value={vehicle.insurance_premium != null ? `€ ${vehicle.insurance_premium.toLocaleString('it-IT', { minimumFractionDigits: 2 })}` : 'N/D'} />
             <DetailItem icon={vehicle.owner_type === 'Privato' ? User : Building2} label="Intestazione" value={vehicle.owner_type === 'Privato' ? 'Privato' : 'Aziendale'} />
@@ -349,7 +360,6 @@ function VehicleCard({
             <DetailItem icon={Wrench} label="Intervallo tagliando" value={`${vehicle.service_interval_km.toLocaleString('it-IT')} km`} />
             <DetailItem icon={Car} label="Tipo" value={vehicle.type} />
           </div>
-          {vehicle.notes && <div className="text-xs text-slate-500 bg-slate-50 rounded-lg p-2">{vehicle.notes}</div>}
           <div className="flex gap-2">
             <button onClick={() => setEditing(true)}
               className="flex-1 flex items-center justify-center gap-1.5 bg-blue-900 hover:bg-blue-800 text-white text-sm font-medium py-2 rounded-lg transition-colors">
