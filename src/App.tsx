@@ -84,11 +84,10 @@ export default function App() {
       .then((role) => {
         if (active) setAccess({ userId, role });
       })
-      .catch((err: unknown) => {
+      .catch(() => {
         if (!active) return;
         setAccess(null);
         setAccessError('Impossibile verificare i permessi. Riprova ad accedere.');
-
       });
     return () => { active = false; };
   }, [session?.user.id]);
@@ -109,7 +108,13 @@ export default function App() {
     }} />
   );
   if (!session) return <Login onSignedIn={(selected) => setArea(selected)} />;
-  if (area === 'home') return <Login signedIn onSelectArea={(selected) => setArea(selected)} />;
+  if (!access) return (
+    <main className="flex min-h-screen flex-col items-center justify-center gap-4 bg-slate-100 p-5 text-center">
+      <p className="text-sm text-slate-700">{accessError ?? 'Verifica dei permessi in corso…'}</p>
+      {accessError && <button className="rounded-lg bg-blue-900 px-5 py-2 text-white" onClick={() => { void supabase.auth.signOut(); }}>Esci e riprova</button>}
+    </main>
+  );
+  if (area === 'home') return <Login signedIn canAdmin={access.role === 'admin'} onSelectArea={(selected) => { setArea(selected); setView({ name: 'dashboard' }); }} />;
 
   const isAdmin = access?.userId === session.user.id && access.role === 'admin';
   const adminArea = isAdmin && area === 'admin';
