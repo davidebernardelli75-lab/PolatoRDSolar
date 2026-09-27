@@ -2,10 +2,10 @@ import { useState, type FormEvent } from 'react';
 import { Building2, HardHat, LockKeyhole, Mail, Eye, EyeOff, ArrowLeft } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 
-interface LoginProps { signedIn?: boolean; onSignedIn?: (area: Portal) => void; onSelectArea?: (area: Portal) => void; }
+interface LoginProps { canAdmin?: boolean; signedIn?: boolean; onSignedIn?: (area: Portal) => void; onSelectArea?: (area: Portal) => void; }
 type Portal = 'admin' | 'fv';
 
-export function Login({ signedIn = false, onSignedIn, onSelectArea }: LoginProps) {
+export function Login({ signedIn = false, canAdmin = true, onSignedIn, onSelectArea }: LoginProps) {
   const [portal, setPortal] = useState<Portal | null>(null);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -16,7 +16,7 @@ export function Login({ signedIn = false, onSignedIn, onSelectArea }: LoginProps
   const [error, setError] = useState<string | null>(null);
 
   const select = (choice: Portal) => {
-    if (signedIn) { onSelectArea?.(choice); return; }
+    if (signedIn) { if (choice === 'admin' && !canAdmin) return; onSelectArea?.(choice); return; }
     setPortal(choice);
     setEmail(choice === 'admin' ? 'amministrazione@polatord.it' : 'impiantiFV@polatord.it');
     setPassword('');
@@ -61,7 +61,7 @@ export function Login({ signedIn = false, onSignedIn, onSelectArea }: LoginProps
 
         {!portal ? (
           <div className="grid gap-4 p-6 md:grid-cols-2 md:gap-6 md:p-10">
-            <button type="button" onClick={() => select('admin')}
+            <button type="button" disabled={signedIn && !canAdmin} onClick={() => select('admin')}
               className="group rounded-2xl border-2 border-slate-200 bg-white p-6 text-left transition hover:border-blue-900 hover:shadow-lg focus-visible:outline focus-visible:outline-4 focus-visible:outline-blue-400">
               <span className="mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-blue-900 text-white"><Building2 size={32} /></span>
               <h2 className="text-xl font-bold text-blue-900">Amministrazione</h2>
