@@ -49,6 +49,13 @@ export async function updateEmployee(id: string, input: Partial<EmployeeInput>):
   return data as Employee;
 }
 
+// Uses an administrator-checked transaction on Supabase. The function deletes
+// this employee's linked training records only after explicit UI confirmation.
+export async function deleteEmployee(id: string): Promise<void> {
+  const { error } = await supabase.rpc('delete_polato_employee', { p_employee_id: id });
+  if (error) throw error;
+}
+
 export async function fetchEmployeeCourses(): Promise<EmployeeCourse[]> {
   const { data, error } = await supabase.from('employee_courses')
     .select('*').order('created_at', { ascending: true });
