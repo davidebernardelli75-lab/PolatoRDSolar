@@ -10,6 +10,15 @@ Questo ramo è una **preview dimostrativa**, non una produzione con permessi gi�
 - Impianti FV: il secondo riquadro precompila l'indirizzo previsto `impiantiFV@polatord.it`; in attesa che la casella e l'account Supabase vengano creati, il pulsante dedicato accede **solo a una demo sintetica isolata** con impianti fittizi. La demo non richiama le API Supabase e non permette di scrivere su dati aziendali. Non esiste né si deve creare una password fittizia che autentichi sul database.
 - Recupero password: già implementato a livello UI e Supabase Auth. Serve comunque test live dei redirect URL e delle email (SMTP/provider) prima di dichiararlo funzionante.
 
+## REQUISITO VINCOLANTE — accesso FV definitivo
+La sezione **Impianti FV** dell'accesso operativo NON è una seconda dashboard semplificata, una copia dei componenti, né un insieme ridotto di funzioni: deve mostrare **lo stesso componente `Dashboard` già utilizzato nell'area Amministrazione**, le stesse viste `PlantEditor` e `PlantDetail`, gli stessi dati reali di `plants`, `panels`, `panel_photos`, roadmap e Storage nello stesso progetto Supabase Solar e gli stessi flussi già insegnati agli operai (lettura, ricerca, creazione/modifica impianti, scansione barcode, gestione pannelli, fotografie, checklist e PDF, salvataggio/cancellazione ove già consentita dalle policy operative approvate).
+
+L'interfaccia FV, le etichette, i passaggi operativi e i comportamenti già utilizzati dal personale **non devono cambiare**: non duplicare la dashboard per ruolo, non introdurre una variante con layout o funzioni differenti. La separazione avviene esclusivamente tramite autorizzazioni, menu e rotte: l'operatore vede e usa la stessa dashboard FV dell'amministratore, ma **non vede né può leggere tramite API** automezzi, assicurazioni, formazione personale e ogni nuova sezione amministrativa. Tutti i vincoli devono essere verificati tramite RLS del database (non soltanto con il menu nascosto). L'amministratore mantiene tutte le dashboard.
+
+**Lo schermo `FvDemo` fittizio ora incluso è soltanto un segnaposto temporaneo per la dimostrazione senza credenziali FV. Non rappresenta la dashboard operativa richiesta e NON deve essere rilasciato come accesso FV definitivo.** Prima della pubblicazione ufficiale della separazione, creare e testare l'account `impiantiFV@polatord.it` (quando la mailbox sarà pronta), instradarlo alla dashboard FV reale condivisa con l'amministrazione e collaudare punto per punto i flussi che gli operai già utilizzano, con account e browser separati.
+
+L'home unica va pubblicata sullo **stesso dominio Cloudflare aziendale** una volta completati backup, configurazione e verifiche dei permessi; un URL demo distinto è soltanto un'opzione di test, non l'architettura prevista.
+
 ## Perché non abbiamo ancora due account reali
 Il connettore Supabase attualmente associato NON autorizza l'operazione sul database originale `fjmrfxjvqsdrwjucgzla`. **Non installare utenti o tabelle su altri progetti.** Nessuna delle nuove migrazioni è stata applicata.
 
