@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
-import { AlertTriangle, CalendarDays, Check, ChevronDown, GraduationCap, Loader2, Pencil, Plus, Search, ShieldCheck, UserRound, Users, X } from 'lucide-react';
+import { AlertTriangle, CalendarDays, Check, ChevronDown, GraduationCap, Loader2, Pencil, Plus, Search, Trash2, ShieldCheck, UserRound, Users, X } from 'lucide-react';
 import { TRAINING_COURSE_GROUPS, TRAINING_COURSE_TITLES } from '@/lib/training-course-catalog';
 import {
-  addEmployeeCourse, createCustomCourse, createEmployee, fetchCustomCourses,
+  addEmployeeCourse, createCustomCourse, createEmployee, deleteEmployee, fetchCustomCourses,
   fetchEmployeeCourses, fetchEmployees, removeEmployeeCourse,
   updateEmployee, updateEmployeeCourse,
   type Employee, type EmployeeCourse, type EmployeeCourseUpdate, type EmployeeInput,
@@ -26,6 +26,8 @@ export function TrainingDashboard() {
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [editing, setEditing] = useState<Employee | 'new' | null>(null);
+  const [deleting, setDeleting] = useState<Employee | null>(null);
+  const [deleteBusy, setDeleteBusy] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -57,6 +59,24 @@ export function TrainingDashboard() {
       setExpandedId(saved.id);
     }
     setEditing(null);
+  };
+
+  const handleDeleteEmployee = async () => {
+    if (!deleting || deleteBusy) return;
+    setDeleteBusy(true);
+    setError(null);
+    try {
+      await deleteEmployee(deleting.id);
+      setEmployees((prev) => prev.filter((employee) => employee.id !== deleting.id));
+      setRecords((prev) => prev.filter((record) => record.employee_id !== deleting.id));
+      setExpandedId((id) => id === deleting.id ? null : id);
+      setDeleting(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Eliminazione del dipendente non riuscita.');
+      setDeleting(null);
+    } finally {
+      setDeleteBusy(false);
+    }
   };
 
   const handleToggleCourse = async (employeeId: string, title: string) => {
@@ -171,11 +191,33 @@ export function TrainingDashboard() {
               expanded={expandedId === person.id}
               onExpand={() => setExpandedId((id) => id === person.id ? null : person.id)}
               onEdit={() => setEditing(person)}
+              onDelete={() => setDeleting(person)}
               onToggle={(course) => handleToggleCourse(person.id, course)}
               onCustom={(course) => handleCustomCourse(person.id, course)}
               onSaveRecord={handleSaveRecord}
             />
           ))}
+        </div>
+      )}
+      {deleting && (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/60 p-4" role="dialog" aria-modal="true" aria-labelledby="delete-employee-title">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
+            <h2 id="delete-employee-title" className="text-lg font-bold text-red-700">Elimina dipendente</h2>
+            <p className="mt-3 text-sm text-slate-700">
+              Confermi l'eliminazione definitiva di <strong>{deleting.first_name} {deleting.last_name}</strong>?
+            </p>
+            <p className="mt-2 text-sm text-red-700">
+              {records.filter((record) => record.employee_id === deleting.id).length > 0
+                ? `Saranno eliminati anche ${records.filter((record) => record.employee_id === deleting.id).length} corsi e i relativi dati degli attestati. L'operazione non è reversibile.`
+                : 'L’operazione non è reversibile.'}
+            </p>
+            <div className="mt-6 flex justify-end gap-3">
+              <button type="button" disabled={deleteBusy} onClick={() => setDeleting(null)} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 disabled:opacity-50">Annulla</button>
+              <button type="button" disabled={deleteBusy} onClick={() => { void handleDeleteEmployee(); }} className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-50">
+                <Trash2 size={16} />{deleteBusy ? 'Eliminazione...' : 'Elimina definitivamente'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
       {editing && (
@@ -191,7 +233,7 @@ export function TrainingDashboard() {
 }
 
 function EmployeeCard({
-  person, selected, customCourses, expanded, onExpand, onEdit, onToggle, onCustom, onSaveRecord,
+  person, selected, customCourses, expanded, onExpand, onEdit, onDelete, onToggle, onCustom, onSaveRecord,
 }: {
   person: Employee;
   selected: EmployeeCourse[];
@@ -199,6 +241,7 @@ function EmployeeCard({
   expanded: boolean;
   onExpand: () => void;
   onEdit: () => void;
+  onDelete: () => void;
   onToggle: (title: string) => Promise<void>;
   onCustom: (title: string) => Promise<void>;
   onSaveRecord: (id: string, input: EmployeeCourseUpdate) => Promise<void>;
@@ -241,6 +284,8 @@ function EmployeeCard({
         </div>
         <button aria-label={'Modifica ' + person.first_name + ' ' + person.last_name} onClick={onEdit}
           className="rounded-lg p-2 text-slate-500 hover:bg-slate-100"><Pencil size={16} /></button>
+        <button type="button" aria-label={'Elimina ' + person.first_name + ' ' + person.last_name} title="Elimina dipendente" onClick={onDelete}
+          className="rounded-lg p-2 text-red-600 hover:bg-red-50"><Trash2 size={16} /></button>
         <button aria-label="Espandi corsi dipendente" onClick={onExpand}
           className="rounded-lg p-2 text-slate-500 hover:bg-slate-100"><ChevronDown size={19} className={expanded ? 'rotate-180' : ''} /></button>
       </div>
