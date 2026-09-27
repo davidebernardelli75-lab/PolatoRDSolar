@@ -20,9 +20,10 @@ interface SidebarProps {
   currentView: View;
   isAdmin: boolean;
   onSignOut: () => void;
+  onChangeArea: () => void;
 }
 
-export function Sidebar({ open, onClose, onNavigate, currentView, isAdmin, onSignOut }: SidebarProps) {
+export function Sidebar({ open, onClose, onNavigate, currentView, isAdmin, onSignOut, onChangeArea }: SidebarProps) {
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [vehicleAlerts, setVehicleAlerts] = useState(0);
 
@@ -138,6 +139,7 @@ export function Sidebar({ open, onClose, onNavigate, currentView, isAdmin, onSig
           >
             <KeyRound size={16} />Cambia password
           </button>
+          <button onClick={onChangeArea} className="mb-3 flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-blue-100 transition hover:bg-blue-800 hover:text-white"><LayoutGrid size={16} />Cambia area</button>
           <button onClick={onSignOut} className="mb-4 flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-blue-100 transition hover:bg-blue-800 hover:text-white">
             <LogOut size={16} />Esci
           </button>
