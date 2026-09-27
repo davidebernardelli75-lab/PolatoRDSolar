@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { AlertTriangle, CalendarDays, Check, ChevronDown, GraduationCap, Loader2, Pencil, Plus, Search, ShieldCheck, UserRound, Users, X } from 'lucide-react';
 import { TRAINING_COURSE_GROUPS, TRAINING_COURSE_TITLES } from '@/lib/training-course-catalog';
+import { TrainingPreview } from './TrainingPreview';
 import {
   addEmployeeCourse, createCustomCourse, createEmployee, fetchCustomCourses,
   fetchEmployeeCourses, fetchEmployees, removeEmployeeCourse,
@@ -24,6 +25,7 @@ export function TrainingDashboard() {
   const [customCourses, setCustomCourses] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [schemaMissing, setSchemaMissing] = useState(false);
   const [search, setSearch] = useState('');
   const [editing, setEditing] = useState<Employee | 'new' | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -38,8 +40,13 @@ export function TrainingDashboard() {
       setRecords(enrollments);
       setCustomCourses(custom);
       setError(null);
+      setSchemaMissing(false);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Impossibile caricare la formazione.');
+      // An absent table is not an empty employee list: preview synthetic data
+      // without enabling writes until the admin-only SQL migration is applied.
+      const code = err && typeof err === 'object' && 'code' in err ? err.code : null;
+      if (code === 'PGRST205' || code === '42P01') setSchemaMissing(true);
+      else setError(err instanceof Error ? err.message : 'Impossibile caricare la formazione.');
     } finally {
       setLoading(false);
     }
@@ -110,6 +117,8 @@ export function TrainingDashboard() {
   const filtered = employees.filter((p) =>
     (p.first_name + ' ' + p.last_name + ' ' + (p.job_title ?? '')).toLocaleLowerCase('it')
       .includes(search.toLocaleLowerCase('it')));
+
+  if (schemaMissing) return <TrainingPreview />;
 
   return (
     <div className="mx-auto max-w-5xl p-4 pb-24 lg:p-8">
