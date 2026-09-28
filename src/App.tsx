@@ -13,6 +13,7 @@ import { PasswordRecovery } from '@/components/PasswordRecovery';
 import { VehicleDashboard } from '@/components/VehicleDashboard';
 import { InsuranceDashboard } from '@/components/InsuranceDashboard';
 import { TrainingDashboard } from '@/components/TrainingDashboard';
+import { QuoteDashboard } from '@/components/QuoteDashboard';
 
 export type View =
   | { name: 'dashboard' }
@@ -21,7 +22,8 @@ export type View =
   | { name: 'plant'; plantId: string }
   | { name: 'vehicles' }
   | { name: 'insurances' }
-  | { name: 'training' };
+  | { name: 'training' }
+  | { name: 'quotes' };
 
 export default function App() {
   const [session, setSession] = useState<Session | null>(null);
@@ -118,7 +120,7 @@ export default function App() {
 
   const isAdmin = access?.userId === session.user.id && access.role === 'admin';
   const adminArea = isAdmin && area === 'admin';
-  const restricted = (v: View) => v.name === 'vehicles' || v.name === 'insurances' || v.name === 'training';
+  const restricted = (v: View) => v.name === 'vehicles' || v.name === 'insurances' || v.name === 'training' || v.name === 'quotes';
   const currentView: View = !adminArea && restricted(view) ? { name: 'dashboard' } : view;
   const navigate = (v: View) => {
     // Navigation is secondary. Supabase RLS is the real permission boundary.
@@ -221,6 +223,9 @@ export default function App() {
           )}
           {adminArea && currentView.name === 'training' && (
             <TrainingDashboard />
+          )}
+          {adminArea && currentView.name === 'quotes' && (
+            <QuoteDashboard />
           )}
         </main>
       </div>
