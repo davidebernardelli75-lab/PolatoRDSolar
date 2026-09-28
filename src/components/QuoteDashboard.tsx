@@ -220,7 +220,12 @@ function QuoteFormModal({ person, rows, onClose, onSave }: {
   const [notes, setNotes] = useState(person?.notes ?? '');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const sources = [...new Set(rows.map((r) => r.source).filter(Boolean) as string[])].sort((a,b) => a.localeCompare(b,'it'));
+  const sources = [...new Set([
+    ...rows.map((r) => r.source).filter(Boolean) as string[],
+    'ALTRO',
+  ])]
+    .filter((source) => !['CLIENTI', 'DAVIDE B'].includes(source.trim().toUpperCase()))
+    .sort((a,b) => a.localeCompare(b,'it'));
 
   const changeDate = (v: string) => {
     setRequestDate(v);
