@@ -26,7 +26,7 @@ export function EquipmentScannerModal({
     previewUrlRef.current = nextPreviewUrl;
     setPreviewUrl(nextPreviewUrl);
     try {
-      const result = await scanImageFile(file);
+      const result = await scanImageFile(file, 'qr');
       if (result?.text) {
         onScan(result.text);
       } else {
@@ -42,7 +42,7 @@ export function EquipmentScannerModal({
     setCameraActive(true);
     cameraStartTimerRef.current = window.setTimeout(async () => {
       cameraStartTimerRef.current = null;
-      const scanner = new CameraScanner('equipment-qr-reader');
+      const scanner = new CameraScanner('equipment-qr-reader', 'qr');
       cameraScannerRef.current = scanner;
       try {
         await scanner.start((text) => {
@@ -115,10 +115,13 @@ export function EquipmentScannerModal({
           </div>
 
           {previewUrl && (
-            <div className="relative rounded-xl overflow-hidden border border-slate-200">
-              <img src={previewUrl} alt="Anteprima scansione" className="w-full max-h-48 object-cover" />
+            <div className="relative rounded-xl overflow-hidden border border-slate-200 bg-black">
+              <img src={previewUrl} alt="Anteprima scansione" className="w-full max-h-48 object-contain" />
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                <div className="w-[60%] aspect-square border-2 border-white rounded-xl shadow-[0_0_0_9999px_rgba(0,0,0,0.38)]" />
+              </div>
               <div className="absolute top-2 right-2 bg-black/60 text-white text-[10px] px-2 py-1 rounded-lg">
-                Foto scansionata
+                Area QR centrale
               </div>
             </div>
           )}
@@ -127,10 +130,17 @@ export function EquipmentScannerModal({
             className="rounded-xl overflow-hidden border-2 border-blue-900"
             style={{ display: cameraActive ? 'block' : 'none' }}
           >
-            <div id="equipment-qr-reader" className="w-full" style={{ minHeight: '300px' }} />
+            <div className="relative bg-black">
+              <div id="equipment-qr-reader" className="w-full" style={{ minHeight: '300px' }} />
+              {cameraActive && (
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                  <div className="w-[52%] aspect-square border-2 border-white rounded-xl shadow-[0_0_0_9999px_rgba(0,0,0,0.38)]" />
+                </div>
+              )}
+            </div>
             {cameraActive && (
               <div className="bg-blue-900 text-white text-xs text-center py-1.5">
-                Inquadra il QR code con la fotocamera
+                Porta solo il QR code dentro il riquadro centrale
               </div>
             )}
           </div>
