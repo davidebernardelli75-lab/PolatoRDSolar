@@ -11,6 +11,8 @@ export interface ScanResult {
   text: string;
 }
 
+export type ScanMode = 'all' | 'qr';
+
 const SUPPORTED_FORMATS = [
   BarcodeFormat.CODE_128,
   BarcodeFormat.CODE_39,
@@ -25,9 +27,11 @@ const SUPPORTED_FORMATS = [
   BarcodeFormat.DATA_MATRIX,
 ];
 
-function createReader(): BrowserMultiFormatReader {
+const QR_ONLY_FORMATS = [BarcodeFormat.QR_CODE];
+
+function createReader(formats = SUPPORTED_FORMATS): BrowserMultiFormatReader {
   const hints = new Map<DecodeHintType, unknown>();
-  hints.set(DecodeHintType.POSSIBLE_FORMATS, SUPPORTED_FORMATS);
+  hints.set(DecodeHintType.POSSIBLE_FORMATS, formats);
   hints.set(DecodeHintType.TRY_HARDER, true);
   return new BrowserMultiFormatReader(hints, {
     delayBetweenScanAttempts: 120,
@@ -36,6 +40,7 @@ function createReader(): BrowserMultiFormatReader {
 }
 
 const sharedReader = createReader();
+const qrReader = createReader(QR_ONLY_FORMATS);
 
 function decodeCanvas(reader: BrowserMultiFormatReader, canvas: HTMLCanvasElement): ScanResult | null {
   try {
@@ -89,15 +94,32 @@ function renderVariant(
   source: CanvasImageSource,
   sourceWidth: number,
   sourceHeight: number,
-  options: { inverted: boolean; rotation?: 0 | 90 | -90; crop?: boolean }
+  options: { inverted: boolean; rotation?: 0 | 90 | -90; crop?: boolean; qrCrop?: boolean }
 ): HTMLCanvasElement {
   const rotation = options.rotation ?? 0;
   const crop = options.crop ?? false;
-  const maxSide = crop ? 1600 : 1800;
-  const sourceX = crop ? Math.round(sourceWidth * 0.04) : 0;
-  const sourceY = crop ? Math.round(sourceHeight * 0.25) : 0;
-  const cropWidth = crop ? Math.round(sourceWidth * 0.92) : sourceWidth;
-  const cropHeight = crop ? Math.round(sourceHeight * 0.5) : sourceHeight;
+  const qrCrop = options.qrCrop ?? false;
+
+  let sourceX = 0;
+  let sourceY = 0;
+  let cropWidth = sourceWidth;
+  let cropHeight = sourceHeight;
+  let maxSide = 1800;
+
+  if (qrCrop) {
+    const side = Math.max(1, Math.round(Math.min(sourceWidth, sourceHeight) * 0.6));
+    sourceX = Math.max(0, Math.round((sourceWidth - side) / 2));
+    sourceY = Math.max(0, Math.round((sourceHeight - side) / 2));
+    cropWidth = side;
+    cropHeight = side;
+    maxSide = 1400;
+  } else if (crop) {
+    sourceX = Math.round(sourceWidth * 0.04);
+    sourceY = Math.round(sourceHeight * 0.25);
+    cropWidth = Math.round(sourceWidth * 0.92);
+    cropHeight = Math.round(sourceHeight * 0.5);
+    maxSide = 1600;
+  }
   const scale = Math.min(1.5, maxSide / Math.max(cropWidth, cropHeight));
   const drawWidth = Math.max(1, Math.round(cropWidth * scale));
   const drawHeight = Math.max(1, Math.round(cropHeight * scale));
@@ -138,24 +160,33 @@ function renderVariant(
   return canvas;
 }
 
-export async function scanImageFile(file: File): Promise<ScanResult | null> {
+export async function scanImageFile(file: File, mode: ScanMode = 'all'): Promise<ScanResult | null> {
   let image: HTMLImageElement | null = null;
   try {
     image = await loadImage(file);
-    const variants: Array<{ inverted: boolean; rotation?: 0 | 90 | -90; crop?: boolean }> = [
-      { inverted: true },
-      { inverted: false },
-      { inverted: true, crop: true },
-      { inverted: true, rotation: 90 },
-      { inverted: true, rotation: -90 },
-    ];
+    const variants: Array<{ inverted: boolean; rotation?: 0 | 90 | -90; crop?: boolean; qrCrop?: boolean }> = mode === 'qr'
+      ? [
+          { inverted: false, qrCrop: true },
+          { inverted: true, qrCrop: true },
+          { inverted: false, rotation: 90, qrCrop: true },
+          { inverted: false, rotation: -90, qrCrop: true },
+        ]
+      : [
+          { inverted: true },
+          { inverted: false },
+          { inverted: true, crop: true },
+          { inverted: true, rotation: 90 },
+          { inverted: true, rotation: -90 },
+        ];
 
     // Una sola variante alla volta: su iPhone evita di trattenere cinque grandi canvas
     // e relativi ImageData per ogni scansione consecutiva.
     for (const options of variants) {
       const canvas = renderVariant(image, image.naturalWidth, image.naturalHeight, options);
       try {
-        const result = await decodeZbarCanvas(canvas) ?? decodeCanvas(sharedReader, canvas);
+        const result = mode === 'qr'
+          ? decodeCanvas(qrReader, canvas)
+          : await decodeZbarCanvas(canvas) ?? decodeCanvas(sharedReader, canvas);
         if (result) return result;
       } finally {
         canvas.width = 1;
@@ -172,7 +203,7 @@ export async function scanImageFile(file: File): Promise<ScanResult | null> {
 }
 
 export class CameraScanner {
-  private reader = sharedReader;
+  private reader: BrowserMultiFormatReader;
   private stream: MediaStream | null = null;
   private video: HTMLVideoElement | null = null;
   private canvas: HTMLCanvasElement | null = null;
@@ -180,7 +211,9 @@ export class CameraScanner {
   private scanning = false;
   private detected = false;
 
-  constructor(private elementId: string) {}
+  constructor(private elementId: string, private mode: ScanMode = 'all') {
+    this.reader = mode === 'qr' ? qrReader : sharedReader;
+  }
 
   async start(onDetected: (text: string) => void): Promise<void> {
     const container = document.getElementById(this.elementId);
@@ -245,9 +278,15 @@ export class CameraScanner {
       const frameWidth = video.videoWidth;
       const frameHeight = video.videoHeight;
       if (!frameWidth || !frameHeight) return;
-      const scale = Math.min(1, 1280 / frameWidth);
-      const width = Math.max(1, Math.round(frameWidth * scale));
-      const height = Math.max(1, Math.round(frameHeight * scale));
+      const qrCrop = this.mode === 'qr';
+      const sourceSide = qrCrop ? Math.round(Math.min(frameWidth, frameHeight) * 0.52) : 0;
+      const sourceX = qrCrop ? Math.round((frameWidth - sourceSide) / 2) : 0;
+      const sourceY = qrCrop ? Math.round((frameHeight - sourceSide) / 2) : 0;
+      const sourceWidth = qrCrop ? sourceSide : frameWidth;
+      const sourceHeight = qrCrop ? sourceSide : frameHeight;
+      const scale = Math.min(1, 1280 / sourceWidth);
+      const width = Math.max(1, Math.round(sourceWidth * scale));
+      const height = Math.max(1, Math.round(sourceHeight * scale));
       if (canvas.width !== width || canvas.height !== height) {
         canvas.width = width;
         canvas.height = height;
@@ -256,13 +295,17 @@ export class CameraScanner {
       if (!context) return;
 
       context.filter = 'grayscale(1) invert(1) contrast(1.7)';
-      context.drawImage(video, 0, 0, width, height);
-      let result = await decodeZbarCanvas(canvas) ?? decodeCanvas(this.reader, canvas);
+      context.drawImage(video, sourceX, sourceY, sourceWidth, sourceHeight, 0, 0, width, height);
+      let result = qrCrop
+        ? decodeCanvas(this.reader, canvas)
+        : await decodeZbarCanvas(canvas) ?? decodeCanvas(this.reader, canvas);
 
       if (!result) {
         context.filter = 'grayscale(1) contrast(1.35)';
-        context.drawImage(video, 0, 0, width, height);
-        result = await decodeZbarCanvas(canvas) ?? decodeCanvas(this.reader, canvas);
+        context.drawImage(video, sourceX, sourceY, sourceWidth, sourceHeight, 0, 0, width, height);
+        result = qrCrop
+          ? decodeCanvas(this.reader, canvas)
+          : await decodeZbarCanvas(canvas) ?? decodeCanvas(this.reader, canvas);
       }
 
       if (result?.text && !this.detected) {
