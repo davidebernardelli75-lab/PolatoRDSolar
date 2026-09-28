@@ -39,6 +39,7 @@ interface FieldProps {
 }
 
 export function Field({ label, value, onChange, required, type = 'text', upper = false }: FieldProps) {
+  const shouldUppercase = type !== 'email' && type !== 'password' && (upper || type === 'text' || type === 'tel');
   return (
     <div>
       <label className="block text-sm font-medium text-slate-700 mb-1.5">
@@ -47,9 +48,9 @@ export function Field({ label, value, onChange, required, type = 'text', upper =
       <input
         type={type}
         value={value}
-        onChange={(e) => onChange(upper ? e.target.value.toUpperCase() : e.target.value)}
+        onChange={(e) => onChange(shouldUppercase ? e.target.value.toUpperCase() : e.target.value)}
         required={required}
-        className={`w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-red-400 focus:border-transparent ${upper ? 'uppercase' : ''}`}
+        className={`w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-red-400 focus:border-transparent ${shouldUppercase ? 'uppercase' : ''}`}
       />
     </div>
   );
