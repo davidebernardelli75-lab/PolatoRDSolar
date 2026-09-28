@@ -10,6 +10,14 @@ const inputClass = 'w-full rounded-xl border border-slate-200 bg-white px-3 py-2
 const money = (value: number | null) => value == null ? '—' : value.toLocaleString('it-IT', { style: 'currency', currency: 'EUR' });
 const displayDate = (value: string | null) => value ? value.split('-').reverse().join('/') : '—';
 
+function normalizeSource(value: string | null | undefined): string {
+  const upper = (value ?? '').trim().toUpperCase().replace(/\s+/g, ' ');
+  if (!upper) return '';
+  const match = upper.match(/^(?:REFERENZA|REFERENZE|REF\.?)\s*(.*)$/);
+  if (!match) return upper;
+  return match[1] ? `REF. ${match[1]}` : 'REF.';
+}
+
 function statusClass(status: QuoteStatus) {
   if (status === 'ACCETTATO') return 'bg-green-100 text-green-700';
   if (status === 'RIFIUTATO') return 'bg-red-100 text-red-700';
@@ -58,7 +66,7 @@ export function QuoteDashboard() {
   const sourceData = useMemo(() => {
     const map = new Map<string, number>();
     yearRows.forEach((r) => {
-      const key = (r.source?.trim() || 'NON INDICATA').toUpperCase();
+      const key = normalizeSource(r.source) || 'NON INDICATA';
       map.set(key, (map.get(key) ?? 0) + 1);
     });
     const sorted = [...map.entries()].sort((a,b) => b[1]-a[1]);
@@ -151,7 +159,7 @@ export function QuoteDashboard() {
           <div className="mb-4 flex flex-wrap items-center gap-3">
             <label className="relative min-w-[220px] flex-1">
               <Search size={16} className="absolute left-3 top-3 text-slate-400"/>
-              <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Cerca cliente, referenza, tipo..." className={inputClass + ' pl-9'} />
+              <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Cerca cliente, ref., tipo..." className={inputClass + ' pl-9'} />
             </label>
             <select value={year} onChange={(e) => setYear(Number(e.target.value))} className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm">
               {years.map((y) => <option key={y}>{y}</option>)}
@@ -174,7 +182,7 @@ export function QuoteDashboard() {
                       <h3 className="font-semibold text-slate-900">{r.client}</h3>
                       <span className={"rounded-full px-2 py-0.5 text-[10px] font-semibold " + statusClass(r.status)}>{r.status}</span>
                     </div>
-                    <p className="mt-0.5 text-xs text-slate-500">{displayDate(r.request_date)} · {r.source || 'REFERENZA NON INDICATA'}</p>
+                    <p className="mt-0.5 text-xs text-slate-500">{displayDate(r.request_date)} · {normalizeSource(r.source) || 'REF. NON INDICATA'}</p>
                     <p className="mt-1 text-sm text-slate-700">{r.quote_type || 'TIPO PREVENTIVO NON INDICATO'}</p>
                     {(r.value_ex_vat != null || r.notes) && <p className="mt-1 text-xs text-slate-500">{r.value_ex_vat != null ? `VALORE: ${money(r.value_ex_vat)}` : ''}{r.value_ex_vat != null && r.notes ? ' · ' : ''}{r.notes || ''}</p>}
                   </div>
@@ -221,7 +229,7 @@ function QuoteFormModal({ person, rows, onClose, onSave }: {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const sources = [...new Set([
-    ...rows.map((r) => r.source).filter(Boolean) as string[],
+    ...rows.map((r) => normalizeSource(r.source)).filter(Boolean),
     'ALTRO',
   ])]
     .filter((source) => !['CLIENTI', 'DAVIDE B'].includes(source.trim().toUpperCase()))
@@ -246,7 +254,7 @@ function QuoteFormModal({ person, rows, onClose, onSave }: {
         series: 'FV',
         quote_year: year,
         request_date: requestDate || null,
-        source: source.trim().toUpperCase() || null,
+        source: normalizeSource(source) || null,
         client: client.trim().toUpperCase(),
         quote_type: quoteType.trim().toUpperCase() || null,
         value_ex_vat: value === '' ? null : Number(value),
@@ -270,7 +278,7 @@ function QuoteFormModal({ person, rows, onClose, onSave }: {
         <label className="text-xs font-semibold text-slate-600">Data richiesta
           <input type="date" value={requestDate} onChange={(e) => changeDate(e.target.value)} className={inputClass + ' mt-1'} />
         </label>
-        <label className="text-xs font-semibold text-slate-600">Da dove arriva / referenza
+        <label className="text-xs font-semibold text-slate-600">Da dove arriva / ref.
           <input list="quote-sources" value={source} onChange={(e) => setSource(e.target.value.toUpperCase())} className={inputClass + ' mt-1'} placeholder="SITO, CLIENTE, NICOLA..." />
           <datalist id="quote-sources">{sources.map((s) => <option key={s} value={s}/>)}</datalist>
         </label>
