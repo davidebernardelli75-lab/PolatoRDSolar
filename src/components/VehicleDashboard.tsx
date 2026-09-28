@@ -78,7 +78,7 @@ export function VehicleDashboard() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [reportYear, setReportYear] = useState(new Date().getFullYear());
-  const [showAllVehicles, setShowAllVehicles] = useState(false);
+  const [showAllVehicles, setShowAllVehicles] = useState(true);
   const report = calculateVehicleCosts(vehicles, reportYear);
   const registered = calculateRegisteredVehicleCosts(vehicles);
 
@@ -232,7 +232,7 @@ export function VehicleDashboard() {
         <div className="flex gap-2">
           <button type="button" onClick={() => { setShowAllVehicles((v) => !v); setExpandedId(null); }}
             className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
-            {showAllVehicles ? 'Solo alert' : 'Gestisci parco completo'}
+            {showAllVehicles ? 'Riepilogo alert' : 'Gestisci parco completo'}
           </button>
           {showAllVehicles && (
             <button onClick={() => setShowForm(true)}
