@@ -1,3 +1,11 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+
+/* Uniform data-entry styling across the app.
+   Email and password fields intentionally keep their natural casing. */
+input:not([type='email']):not([type='password']):not([type='date']):not([type='month']):not([type='number']),
+textarea {
+  text-transform: uppercase;
+}
