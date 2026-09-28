@@ -87,7 +87,6 @@ export function PlantTechnicalDetails({ plant }: { plant: Plant }) {
         <DetailRow label="POD" value={plant.pod} />
         <DetailRow label="Codice CENSIMP" value={plant.censimp_code} />
         <DetailRow label="Potenza Totale" value={plant.total_power_kw != null ? `${plant.total_power_kw} kWh` : null} />
-        <DetailRow label="Pannelli" value={plant.panel_brand_model} />
         <DetailRow label="Data Installazione" value={plant.installation_date ? plant.installation_date.slice(0, 10) : null} />
         <DetailRow label="Note" value={plant.notes} />
       </div>
