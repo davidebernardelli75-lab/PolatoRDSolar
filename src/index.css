@@ -5,7 +5,11 @@
 
 /* Uniform data-entry styling across the app.
    Email and password fields intentionally keep their natural casing. */
-input:not([type='email']):not([type='password']):not([type='date']):not([type='month']):not([type='number']),
-textarea {
+input:not([type='email']):not([type='password']):not([type='date']):not([type='month']):not([type='number']):not([data-preserve-case='true']),
+textarea:not([data-preserve-case='true']) {
   text-transform: uppercase;
+}
+
+[data-preserve-case='true'] {
+  text-transform: none !important;
 }

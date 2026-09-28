@@ -72,7 +72,7 @@ export function PasswordRecovery({ onComplete }: PasswordRecoveryProps) {
             <div className="flex items-center gap-2 text-blue-900"><LockKeyhole size={20} />Nuova password</div>
             <label className="block text-sm font-medium text-slate-700">Password (almeno 12 caratteri)
               <div className="relative mt-1">
-                <input type={visible ? 'text' : 'password'} required minLength={12}
+                <input type={visible ? 'text' : 'password'}  data-preserve-case="true" autoCapitalize="none" spellCheck={false} required minLength={12}
                   autoComplete="new-password" value={password}
                   onChange={(event) => setPassword(event.target.value)}
                   className="w-full rounded-lg border border-slate-300 px-3 py-3 pr-12" />
@@ -84,7 +84,7 @@ export function PasswordRecovery({ onComplete }: PasswordRecoveryProps) {
               </div>
             </label>
             <label className="block text-sm font-medium text-slate-700">Conferma nuova password
-              <input type={visible ? 'text' : 'password'} required minLength={12}
+              <input type={visible ? 'text' : 'password'}  data-preserve-case="true" autoCapitalize="none" spellCheck={false} required minLength={12}
                 autoComplete="new-password" value={confirm}
                 onChange={(event) => setConfirm(event.target.value)}
                 className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-3" />
