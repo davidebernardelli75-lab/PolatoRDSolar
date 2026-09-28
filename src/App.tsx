@@ -137,6 +137,20 @@ export default function App() {
     }
   };
 
+  const handleChangeArea = async () => {
+    setSidebarOpen(false);
+    setError(null);
+    const { error: signOutError } = await supabase.auth.signOut();
+    if (signOutError) {
+      setError('Impossibile uscire dall’area corrente. Riprova.');
+      return;
+    }
+    setArea('home');
+    setView({ name: 'dashboard' });
+    setAccess(null);
+    setSession(null);
+  };
+
   return (
     <div className="flex h-screen bg-slate-50">
       <Sidebar
@@ -145,7 +159,7 @@ export default function App() {
         onNavigate={navigate}
         currentView={currentView}
         isAdmin={adminArea}
-        onChangeArea={() => { setArea('home'); setView({ name: 'dashboard' }); }}
+        onChangeArea={() => { void handleChangeArea(); }}
         onSignOut={() => supabase.auth.signOut()}
       />
 
