@@ -1,4 +1,4 @@
-const CACHE_NAME = 'polato-solar-v7';
+const CACHE_NAME = 'polato-solar-v8';
 const APP_SHELL = [
   '/',
   '/manifest.webmanifest',
@@ -15,7 +15,7 @@ self.addEventListener('install', (event) => {
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keys) =>
-      Promise.all(keys.filter((key) => key !== CACHE_NAME && key !== 'polato-solar-v4').map((key) => caches.delete(key)))
+      Promise.all(keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key)))
     ).then(() => self.clients.claim()).then(() => self.clients.matchAll({ type: 'window' }).then((clients) =>
       clients.forEach((client) => client.navigate(client.url))
     ))
