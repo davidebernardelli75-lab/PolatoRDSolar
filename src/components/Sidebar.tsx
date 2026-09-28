@@ -243,7 +243,7 @@ function ChangePasswordModal({ onClose }: { onClose: () => void }) {
             <div className="relative mt-1.5">
               <input
                 type={showCurrent ? 'text' : 'password'}
-                required
+                 data-preserve-case="true" autoCapitalize="none" spellCheck={false} required
                 value={currentPassword}
                 onChange={(e) => setCurrentPassword(e.target.value)}
                 className="w-full rounded-lg border border-slate-300 px-3 py-2.5 pr-10 outline-none transition focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
@@ -257,7 +257,7 @@ function ChangePasswordModal({ onClose }: { onClose: () => void }) {
             <div className="relative mt-1.5">
               <input
                 type={showNew ? 'text' : 'password'}
-                required
+                 data-preserve-case="true" autoCapitalize="none" spellCheck={false} required
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
                 className="w-full rounded-lg border border-slate-300 px-3 py-2.5 pr-10 outline-none transition focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
@@ -272,7 +272,7 @@ function ChangePasswordModal({ onClose }: { onClose: () => void }) {
             <div className="relative mt-1.5">
               <input
                 type={showConfirm ? 'text' : 'password'}
-                required
+                 data-preserve-case="true" autoCapitalize="none" spellCheck={false} required
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 className="w-full rounded-lg border border-slate-300 px-3 py-2.5 pr-10 outline-none transition focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
