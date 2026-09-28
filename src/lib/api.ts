@@ -1,5 +1,5 @@
 import { supabase, STORAGE_BUCKET } from './supabase';
-import type { Plant, Panel, PanelPhoto, PlantInsert, PlantUpdate, PanelInsert, RoadmapTask, PlantInverter, PlantStorage, PlantCharger, PlantInverterInsert, PlantStorageInsert, PlantChargerInsert, PlantPowerMeter, PlantPowerMeterInsert, Vehicle, VehicleInsert, Insurance, InsuranceInsert, EquipmentCatalogEntry, EquipmentCategory } from './types';
+import type { Plant, Panel, PanelPhoto, PlantInsert, PlantUpdate, PanelInsert, RoadmapTask, PlantInverter, PlantStorage, PlantCharger, PlantInverterInsert, PlantStorageInsert, PlantChargerInsert, PlantPowerMeter, PlantPowerMeterInsert, Vehicle, VehicleInsert, Insurance, InsuranceInsert, EquipmentCatalogEntry, EquipmentCategory, QuoteRequest, QuoteRequestInsert } from './types';
 
 export async function fetchPlants(): Promise<Plant[]> {
   const { data, error } = await supabase
@@ -458,5 +458,44 @@ export async function addEquipmentModel(category: EquipmentCategory, brand: stri
   const { error } = await supabase
     .from('equipment_catalog')
     .insert({ category, brand, model });
+  if (error) throw error;
+}
+
+
+// ── Quote Requests (Preventivi) ───────────────────────────────────
+
+export async function fetchQuoteRequests(): Promise<QuoteRequest[]> {
+  const { data, error } = await supabase
+    .from('quote_requests')
+    .select('*')
+    .order('quote_year', { ascending: false })
+    .order('progressive_number', { ascending: false });
+  if (error) throw error;
+  return data ?? [];
+}
+
+export async function createQuoteRequest(input: QuoteRequestInsert): Promise<QuoteRequest> {
+  const { data, error } = await supabase
+    .from('quote_requests')
+    .insert(input)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+export async function updateQuoteRequest(id: string, input: Partial<QuoteRequestInsert>): Promise<QuoteRequest> {
+  const { data, error } = await supabase
+    .from('quote_requests')
+    .update({ ...input, updated_at: new Date().toISOString() })
+    .eq('id', id)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+export async function deleteQuoteRequest(id: string): Promise<void> {
+  const { error } = await supabase.from('quote_requests').delete().eq('id', id);
   if (error) throw error;
 }
