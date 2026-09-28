@@ -238,7 +238,7 @@ function QuoteFormModal({ person, rows, onClose, onSave }: {
     try {
       await onSave({
         progressive_number: progressive,
-        series: person?.series ?? 'F',
+        series: 'FV',
         quote_year: year,
         request_date: requestDate || null,
         source: source.trim().toUpperCase() || null,
