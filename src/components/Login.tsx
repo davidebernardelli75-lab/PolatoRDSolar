@@ -92,7 +92,7 @@ export function Login({ signedIn = false, canAdmin = true, onSignedIn, onSelectA
               </label>
               <label className="block text-sm font-semibold text-slate-700">Password
                 <div className="relative mt-1">
-                  <input type={visible ? 'text' : 'password'} required autoComplete="current-password"
+                  <input type={visible ? 'text' : 'password'}  data-preserve-case="true" autoCapitalize="none" spellCheck={false} required autoComplete="current-password"
                     value={password} onChange={(e) => setPassword(e.target.value)}
                     className="w-full rounded-lg border border-slate-300 px-3 py-3 pr-12 focus:border-blue-900 focus:outline-none" />
                   <button type="button" onClick={() => setVisible(v => !v)}
