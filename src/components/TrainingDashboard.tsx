@@ -441,7 +441,6 @@ function EmployeeFormModal({ person, onClose, onSave }: {
   const [firstName, setFirstName] = useState(person?.first_name ?? '');
   const [lastName, setLastName] = useState(person?.last_name ?? '');
   const [jobTitle, setJobTitle] = useState(person?.job_title ?? '');
-  const [hiredOn, setHiredOn] = useState(person?.hired_on ?? '');
   const [active, setActive] = useState(person?.active ?? true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -453,7 +452,7 @@ function EmployeeFormModal({ person, onClose, onSave }: {
     try {
       await onSave({
         first_name: firstName.trim(), last_name: lastName.trim(),
-        job_title: jobTitle.trim() || null, hired_on: hiredOn || null, active,
+        job_title: jobTitle.trim() || null, hired_on: person?.hired_on ?? null, active,
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Impossibile salvare il dipendente.');
@@ -475,9 +474,6 @@ function EmployeeFormModal({ person, onClose, onSave }: {
           </label>
           <label className="block text-xs font-semibold text-slate-600">Mansione / ruolo
             <input maxLength={160} className={inputClass + ' mt-1'} value={jobTitle} onChange={(e) => setJobTitle(e.target.value)} placeholder="Elettricista, installatore FV, responsabile..." />
-          </label>
-          <label className="block text-xs font-semibold text-slate-600">Data assunzione (facoltativa)
-            <input type="date" className={inputClass + ' mt-1'} value={hiredOn} onChange={(e) => setHiredOn(e.target.value)} />
           </label>
           <label className="flex items-center gap-2 text-sm text-slate-700">
             <input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} />
