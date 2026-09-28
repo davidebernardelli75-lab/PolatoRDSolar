@@ -186,3 +186,24 @@ export type PlantInsert = Omit<Plant, 'id' | 'created_at' | 'updated_at'>;
 export type PlantUpdate = Partial<PlantInsert>;
 export type PanelInsert = Omit<Panel, 'id' | 'created_at'>;
 export type PanelPhotoInsert = Omit<PanelPhoto, 'id' | 'created_at'>;
+
+
+export type QuoteStatus = 'DA VERIFICARE' | 'DA GESTIRE' | 'IN PREPARAZIONE' | 'INVIATO' | 'ACCETTATO' | 'RIFIUTATO' | 'SOSPESO';
+
+export interface QuoteRequest {
+  id: string;
+  progressive_number: number;
+  series: string;
+  quote_year: number;
+  request_date: string | null;
+  source: string | null;
+  client: string;
+  quote_type: string | null;
+  value_ex_vat: number | null;
+  status: QuoteStatus;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type QuoteRequestInsert = Omit<QuoteRequest, 'id' | 'created_at' | 'updated_at'>;
