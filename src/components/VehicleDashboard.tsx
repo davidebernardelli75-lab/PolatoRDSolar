@@ -78,6 +78,7 @@ export function VehicleDashboard() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [reportYear, setReportYear] = useState(new Date().getFullYear());
+  const [showAllVehicles, setShowAllVehicles] = useState(false);
   const report = calculateVehicleCosts(vehicles, reportYear);
   const registered = calculateRegisteredVehicleCosts(vehicles);
 
@@ -96,7 +97,16 @@ export function VehicleDashboard() {
 
   useEffect(() => { loadVehicles(); }, [loadVehicles]);
 
-  const alertCount = vehicles.filter((v) => getOverallStatus(v) !== 'ok').length;
+  const alertVehicles = vehicles.filter((v) => getOverallStatus(v) !== 'ok');
+  const alertCount = alertVehicles.length;
+  const dangerCount = alertVehicles.filter((v) => getOverallStatus(v) === 'danger').length;
+  const warningCount = alertVehicles.filter((v) => getOverallStatus(v) === 'warning').length;
+  const visibleVehicles = showAllVehicles
+    ? vehicles
+    : [...alertVehicles].sort((a, b) => {
+        const rank = { danger: 0, warning: 1, ok: 2 } as const;
+        return rank[getOverallStatus(a)] - rank[getOverallStatus(b)];
+      });
 
   return (
     <div className="p-4 lg:p-8 max-w-5xl mx-auto pb-24">
@@ -106,10 +116,11 @@ export function VehicleDashboard() {
             <div className="flex items-center gap-2 mb-2">
               <span className="text-[10px] font-semibold px-2 py-1 rounded-full bg-red-500/20 text-red-300">PARCO AUTOMEZZI</span>
             </div>
-            <h1 className="text-xl lg:text-2xl font-bold mb-1">Gestione Automezzi</h1>
+            <h1 className="text-xl lg:text-2xl font-bold mb-1">{showAllVehicles ? 'Gestione Automezzi' : 'Dashboard Automezzi'}</h1>
             <div className="text-slate-400 text-sm">
-              {vehicles.length} veicoli registrati
-              {alertCount > 0 && <span className="text-amber-400 ml-2">- {alertCount} con interventi da fare</span>}
+              {showAllVehicles
+                ? <>{vehicles.length} veicoli registrati{alertCount > 0 && <span className="text-amber-400 ml-2">- {alertCount} con interventi da fare</span>}</>
+                : <>{alertCount} veicoli con alert su {vehicles.length} registrati</>}
             </div>
           </div>
           <div className="flex-shrink-0">
@@ -128,7 +139,24 @@ export function VehicleDashboard() {
         </div>
       )}
 
-      <section aria-label="Totale spese automezzi registrate" className="mb-4 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 lg:p-5">
+      {!showAllVehicles && !loading && (
+        <section aria-label="Riepilogo alert automezzi" className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <div className="rounded-2xl border border-red-200 bg-red-50 p-4">
+            <div className="flex items-center gap-2 text-red-700"><AlertTriangle size={18} /><span className="text-sm font-semibold">Scaduti / urgenti</span></div>
+            <div className="mt-2 text-3xl font-bold text-red-800">{dangerCount}</div>
+          </div>
+          <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
+            <div className="flex items-center gap-2 text-amber-700"><Calendar size={18} /><span className="text-sm font-semibold">In scadenza</span></div>
+            <div className="mt-2 text-3xl font-bold text-amber-800">{warningCount}</div>
+          </div>
+          <div className="rounded-2xl border border-slate-200 bg-white p-4">
+            <div className="text-sm font-semibold text-slate-700">Parco totale</div>
+            <div className="mt-2 text-3xl font-bold text-slate-900">{vehicles.length}</div>
+          </div>
+        </section>
+      )}
+
+      {showAllVehicles && <section aria-label="Totale spese automezzi registrate" className="mb-4 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 lg:p-5">
         <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
           <div>
             <h2 className="font-semibold text-slate-900">Spese di gestione registrate</h2>
@@ -157,9 +185,9 @@ export function VehicleDashboard() {
           <span>{registered.total.toLocaleString('it-IT', { style: 'currency', currency: 'EUR' })}</span>
         </div>
         <p className="mt-2 text-xs text-slate-600">Fotografia degli ultimi costi per veicolo, non somma delle fatture pagate nell'anno.</p>
-      </section>
+      </section>}
 
-      <section aria-label="Rendiconto annuale automezzi" className="mb-6 rounded-2xl border border-slate-200 bg-white p-4 lg:p-5">
+      {showAllVehicles && <section aria-label="Rendiconto annuale automezzi" className="mb-6 rounded-2xl border border-slate-200 bg-white p-4 lg:p-5">
         <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
           <h2 className="font-semibold text-slate-900">Riepilogo per anno di riferimento</h2>
           <label className="flex items-center gap-2 text-sm text-slate-700">Anno
@@ -194,14 +222,25 @@ export function VehicleDashboard() {
           Un importo appena inserito può non comparire qui se la scadenza è in un altro anno.
           Lo storico effettivo dei pagamenti richiederà registrazioni di spesa datate.
         </p>
-      </section>
+      </section>}
 
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="font-semibold text-slate-900">Veicoli</h2>
-        <button onClick={() => setShowForm(true)}
-          className="flex items-center gap-1.5 bg-blue-900 hover:bg-blue-800 text-white text-sm font-medium px-3 py-2 rounded-lg transition-colors">
-          <Plus size={16} /> Aggiungi Veicolo
-        </button>
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+        <div>
+          <h2 className="font-semibold text-slate-900">{showAllVehicles ? 'Tutti i veicoli' : 'Veicoli con alert'}</h2>
+          {!showAllVehicles && <p className="text-xs text-slate-500 mt-0.5">Sono mostrati solo gli automezzi che richiedono attenzione.</p>}
+        </div>
+        <div className="flex gap-2">
+          <button type="button" onClick={() => { setShowAllVehicles((v) => !v); setExpandedId(null); }}
+            className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
+            {showAllVehicles ? 'Solo alert' : 'Gestisci parco completo'}
+          </button>
+          {showAllVehicles && (
+            <button onClick={() => setShowForm(true)}
+              className="flex items-center gap-1.5 bg-blue-900 hover:bg-blue-800 text-white text-sm font-medium px-3 py-2 rounded-lg transition-colors">
+              <Plus size={16} /> Aggiungi Veicolo
+            </button>
+          )}
+        </div>
       </div>
 
       {loading ? (
@@ -211,9 +250,15 @@ export function VehicleDashboard() {
           <Car className="mx-auto text-slate-300 mb-2" size={32} />
           <p className="text-slate-500 text-sm">Nessun veicolo registrato.</p>
         </div>
+      ) : visibleVehicles.length === 0 ? (
+        <div className="bg-green-50 rounded-2xl border border-green-200 p-8 text-center">
+          <Shield className="mx-auto text-green-600 mb-2" size={32} />
+          <p className="font-semibold text-green-800">Nessun alert attivo.</p>
+          <p className="text-green-700 text-sm mt-1">Tutti gli automezzi risultano regolari rispetto alle scadenze monitorate.</p>
+        </div>
       ) : (
         <div className="space-y-3">
-          {vehicles.map((v) => (
+          {visibleVehicles.map((v) => (
             <VehicleCard key={v.id} vehicle={v} expanded={expandedId === v.id}
               onToggle={() => setExpandedId(expandedId === v.id ? null : v.id)}
               onUpdate={async (input) => {
