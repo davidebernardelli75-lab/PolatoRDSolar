@@ -128,8 +128,8 @@ export function PlantEditor({ plantId, onSaved, onCancel }: PlantEditorProps) {
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1.5">Note</label>
-              <textarea value={form.notes ?? ''} onChange={(e) => update('notes', e.target.value)} rows={3}
-                className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-red-400 focus:border-transparent resize-none" />
+              <textarea value={form.notes ?? ''} onChange={(e) => update('notes', e.target.value.toUpperCase())} rows={3}
+                className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm uppercase focus:outline-none focus:ring-2 focus:ring-red-400 focus:border-transparent resize-none" />
             </div>
           </div>
         </section>
