@@ -101,7 +101,12 @@ export function VehicleDashboard() {
   const alertCount = alertVehicles.length;
   const dangerCount = alertVehicles.filter((v) => getOverallStatus(v) === 'danger').length;
   const warningCount = alertVehicles.filter((v) => getOverallStatus(v) === 'warning').length;
-  const visibleVehicles = showAllVehicles ? vehicles : alertVehicles;
+  const visibleVehicles = showAllVehicles
+    ? vehicles
+    : [...alertVehicles].sort((a, b) => {
+        const rank = { danger: 0, warning: 1, ok: 2 } as const;
+        return rank[getOverallStatus(a)] - rank[getOverallStatus(b)];
+      });
 
   return (
     <div className="p-4 lg:p-8 max-w-5xl mx-auto pb-24">
