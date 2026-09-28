@@ -18,7 +18,7 @@ export function Login({ signedIn = false, canAdmin = true, onSignedIn, onSelectA
   const select = (choice: Portal) => {
     if (signedIn) { if (choice === 'admin' && !canAdmin) return; onSelectArea?.(choice); return; }
     setPortal(choice);
-    setEmail(choice === 'admin' ? 'amministrazione@polatord.it' : 'impiantiFV@polatord.it');
+    setEmail(choice === 'admin' ? 'amministrazione@polatord.it' : 'energia@polatord.it');
     setPassword('');
     setMessage(null); setError(null);
   };
