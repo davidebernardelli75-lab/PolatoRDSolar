@@ -226,7 +226,9 @@ export type WorkReportStatus = 'BOZZA' | 'DA_VERIFICARE' | 'APPROVATO' | 'DA_COR
 
 export interface WorkReport {
   id: string;
-  plant_id: string;
+  plant_id: string | null;
+  client_reference: string;
+  quote_request_id: string | null;
   report_date: string;
   team_name: string;
   work_description: string | null;
