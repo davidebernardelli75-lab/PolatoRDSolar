@@ -132,9 +132,10 @@ export function QuoteDashboard() {
     setUploadingQuoteId(quoteId);
     setError(null);
     try {
-      const uploaded: QuoteRequestFile[] = [];
-      for (const file of files) uploaded.push(await uploadQuoteRequestFile(quoteId, file));
-      setQuoteFiles((prev) => [...uploaded, ...prev]);
+      for (const file of files) {
+        const uploaded = await uploadQuoteRequestFile(quoteId, file);
+        setQuoteFiles((prev) => [uploaded, ...prev]);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Caricamento file non riuscito.');
     } finally {
