@@ -22,12 +22,16 @@ import type {
   PlantQuoteLink,
   QuoteRequest,
   WorkReport,
+  WorkReportLaborRateDefault,
   WorkReportMaterial,
   WorkReportMaterialCatalogEntry,
+  WorkReportMaterialCost,
+  WorkReportMaterialCostDefault,
   WorkReportMaterialInput,
   WorkReportStatus,
   WorkReportWorker,
   WorkReportWorkerCatalogEntry,
+  WorkReportWorkerCost,
   WorkReportWorkerInput,
 } from '@/lib/types';
 import {
@@ -82,6 +86,10 @@ export function WorkReportDashboard({ isAdmin }: WorkReportDashboardProps) {
   const [materials, setMaterials] = useState<WorkReportMaterial[]>([]);
   const [materialCatalog, setMaterialCatalog] = useState<WorkReportMaterialCatalogEntry[]>([]);
   const [workerCatalog, setWorkerCatalog] = useState<WorkReportWorkerCatalogEntry[]>([]);
+  const [materialCostDefaults, setMaterialCostDefaults] = useState<WorkReportMaterialCostDefault[]>([]);
+  const [laborRateDefaults, setLaborRateDefaults] = useState<WorkReportLaborRateDefault[]>([]);
+  const [materialCostSnapshots, setMaterialCostSnapshots] = useState<WorkReportMaterialCost[]>([]);
+  const [workerCostSnapshots, setWorkerCostSnapshots] = useState<WorkReportWorkerCost[]>([]);
   const [plants, setPlants] = useState<Plant[]>([]);
   const [quotes, setQuotes] = useState<QuoteRequest[]>([]);
   const [quoteLinks, setQuoteLinks] = useState<PlantQuoteLink[]>([]);
@@ -109,10 +117,25 @@ export function WorkReportDashboard({ isAdmin }: WorkReportDashboardProps) {
 
       let quoteRows: QuoteRequest[] = [];
       let plantQuoteRows: PlantQuoteLink[] = [];
+      let materialCostDefaultRows: WorkReportMaterialCostDefault[] = [];
+      let laborRateDefaultRows: WorkReportLaborRateDefault[] = [];
+      let materialCostRows: WorkReportMaterialCost[] = [];
+      let workerCostRows: WorkReportWorkerCost[] = [];
       if (isAdmin) {
-        [quoteRows, plantQuoteRows] = await Promise.all([
+        [
+          quoteRows,
+          plantQuoteRows,
+          materialCostDefaultRows,
+          laborRateDefaultRows,
+          materialCostRows,
+          workerCostRows,
+        ] = await Promise.all([
           fetchQuoteRequests(),
           fetchPlantQuoteLinks(),
+          fetchWorkReportMaterialCostDefaults(),
+          fetchWorkReportLaborRateDefaults(),
+          fetchWorkReportMaterialCosts(),
+          fetchWorkReportWorkerCosts(),
         ]);
       }
 
@@ -124,6 +147,10 @@ export function WorkReportDashboard({ isAdmin }: WorkReportDashboardProps) {
       setWorkerCatalog(workerOptions);
       setQuotes(quoteRows);
       setQuoteLinks(plantQuoteRows);
+      setMaterialCostDefaults(materialCostDefaultRows);
+      setLaborRateDefaults(laborRateDefaultRows);
+      setMaterialCostSnapshots(materialCostRows);
+      setWorkerCostSnapshots(workerCostRows);
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Impossibile caricare i rapportini.');
@@ -137,6 +164,33 @@ export function WorkReportDashboard({ isAdmin }: WorkReportDashboardProps) {
   const plantById = useMemo(() => new Map(plants.map((plant) => [plant.id, plant])), [plants]);
   const quoteById = useMemo(() => new Map(quotes.map((quote) => [quote.id, quote])), [quotes]);
   const quoteLinkByPlant = useMemo(() => new Map(quoteLinks.map((link) => [link.plant_id, link.quote_request_id])), [quoteLinks]);
+  const materialCostByRow = useMemo(
+    () => new Map(materialCostSnapshots.map((row) => [row.report_material_id, Number(row.unit_price)])),
+    [materialCostSnapshots],
+  );
+  const workerCostByRow = useMemo(
+    () => new Map(workerCostSnapshots.map((row) => [row.report_worker_id, Number(row.hourly_rate)])),
+    [workerCostSnapshots],
+  );
+  const materialDefaultByCatalog = useMemo(
+    () => new Map(materialCostDefaults.map((row) => [row.material_catalog_id, Number(row.unit_price)])),
+    [materialCostDefaults],
+  );
+  const laborDefaultByKey = useMemo(
+    () => new Map(laborRateDefaults.map((row) => [
+      `${row.worker_catalog_id}::${normalizeCatalogValue(row.rate_type)}`,
+      Number(row.hourly_rate),
+    ])),
+    [laborRateDefaults],
+  );
+  const materialCatalogByDescription = useMemo(
+    () => new Map(materialCatalog.map((item) => [item.normalized_description, item])),
+    [materialCatalog],
+  );
+  const workerCatalogByName = useMemo(
+    () => new Map(workerCatalog.map((item) => [item.normalized_worker_name, item])),
+    [workerCatalog],
+  );
   const filtered = reports.filter((report) => statusFilter === 'TUTTI' || report.status === statusFilter);
 
   const adminGroups = useMemo(() => {
@@ -362,6 +416,7 @@ export function WorkReportDashboard({ isAdmin }: WorkReportDashboardProps) {
             materialCatalog={materialCatalog}
             quoteOptions={quotes}
             linkedQuoteRequestId={quoteLinkByPlant.get(report.plant_id) ?? null}
+            onCostsSaved={load}
           />
         )}
 
@@ -458,6 +513,72 @@ export function WorkReportDashboard({ isAdmin }: WorkReportDashboardProps) {
             const groupWorkers = workers.filter((worker) => reportIds.has(worker.report_id));
             const groupMaterials = materials.filter((material) => reportIds.has(material.report_id));
             const groupHours = groupWorkers.reduce((sum, worker) => sum + Number(worker.hours || 0), 0);
+
+            let groupLaborCost = 0;
+            let groupMaterialCost = 0;
+            let groupMissingCosts = 0;
+
+            groupWorkers.forEach((worker) => {
+              let rate = workerCostByRow.get(worker.id);
+              if (rate == null) {
+                const workerCatalogEntry = workerCatalogByName.get(normalizeCatalogValue(worker.worker_name));
+                const fallbackKey = workerCatalogEntry
+                  ? `${workerCatalogEntry.id}::${normalizeCatalogValue(worker.rate_type || 'ORDINARIA')}`
+                  : '';
+                rate = fallbackKey ? laborDefaultByKey.get(fallbackKey) : undefined;
+              }
+
+              if (rate == null || !Number.isFinite(rate)) {
+                groupMissingCosts += 1;
+                return;
+              }
+
+              groupLaborCost += Number(worker.hours) * rate;
+            });
+
+            groupMaterials.forEach((material) => {
+              let unitPrice = materialCostByRow.get(material.id);
+              if (unitPrice == null) {
+                const materialCatalogEntry = materialCatalogByDescription.get(normalizeCatalogValue(material.description));
+                unitPrice = materialCatalogEntry
+                  ? materialDefaultByCatalog.get(materialCatalogEntry.id)
+                  : undefined;
+              }
+
+              if (unitPrice == null || !Number.isFinite(unitPrice)) {
+                groupMissingCosts += 1;
+                return;
+              }
+
+              groupMaterialCost += Number(material.quantity) * unitPrice;
+            });
+
+            const groupCostToDate = groupLaborCost + groupMaterialCost;
+            const quoteValue = quote?.value_ex_vat == null ? null : Number(quote.value_ex_vat);
+            const groupBudgetUsedPercent = quoteValue != null && quoteValue > 0
+              ? (groupCostToDate / quoteValue) * 100
+              : null;
+            const groupMargin = quoteValue == null ? null : quoteValue - groupCostToDate;
+            const groupMarginPercent = quoteValue != null && quoteValue > 0 && groupMargin != null
+              ? (groupMargin / quoteValue) * 100
+              : null;
+            const groupLaborPercent = quoteValue != null && quoteValue > 0
+              ? (groupLaborCost / quoteValue) * 100
+              : null;
+            const groupMaterialPercent = quoteValue != null && quoteValue > 0
+              ? (groupMaterialCost / quoteValue) * 100
+              : null;
+            const budgetProgressWidth = groupBudgetUsedPercent == null
+              ? 0
+              : Math.min(Math.max(groupBudgetUsedPercent, 0), 100);
+            const budgetProgressClass = groupBudgetUsedPercent == null
+              ? 'bg-slate-300'
+              : groupBudgetUsedPercent > 100
+                ? 'bg-red-600'
+                : groupBudgetUsedPercent >= 75
+                  ? 'bg-amber-500'
+                  : 'bg-green-600';
+
             const newestDate = group.reports[0]?.report_date ?? '';
             const oldestDate = group.reports[group.reports.length - 1]?.report_date ?? '';
             const dateLabel = newestDate === oldestDate
@@ -536,6 +657,103 @@ export function WorkReportDashboard({ isAdmin }: WorkReportDashboardProps) {
                       </button>
                     </div>
                   </div>
+
+                  {quote && quoteValue != null && quoteValue > 0 && (
+                    <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50/70 p-3 sm:p-4">
+                      <div className="flex flex-wrap items-start justify-between gap-2">
+                        <div>
+                          <h4 className="text-xs font-bold uppercase tracking-wide text-slate-700">Andamento economico cantiere</h4>
+                          <p className="mt-0.5 text-[11px] text-slate-500">
+                            Percentuali calcolate sul consuntivo di tutti i rapportini collegati alla commessa.
+                          </p>
+                        </div>
+                        <span className={`rounded-full px-3 py-1.5 text-xs font-bold ${
+                          groupBudgetUsedPercent != null && groupBudgetUsedPercent > 100
+                            ? 'bg-red-100 text-red-800'
+                            : groupBudgetUsedPercent != null && groupBudgetUsedPercent >= 75
+                              ? 'bg-amber-100 text-amber-800'
+                              : 'bg-green-100 text-green-800'
+                        }`}>
+                          {groupBudgetUsedPercent?.toLocaleString('it-IT', { maximumFractionDigits: 1 })}% utilizzato
+                        </span>
+                      </div>
+
+                      <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                        <div className="rounded-xl bg-white p-3 ring-1 ring-slate-100">
+                          <div className="text-[9px] font-bold uppercase tracking-wide text-slate-400">Costi / preventivo</div>
+                          <div className="mt-1 text-lg font-bold text-slate-900">
+                            {groupBudgetUsedPercent?.toLocaleString('it-IT', { maximumFractionDigits: 1 })}%
+                          </div>
+                          <div className="mt-0.5 text-[10px] text-slate-500">
+                            {groupCostToDate.toLocaleString('it-IT', { style: 'currency', currency: 'EUR' })}
+                          </div>
+                        </div>
+
+                        <div className="rounded-xl bg-white p-3 ring-1 ring-slate-100">
+                          <div className="text-[9px] font-bold uppercase tracking-wide text-slate-400">Margine residuo</div>
+                          <div className={`mt-1 text-lg font-bold ${
+                            groupMarginPercent == null
+                              ? 'text-slate-500'
+                              : groupMarginPercent >= 0
+                                ? 'text-green-700'
+                                : 'text-red-700'
+                          }`}>
+                            {groupMarginPercent == null ? '—' : `${groupMarginPercent.toLocaleString('it-IT', { maximumFractionDigits: 1 })}%`}
+                          </div>
+                          <div className="mt-0.5 text-[10px] text-slate-500">
+                            {groupMargin == null ? '—' : groupMargin.toLocaleString('it-IT', { style: 'currency', currency: 'EUR' })}
+                          </div>
+                        </div>
+
+                        <div className="rounded-xl bg-white p-3 ring-1 ring-slate-100">
+                          <div className="text-[9px] font-bold uppercase tracking-wide text-slate-400">Incidenza manodopera</div>
+                          <div className="mt-1 text-lg font-bold text-slate-900">
+                            {groupLaborPercent == null ? '—' : `${groupLaborPercent.toLocaleString('it-IT', { maximumFractionDigits: 1 })}%`}
+                          </div>
+                          <div className="mt-0.5 text-[10px] text-slate-500">
+                            {groupLaborCost.toLocaleString('it-IT', { style: 'currency', currency: 'EUR' })}
+                          </div>
+                        </div>
+
+                        <div className="rounded-xl bg-white p-3 ring-1 ring-slate-100">
+                          <div className="text-[9px] font-bold uppercase tracking-wide text-slate-400">Incidenza materiali</div>
+                          <div className="mt-1 text-lg font-bold text-slate-900">
+                            {groupMaterialPercent == null ? '—' : `${groupMaterialPercent.toLocaleString('it-IT', { maximumFractionDigits: 1 })}%`}
+                          </div>
+                          <div className="mt-0.5 text-[10px] text-slate-500">
+                            {groupMaterialCost.toLocaleString('it-IT', { style: 'currency', currency: 'EUR' })}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="mt-3">
+                        <div className="h-2.5 overflow-hidden rounded-full bg-slate-200">
+                          <div
+                            className={`h-full rounded-full transition-all ${budgetProgressClass}`}
+                            style={{ width: `${budgetProgressWidth}%` }}
+                          />
+                        </div>
+                        <div className="mt-1 flex justify-between text-[9px] font-semibold text-slate-400">
+                          <span>0%</span>
+                          <span>50%</span>
+                          <span>75%</span>
+                          <span>100%</span>
+                        </div>
+                      </div>
+
+                      {groupBudgetUsedPercent != null && groupBudgetUsedPercent > 100 && (
+                        <p className="mt-2 rounded-lg bg-red-50 px-3 py-2 text-[11px] font-semibold text-red-800">
+                          Costi oltre il valore del preventivo di {(groupBudgetUsedPercent - 100).toLocaleString('it-IT', { maximumFractionDigits: 1 })}%.
+                        </p>
+                      )}
+
+                      {groupMissingCosts > 0 && (
+                        <p className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-[11px] text-amber-900">
+                          Andamento parziale: {groupMissingCosts} voce/i di costo non sono ancora valorizzate.
+                        </p>
+                      )}
+                    </div>
+                  )}
 
                   {correctingAssociation && (
                     <div className="mt-4 rounded-xl border border-blue-200 bg-blue-50/60 p-3">
@@ -633,6 +851,7 @@ function AdminReportCostEditor({
   materialCatalog,
   quoteOptions,
   linkedQuoteRequestId,
+  onCostsSaved,
 }: {
   reportId: string;
   plantId: string;
@@ -645,6 +864,7 @@ function AdminReportCostEditor({
   materialCatalog: WorkReportMaterialCatalogEntry[];
   quoteOptions: QuoteRequest[];
   linkedQuoteRequestId: string | null;
+  onCostsSaved: () => Promise<void>;
 }) {
   const [workerRates, setWorkerRates] = useState<Record<string, string>>({});
   const [materialPrices, setMaterialPrices] = useState<Record<string, string>>({});
@@ -830,6 +1050,7 @@ function AdminReportCostEditor({
           .map((material) => setWorkReportMaterialCost(material.id, Number(materialPrices[material.id]))),
       ]);
       setSaved(true);
+      await onCostsSaved();
     } catch (err) {
       setCostError(err instanceof Error ? err.message : 'Salvataggio costi non riuscito.');
     } finally {
