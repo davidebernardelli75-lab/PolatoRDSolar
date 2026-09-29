@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { AlertCircle, CalendarDays, CheckCircle2, Download, Euro, FileSpreadsheet, Loader2, Paperclip, Pencil, Plus, Search, Trash2, Upload, X } from 'lucide-react';
+import { AlertCircle, CalendarDays, CheckCircle2, Download, Euro, FileSpreadsheet, Loader2, Mail, Paperclip, Pencil, Phone, Plus, Search, Trash2, Upload, X } from 'lucide-react';
 import type { QuoteRequest, QuoteRequestFile, QuoteRequestInsert, QuoteStatus } from '@/lib/types';
 import { createQuoteRequest, deleteQuoteRequest, deleteQuoteRequestFile, downloadQuoteRequestFile, fetchQuoteRequestFiles, fetchQuoteRequests, updateQuoteRequest, uploadQuoteRequestFile } from '@/lib/api';
 import { saveAs } from 'file-saver';
@@ -72,7 +72,7 @@ export function QuoteDashboard() {
   const yearRows = rows.filter((r) => r.quote_year === year);
   const filtered = yearRows.filter((r) => {
     const q = search.trim().toLocaleLowerCase('it');
-    const hit = !q || [r.client, r.source ?? '', r.quote_type ?? '', r.notes ?? '', `${r.progressive_number}/${r.series}`]
+    const hit = !q || [r.client, r.client_email ?? '', r.client_phone ?? '', r.source ?? '', r.quote_type ?? '', r.notes ?? '', `${r.progressive_number}/${r.series}`]
       .some((v) => v.toLocaleLowerCase('it').includes(q));
     return hit && (statusFilter === 'TUTTI' || r.status === statusFilter);
   });
@@ -241,6 +241,12 @@ export function QuoteDashboard() {
                       <span className={"rounded-full px-2 py-0.5 text-[10px] font-semibold " + statusClass(r.status)}>{r.status}</span>
                     </div>
                     <p className="mt-0.5 text-xs text-slate-500">{displayDate(r.request_date)} · {normalizeSource(r.source) || 'REF. NON INDICATA'}</p>
+                    {(r.client_email || r.client_phone) && (
+                      <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-500">
+                        {r.client_email && <span className="inline-flex items-center gap-1"><Mail size={12}/>{r.client_email}</span>}
+                        {r.client_phone && <span className="inline-flex items-center gap-1"><Phone size={12}/>{r.client_phone}</span>}
+                      </div>
+                    )}
                     <p className="mt-1 text-sm text-slate-700">{r.quote_type || 'TIPO PREVENTIVO NON INDICATO'}</p>
                     {(r.value_ex_vat != null || r.notes) && <p className="mt-1 text-xs text-slate-500">{r.value_ex_vat != null ? `VALORE: ${money(r.value_ex_vat)}` : ''}{r.value_ex_vat != null && r.notes ? ' · ' : ''}{r.notes || ''}</p>}
                     <QuoteAttachments
@@ -337,6 +343,8 @@ function QuoteFormModal({ person, rows, onClose, onSave }: {
   const [progressive, setProgressive] = useState(person?.progressive_number ?? nextFor(initialYear));
   const [source, setSource] = useState(person?.source ?? '');
   const [client, setClient] = useState(person?.client ?? '');
+  const [clientEmail, setClientEmail] = useState(person?.client_email ?? '');
+  const [clientPhone, setClientPhone] = useState(person?.client_phone ?? '');
   const [quoteType, setQuoteType] = useState(person?.quote_type ?? '');
   const [value, setValue] = useState(person?.value_ex_vat != null ? String(person.value_ex_vat) : '');
   const [status, setStatus] = useState<QuoteStatus>(person?.status ?? 'DA GESTIRE');
@@ -371,6 +379,8 @@ function QuoteFormModal({ person, rows, onClose, onSave }: {
         request_date: requestDate || null,
         source: normalizeSource(source) || null,
         client: client.trim().toUpperCase(),
+        client_email: clientEmail.trim().toLowerCase() || null,
+        client_phone: clientPhone.trim() || null,
         quote_type: quoteType.trim().toUpperCase() || null,
         value_ex_vat: value === '' ? null : Number(value),
         status,
@@ -399,6 +409,12 @@ function QuoteFormModal({ person, rows, onClose, onSave }: {
         </label>
         <label className="text-xs font-semibold text-slate-600">Cliente *
           <input required value={client} onChange={(e) => setClient(e.target.value.toUpperCase())} className={inputClass + ' mt-1'} />
+        </label>
+        <label className="text-xs font-semibold text-slate-600">Email cliente
+          <input type="email" value={clientEmail} onChange={(e) => setClientEmail(e.target.value)} autoCapitalize="none" spellCheck={false} className={inputClass + ' mt-1'} placeholder="nome@azienda.it" />
+        </label>
+        <label className="text-xs font-semibold text-slate-600">Telefono cliente
+          <input type="tel" value={clientPhone} onChange={(e) => setClientPhone(e.target.value)} className={inputClass + ' mt-1'} placeholder="+39 ..." />
         </label>
         <label className="text-xs font-semibold text-slate-600 sm:col-span-2">Tipo preventivo
           <input value={quoteType} onChange={(e) => setQuoteType(e.target.value.toUpperCase())} className={inputClass + ' mt-1'} placeholder="FOTOVOLTAICO, ACCUMULO, WALLBOX..." />
