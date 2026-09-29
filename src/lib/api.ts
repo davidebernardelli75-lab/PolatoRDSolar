@@ -1,5 +1,5 @@
 import { supabase, STORAGE_BUCKET, QUOTE_FILES_BUCKET } from './supabase';
-import type { Plant, Panel, PanelPhoto, PlantInsert, PlantUpdate, PanelInsert, RoadmapTask, PlantInverter, PlantStorage, PlantCharger, PlantInverterInsert, PlantStorageInsert, PlantChargerInsert, PlantPowerMeter, PlantPowerMeterInsert, Vehicle, VehicleInsert, Insurance, InsuranceInsert, EquipmentCatalogEntry, EquipmentCategory, QuoteRequest, QuoteRequestInsert, QuoteRequestFile } from './types';
+import type { Plant, Panel, PanelPhoto, PlantInsert, PlantUpdate, PanelInsert, RoadmapTask, PlantInverter, PlantStorage, PlantCharger, PlantInverterInsert, PlantStorageInsert, PlantChargerInsert, PlantPowerMeter, PlantPowerMeterInsert, Vehicle, VehicleInsert, Insurance, InsuranceInsert, EquipmentCatalogEntry, EquipmentCategory, QuoteRequest, QuoteRequestInsert, QuoteRequestFile, WorkReport, WorkReportInsert, WorkReportMaterial, WorkReportMaterialInput, WorkReportWorker, WorkReportWorkerInput, WorkReportStatus } from './types';
 
 export async function fetchPlants(): Promise<Plant[]> {
   const { data, error } = await supabase
@@ -587,5 +587,102 @@ export async function deleteQuoteRequest(id: string): Promise<void> {
   }
 
   const { error } = await supabase.from('quote_requests').delete().eq('id', id);
+  if (error) throw error;
+}
+
+
+// ── Work Reports (Rapportini squadre) ─────────────────────────────
+
+export async function fetchWorkReports(): Promise<WorkReport[]> {
+  const { data, error } = await supabase
+    .from('work_reports')
+    .select('*')
+    .order('report_date', { ascending: false })
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  return data ?? [];
+}
+
+export async function fetchWorkReportWorkers(): Promise<WorkReportWorker[]> {
+  const { data, error } = await supabase
+    .from('work_report_workers')
+    .select('*')
+    .order('created_at', { ascending: true });
+  if (error) throw error;
+  return data ?? [];
+}
+
+export async function fetchWorkReportMaterials(): Promise<WorkReportMaterial[]> {
+  const { data, error } = await supabase
+    .from('work_report_materials')
+    .select('*')
+    .order('created_at', { ascending: true });
+  if (error) throw error;
+  return data ?? [];
+}
+
+export async function createWorkReport(input: WorkReportInsert): Promise<WorkReport> {
+  const { data, error } = await supabase
+    .from('work_reports')
+    .insert(input)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+export async function updateWorkReport(
+  id: string,
+  input: Partial<WorkReportInsert> & {
+    status?: WorkReportStatus;
+    submitted_at?: string | null;
+    approved_at?: string | null;
+    approved_by?: string | null;
+  },
+): Promise<WorkReport> {
+  const { data, error } = await supabase
+    .from('work_reports')
+    .update({ ...input, updated_at: new Date().toISOString() })
+    .eq('id', id)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+export async function deleteWorkReport(id: string): Promise<void> {
+  const { error } = await supabase.from('work_reports').delete().eq('id', id);
+  if (error) throw error;
+}
+
+export async function replaceWorkReportWorkers(reportId: string, workers: WorkReportWorkerInput[]): Promise<void> {
+  const { error: deleteError } = await supabase.from('work_report_workers').delete().eq('report_id', reportId);
+  if (deleteError) throw deleteError;
+  if (workers.length === 0) return;
+  const { error } = await supabase.from('work_report_workers').insert(
+    workers.map((worker) => ({
+      report_id: reportId,
+      worker_name: worker.worker_name.trim().toUpperCase(),
+      hours: worker.hours,
+      notes: worker.notes?.trim().toUpperCase() || null,
+    })),
+  );
+  if (error) throw error;
+}
+
+export async function replaceWorkReportMaterials(reportId: string, materials: WorkReportMaterialInput[]): Promise<void> {
+  const { error: deleteError } = await supabase.from('work_report_materials').delete().eq('report_id', reportId);
+  if (deleteError) throw deleteError;
+  if (materials.length === 0) return;
+  const { error } = await supabase.from('work_report_materials').insert(
+    materials.map((material) => ({
+      report_id: reportId,
+      item_code: material.item_code?.trim().toUpperCase() || null,
+      description: material.description.trim().toUpperCase(),
+      quantity: material.quantity,
+      unit: material.unit.trim().toUpperCase() || 'PZ',
+      notes: material.notes?.trim().toUpperCase() || null,
+    })),
+  );
   if (error) throw error;
 }
