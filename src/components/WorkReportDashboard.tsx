@@ -504,21 +504,44 @@ function AdminReportCostEditor({
 
         allWorkers.forEach((worker) => {
           if (!otherReportIds.has(worker.report_id)) return;
-          const rate = workerSnapshotByRow.get(worker.id);
+
+          let rate = workerSnapshotByRow.get(worker.id);
+          if (rate == null) {
+            const workerCatalogEntry = workerCatalog.find(
+              (item) => item.normalized_worker_name === normalizeCatalogValue(worker.worker_name),
+            );
+            const laborDefaultKey = workerCatalogEntry
+              ? `${workerCatalogEntry.id}::${normalizeCatalogValue(worker.rate_type || 'ORDINARIA')}`
+              : '';
+            rate = laborDefaultKey ? laborDefaultByKey.get(laborDefaultKey) : undefined;
+          }
+
           if (rate == null) {
             missingHistoricalCosts += 1;
             return;
           }
+
           historicalLaborCost += Number(worker.hours) * rate;
         });
 
         allMaterials.forEach((material) => {
           if (!otherReportIds.has(material.report_id)) return;
-          const unitPrice = materialSnapshotByRow.get(material.id);
+
+          let unitPrice = materialSnapshotByRow.get(material.id);
+          if (unitPrice == null) {
+            const materialCatalogEntry = materialCatalog.find(
+              (item) => item.normalized_description === normalizeCatalogValue(material.description),
+            );
+            unitPrice = materialCatalogEntry
+              ? materialDefaultByCatalog.get(materialCatalogEntry.id)
+              : undefined;
+          }
+
           if (unitPrice == null) {
             missingHistoricalCosts += 1;
             return;
           }
+
           historicalMaterialCost += Number(material.quantity) * unitPrice;
         });
 
