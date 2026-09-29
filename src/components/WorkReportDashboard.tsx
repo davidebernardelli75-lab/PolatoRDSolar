@@ -238,7 +238,15 @@ export function WorkReportDashboard({ isAdmin }: WorkReportDashboardProps) {
                     {report.notes && <p className="mt-1 rounded-lg bg-amber-50 px-2.5 py-2 text-xs text-amber-900">NOTE: {report.notes}</p>}
                   </div>
 
-                  <div className="flex items-center gap-1">
+                  <div className="flex flex-wrap items-center justify-end gap-1">
+                    {isAdmin && !expanded && (
+                      <button
+                        onClick={() => setExpandedId(report.id)}
+                        className="rounded-lg bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-800 hover:bg-emerald-100"
+                      >
+                        Inserisci prezzi e costi
+                      </button>
+                    )}
                     {editable && (
                       <button onClick={() => setEditing(report)} className="rounded-lg p-2 text-slate-500 hover:bg-slate-100" aria-label="Modifica rapportino">
                         <Pencil size={17} />
@@ -506,7 +514,10 @@ function AdminReportCostEditor({
           </div>
 
           <div>
-            <h5 className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-600">Materiali</h5>
+            <div className="mb-2">
+              <h5 className="text-xs font-bold uppercase tracking-wide text-slate-600">Materiali</h5>
+              <p className="mt-0.5 text-[11px] text-slate-500">Inserisci il prezzo unitario del materiale: il totale riga viene calcolato automaticamente.</p>
+            </div>
             <div className="space-y-2">
               {materials.map((material) => {
                 const price = materialPrices[material.id] ?? '';
