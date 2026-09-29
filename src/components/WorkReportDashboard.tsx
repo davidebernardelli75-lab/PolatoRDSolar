@@ -513,12 +513,19 @@ export function WorkReportDashboard({ isAdmin }: WorkReportDashboardProps) {
             const groupWorkers = workers.filter((worker) => reportIds.has(worker.report_id));
             const groupMaterials = materials.filter((material) => reportIds.has(material.report_id));
             const groupHours = groupWorkers.reduce((sum, worker) => sum + Number(worker.hours || 0), 0);
+            const economicReportIds = new Set(
+              reports
+                .filter((report) => report.plant_id === group.plantId)
+                .map((report) => report.id),
+            );
+            const economicWorkers = workers.filter((worker) => economicReportIds.has(worker.report_id));
+            const economicMaterials = materials.filter((material) => economicReportIds.has(material.report_id));
 
             let groupLaborCost = 0;
             let groupMaterialCost = 0;
             let groupMissingCosts = 0;
 
-            groupWorkers.forEach((worker) => {
+            economicWorkers.forEach((worker) => {
               let rate = workerCostByRow.get(worker.id);
               if (rate == null) {
                 const workerCatalogEntry = workerCatalogByName.get(normalizeCatalogValue(worker.worker_name));
@@ -536,7 +543,7 @@ export function WorkReportDashboard({ isAdmin }: WorkReportDashboardProps) {
               groupLaborCost += Number(worker.hours) * rate;
             });
 
-            groupMaterials.forEach((material) => {
+            economicMaterials.forEach((material) => {
               let unitPrice = materialCostByRow.get(material.id);
               if (unitPrice == null) {
                 const materialCatalogEntry = materialCatalogByDescription.get(normalizeCatalogValue(material.description));
