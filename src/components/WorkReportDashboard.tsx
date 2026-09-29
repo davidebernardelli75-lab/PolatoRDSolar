@@ -355,6 +355,8 @@ function WorkReportFormModal({
   plants,
   workers,
   materials,
+  materialCatalog,
+  workerCatalog,
   onClose,
   onSaved,
 }: {
@@ -362,6 +364,8 @@ function WorkReportFormModal({
   plants: Plant[];
   workers: WorkReportWorker[];
   materials: WorkReportMaterial[];
+  materialCatalog: WorkReportMaterialCatalogEntry[];
+  workerCatalog: WorkReportWorkerCatalogEntry[];
   onClose: () => void;
   onSaved: () => Promise<void>;
 }) {
@@ -372,12 +376,11 @@ function WorkReportFormModal({
   const [notes, setNotes] = useState(report?.notes ?? '');
   const [workerRows, setWorkerRows] = useState<WorkerDraft[]>(
     workers.length > 0
-      ? workers.map((worker) => ({ worker_name: worker.worker_name, hours: String(worker.hours), notes: worker.notes ?? '' }))
-      : [{ worker_name: '', hours: '', notes: '' }],
+      ? workers.map((worker) => ({ worker_name: worker.worker_name, hours: String(worker.hours), rate_type: worker.rate_type || 'ORDINARIA', notes: worker.notes ?? '' }))
+      : [{ worker_name: '', hours: '', rate_type: 'ORDINARIA', notes: '' }],
   );
   const [materialRows, setMaterialRows] = useState<MaterialDraft[]>(
     materials.map((material) => ({
-      item_code: material.item_code ?? '',
       description: material.description,
       quantity: String(material.quantity),
       unit: material.unit,
@@ -393,12 +396,13 @@ function WorkReportFormModal({
       .map((worker) => ({
         worker_name: worker.worker_name,
         hours: Number(worker.hours),
+        rate_type: worker.rate_type || 'ORDINARIA',
         notes: worker.notes || null,
       }));
     const cleanMaterials: WorkReportMaterialInput[] = materialRows
       .filter((material) => material.description.trim() && Number(material.quantity) > 0)
       .map((material) => ({
-        item_code: material.item_code || null,
+        item_code: null,
         description: material.description,
         quantity: Number(material.quantity),
         unit: material.unit || 'PZ',
@@ -485,17 +489,33 @@ function WorkReportFormModal({
             <h3 className="inline-flex items-center gap-2 font-semibold text-slate-900"><Users size={17} /> Manodopera</h3>
             <button
               type="button"
-              onClick={() => setWorkerRows((rows) => [...rows, { worker_name: '', hours: '', notes: '' }])}
+              onClick={() => setWorkerRows((rows) => [...rows, { worker_name: '', hours: '', rate_type: 'ORDINARIA', notes: '' }])}
               className="inline-flex items-center gap-1 rounded-lg bg-blue-50 px-2.5 py-1.5 text-xs font-semibold text-blue-900"
             >
               <UserRoundPlus size={14} /> Aggiungi
             </button>
           </div>
+          <datalist id="work-report-worker-options">
+            {workerCatalog.map((worker) => <option key={worker.id} value={worker.worker_name} />)}
+          </datalist>
           <div className="space-y-3">
             {workerRows.map((worker, index) => (
-              <div key={index} className="grid gap-2 rounded-xl bg-slate-50 p-3 sm:grid-cols-[1.4fr_0.5fr_1fr_auto]">
-                <input value={worker.worker_name} onChange={(e) => setWorkerRows((rows) => rows.map((row, i) => i === index ? { ...row, worker_name: e.target.value.toUpperCase() } : row))} className={inputClass} placeholder="Nome lavoratore" />
+              <div key={index} className="grid gap-2 rounded-xl bg-slate-50 p-3 sm:grid-cols-[1.25fr_0.5fr_0.8fr_1fr_auto]">
+                <input
+                  list="work-report-worker-options"
+                  value={worker.worker_name}
+                  onChange={(e) => setWorkerRows((rows) => rows.map((row, i) => i === index ? { ...row, worker_name: e.target.value.toUpperCase() } : row))}
+                  className={inputClass}
+                  placeholder="Nome lavoratore"
+                />
                 <input type="number" min="0.25" max="24" step="0.25" value={worker.hours} onChange={(e) => setWorkerRows((rows) => rows.map((row, i) => i === index ? { ...row, hours: e.target.value } : row))} className={inputClass} placeholder="Ore" />
+                <select value={worker.rate_type} onChange={(e) => setWorkerRows((rows) => rows.map((row, i) => i === index ? { ...row, rate_type: e.target.value } : row))} className={inputClass}>
+                  <option value="ORDINARIA">Ordinaria</option>
+                  <option value="STRAORDINARIA">Straordinaria</option>
+                  <option value="FESTIVA">Festiva</option>
+                  <option value="NOTTURNA">Notturna</option>
+                  <option value="ALTRO">Altro</option>
+                </select>
                 <input value={worker.notes} onChange={(e) => setWorkerRows((rows) => rows.map((row, i) => i === index ? { ...row, notes: e.target.value.toUpperCase() } : row))} className={inputClass} placeholder="Nota opzionale" />
                 <button type="button" onClick={() => setWorkerRows((rows) => rows.filter((_, i) => i !== index))} className="rounded-lg p-2 text-red-600 hover:bg-red-50"><Trash2 size={17} /></button>
               </div>
@@ -508,21 +528,33 @@ function WorkReportFormModal({
             <h3 className="inline-flex items-center gap-2 font-semibold text-slate-900"><PackagePlus size={17} /> Materiali utilizzati</h3>
             <button
               type="button"
-              onClick={() => setMaterialRows((rows) => [...rows, { item_code: '', description: '', quantity: '1', unit: 'PZ', notes: '' }])}
+              onClick={() => setMaterialRows((rows) => [...rows, { description: '', quantity: '1', unit: 'PZ', notes: '' }])}
               className="inline-flex items-center gap-1 rounded-lg bg-blue-50 px-2.5 py-1.5 text-xs font-semibold text-blue-900"
             >
               <Plus size={14} /> Aggiungi
             </button>
           </div>
+          <datalist id="work-report-material-options">
+            {materialCatalog.map((material) => <option key={material.id} value={material.description} />)}
+          </datalist>
           {materialRows.length === 0 ? (
             <p className="rounded-xl bg-slate-50 p-4 text-center text-xs text-slate-400">Nessun materiale inserito.</p>
           ) : (
             <div className="space-y-3">
               {materialRows.map((material, index) => (
                 <div key={index} className="rounded-xl bg-slate-50 p-3">
-                  <div className="grid gap-2 sm:grid-cols-[0.8fr_1.8fr_0.55fr_0.55fr_auto]">
-                    <input value={material.item_code} onChange={(e) => setMaterialRows((rows) => rows.map((row, i) => i === index ? { ...row, item_code: e.target.value.toUpperCase() } : row))} className={inputClass} placeholder="Codice" />
-                    <input value={material.description} onChange={(e) => setMaterialRows((rows) => rows.map((row, i) => i === index ? { ...row, description: e.target.value.toUpperCase() } : row))} className={inputClass} placeholder="Descrizione materiale" />
+                  <div className="grid gap-2 sm:grid-cols-[2fr_0.6fr_0.6fr_auto]">
+                    <input
+                      list="work-report-material-options"
+                      value={material.description}
+                      onChange={(e) => {
+                        const value = e.target.value.toUpperCase();
+                        const exact = materialCatalog.find((item) => item.normalized_description === value.trim().replace(/\s+/g, ' '));
+                        setMaterialRows((rows) => rows.map((row, i) => i === index ? { ...row, description: value, unit: exact?.default_unit ?? row.unit } : row));
+                      }}
+                      className={inputClass}
+                      placeholder="Descrizione materiale"
+                    />
                     <input type="number" min="0.001" step="0.001" value={material.quantity} onChange={(e) => setMaterialRows((rows) => rows.map((row, i) => i === index ? { ...row, quantity: e.target.value } : row))} className={inputClass} placeholder="Q.tà" />
                     <input value={material.unit} onChange={(e) => setMaterialRows((rows) => rows.map((row, i) => i === index ? { ...row, unit: e.target.value.toUpperCase() } : row))} className={inputClass} placeholder="PZ" />
                     <button type="button" onClick={() => setMaterialRows((rows) => rows.filter((_, i) => i !== index))} className="rounded-lg p-2 text-red-600 hover:bg-red-50"><Trash2 size={17} /></button>
