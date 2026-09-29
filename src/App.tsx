@@ -14,12 +14,14 @@ import { VehicleDashboard } from '@/components/VehicleDashboard';
 import { InsuranceDashboard } from '@/components/InsuranceDashboard';
 import { TrainingDashboard } from '@/components/TrainingDashboard';
 import { QuoteDashboard } from '@/components/QuoteDashboard';
+import { WorkReportDashboard } from '@/components/WorkReportDashboard';
 
 export type View =
   | { name: 'dashboard' }
   | { name: 'new-plant' }
   | { name: 'edit-plant'; plantId: string }
   | { name: 'plant'; plantId: string }
+  | { name: 'reports' }
   | { name: 'vehicles' }
   | { name: 'insurances' }
   | { name: 'training' }
@@ -239,6 +241,9 @@ export default function App() {
                 navigate({ name: 'dashboard' });
               }}
             />
+          )}
+          {currentView.name === 'reports' && (
+            <WorkReportDashboard isAdmin={adminArea} />
           )}
           {adminArea && currentView.name === 'vehicles' && (
             <VehicleDashboard />
