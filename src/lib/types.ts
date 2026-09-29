@@ -307,3 +307,8 @@ export interface WorkReportAdminSummary {
   report_id: string;
   material_markup_percent: number;
 }
+
+export interface PlantQuoteLink {
+  plant_id: string;
+  quote_request_id: string;
+}
