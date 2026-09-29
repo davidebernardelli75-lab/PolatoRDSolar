@@ -127,135 +127,145 @@ export function Dashboard({ plants, loading, roadmapProgress, onOpenPlant, onNew
           )}
         </div>
       ) : (
-        /* Plant grid */
-        <div className="grid grid-cols-1 items-start gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {filtered.map((plant) => (
-            <div
-              key={plant.id}
-              className="group relative self-start bg-white rounded-2xl border border-slate-200 p-5 hover:border-red-400 hover:shadow-lg transition-all duration-200"
-            >
-              {/* Clickable area opens plant detail */}
-              <button
-                onClick={() => onOpenPlant(plant.id)}
-                className="block w-full text-left"
+        /* Plant list */
+        <div className="space-y-3">
+          {filtered.map((plant) => {
+            const hasAlert = Boolean(plant.notes?.trim());
+            const progress = roadmapProgress[plant.id] ?? 0;
+            const progressColor = getProgressColor(progress);
+
+            return (
+              <div
+                key={plant.id}
+                className="group relative rounded-2xl border border-slate-200 bg-white p-4 transition-all duration-200 hover:border-red-400 hover:shadow-lg sm:p-5"
               >
-                <div className="flex items-start justify-between mb-3">
-                  <div className="inline-flex items-center justify-center w-10 h-10 bg-blue-900 rounded-lg group-hover:bg-red-500 transition-colors">
-                    {plant.owner_type === 'Azienda'
-                      ? <Factory className="text-red-400 group-hover:text-white transition-colors" size={20} />
-                      : <Home className="text-red-400 group-hover:text-white transition-colors" size={20} />}
-                  </div>
-                  <span className={`text-[10px] font-semibold px-2 py-1 rounded-full ${
-                    plant.owner_type === 'Azienda'
-                      ? 'bg-blue-100 text-blue-700'
-                      : 'bg-slate-100 text-slate-600'
-                  }`}>
-                    {plant.owner_type}
-                  </span>
-                </div>
-                <h3 className="font-semibold text-slate-900 text-sm mb-1 line-clamp-1">
-                  {plant.owner_name}
-                </h3>
-                <div className="flex items-center gap-1 text-slate-500 text-xs mb-2">
-                  <MapPin size={12} />
-                  <span className="line-clamp-1">{plant.address}</span>
-                </div>
-                {plant.total_power_kw != null && (
-                  <div className="flex items-center gap-1 text-slate-400 text-xs">
-                    <Zap size={12} />
-                    <span>{plant.total_power_kw} kWh</span>
-                  </div>
-                )}
+                <div className={`grid gap-4 ${hasAlert ? 'sm:grid-cols-[minmax(0,1.55fr)_minmax(280px,0.95fr)] sm:items-center' : 'sm:grid-cols-1'}`}>
+                  <button
+                    onClick={() => onOpenPlant(plant.id)}
+                    className="w-full pr-8 text-left"
+                  >
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                      <div className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-900 transition-colors group-hover:bg-red-500">
+                        {plant.owner_type === 'Azienda'
+                          ? <Factory className="text-red-400 transition-colors group-hover:text-white" size={21} />
+                          : <Home className="text-red-400 transition-colors group-hover:text-white" size={21} />}
+                      </div>
 
-                {/* SyncroSolar roadmap progress badge */}
-                <div className="flex items-center gap-2 mt-3 pr-12">
-                  <div className="flex items-center gap-1.5">
-                    <ListChecks size={14} className="text-slate-400" />
-                    <span className="text-[10px] font-medium text-slate-500 uppercase tracking-wider">SyncroSolar</span>
-                  </div>
-                  <div className="flex items-center gap-1.5 ml-auto">
-                    <div className="w-16 h-2 bg-slate-200 rounded-full overflow-hidden">
-                      <div
-                        className={`h-full rounded-full transition-all duration-500 ${getProgressColor(roadmapProgress[plant.id] ?? 0).bar}`}
-                        style={{ width: `${roadmapProgress[plant.id] ?? 0}%` }}
-                      />
+                      <div className="min-w-0 flex-1">
+                        <h3 className="truncate text-sm font-semibold text-slate-900 sm:text-base">
+                          {plant.owner_name}
+                        </h3>
+                        <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-500">
+                          <span className="inline-flex min-w-0 items-center gap-1">
+                            <MapPin size={12} className="shrink-0" />
+                            <span className="truncate">{plant.address}</span>
+                          </span>
+                          {plant.total_power_kw != null && (
+                            <span className="inline-flex items-center gap-1 text-slate-400">
+                              <Zap size={12} />
+                              {plant.total_power_kw} kWh
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="flex shrink-0 flex-wrap items-center gap-3 sm:ml-auto">
+                        <span className={`rounded-full px-2 py-1 text-[10px] font-semibold ${
+                          plant.owner_type === 'Azienda'
+                            ? 'bg-blue-100 text-blue-700'
+                            : 'bg-slate-100 text-slate-600'
+                        }`}>
+                          {plant.owner_type}
+                        </span>
+
+                        <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-1.5">
+                            <ListChecks size={14} className="text-slate-400" />
+                            <span className="text-[10px] font-medium uppercase tracking-wider text-slate-500">SyncroSolar</span>
+                          </div>
+                          <div className="h-2 w-20 overflow-hidden rounded-full bg-slate-200">
+                            <div
+                              className={`h-full rounded-full transition-all duration-500 ${progressColor.bar}`}
+                              style={{ width: `${progress}%` }}
+                            />
+                          </div>
+                          <span className={`min-w-[38px] text-right text-sm font-bold tabular-nums ${progressColor.text}`}>
+                            {progress}%
+                          </span>
+                        </div>
+                      </div>
                     </div>
-                    <span className={`text-sm font-bold tabular-nums ${getProgressColor(roadmapProgress[plant.id] ?? 0).text}`}>
-                      {roadmapProgress[plant.id] ?? 0}%
-                    </span>
-                  </div>
-                </div>
-              </button>
+                  </button>
 
-              {plant.notes?.trim() && (
-                <div className="mt-3 mr-8 rounded-xl border border-amber-300 bg-amber-50 p-3">
-                  <div className="flex items-start gap-2">
-                    <AlertTriangle size={16} className="mt-0.5 shrink-0 text-amber-700" />
-                    <div className="min-w-0 flex-1">
-                      <p className="text-[10px] font-bold uppercase tracking-wide text-amber-800">Alert operativo</p>
-                      <p className="mt-0.5 whitespace-pre-wrap break-words text-xs font-medium text-slate-800">{plant.notes}</p>
+                  {hasAlert && (
+                    <div className="rounded-xl border border-amber-300 bg-amber-50 p-3 sm:mr-7">
+                      <div className="flex items-start gap-2">
+                        <AlertTriangle size={16} className="mt-0.5 shrink-0 text-amber-700" />
+                        <div className="min-w-0 flex-1">
+                          <p className="text-[10px] font-bold uppercase tracking-wide text-amber-800">Alert operativo</p>
+                          <p className="mt-0.5 whitespace-pre-wrap break-words text-xs font-medium text-slate-800">{plant.notes}</p>
+                        </div>
+                        <button
+                          type="button"
+                          disabled={clearingAlertId === plant.id}
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            setClearingAlertId(plant.id);
+                            try { await onClearPlantAlert(plant.id); }
+                            finally { setClearingAlertId(null); }
+                          }}
+                          className="shrink-0 rounded-lg border border-amber-300 bg-white px-2 py-1 text-[10px] font-semibold text-amber-900 hover:bg-amber-100 disabled:opacity-50"
+                          aria-label={`Segna come svolto l'alert di ${plant.owner_name}`}
+                        >
+                          {clearingAlertId === plant.id ? '...' : 'Svolto'}
+                        </button>
+                      </div>
                     </div>
-                    <button
-                      type="button"
-                      disabled={clearingAlertId === plant.id}
-                      onClick={async (e) => {
-                        e.stopPropagation();
-                        setClearingAlertId(plant.id);
-                        try { await onClearPlantAlert(plant.id); }
-                        finally { setClearingAlertId(null); }
-                      }}
-                      className="shrink-0 rounded-lg border border-amber-300 bg-white px-2 py-1 text-[10px] font-semibold text-amber-900 hover:bg-amber-100 disabled:opacity-50"
-                      aria-label={`Segna come svolto l'alert di ${plant.owner_name}`}
-                    >
-                      {clearingAlertId === plant.id ? '...' : 'Svolto'}
-                    </button>
-                  </div>
+                  )}
                 </div>
-              )}
 
-              {/* More menu trigger — bottom-right, away from owner_type badge */}
-              <div className="absolute bottom-3 right-3" ref={openMenuId === plant.id ? menuRef : undefined}>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setOpenMenuId(openMenuId === plant.id ? null : plant.id);
-                  }}
-                  className="p-1.5 rounded-lg text-slate-400 hover:text-slate-900 hover:bg-slate-100 transition-colors touch-manipulation"
-                  aria-label="Apri menu gestione"
-                >
-                  <MoreVertical size={18} />
-                </button>
+                <div className="absolute right-3 top-3" ref={openMenuId === plant.id ? menuRef : undefined}>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setOpenMenuId(openMenuId === plant.id ? null : plant.id);
+                    }}
+                    className="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-900 touch-manipulation"
+                    aria-label="Apri menu gestione"
+                  >
+                    <MoreVertical size={18} />
+                  </button>
 
-                {/* Dropdown menu */}
-                {openMenuId === plant.id && (
-                  <div className="absolute right-0 bottom-full mb-1 w-52 bg-white rounded-xl shadow-xl border border-slate-200 py-1.5 z-50 overflow-hidden">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setOpenMenuId(null);
-                        onEditPlant(plant.id);
-                      }}
-                      className="w-full flex items-center gap-3 px-4 py-3 text-sm text-slate-700 hover:bg-slate-50 transition-colors text-left touch-manipulation"
-                    >
-                      <Pencil size={16} className="text-blue-900" />
-                      Modifica Dati
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setOpenMenuId(null);
-                        setConfirmDelete(plant);
-                      }}
-                      className="w-full flex items-center gap-3 px-4 py-3 text-sm text-red-600 hover:bg-red-50 transition-colors text-left touch-manipulation"
-                    >
-                      <Trash2 size={16} />
-                      Elimina Impianto
-                    </button>
-                  </div>
-                )}
+                  {openMenuId === plant.id && (
+                    <div className="absolute right-0 top-full mt-1 w-52 overflow-hidden rounded-xl border border-slate-200 bg-white py-1.5 shadow-xl z-50">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setOpenMenuId(null);
+                          onEditPlant(plant.id);
+                        }}
+                        className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm text-slate-700 transition-colors hover:bg-slate-50 touch-manipulation"
+                      >
+                        <Pencil size={16} className="text-blue-900" />
+                        Modifica Dati
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setOpenMenuId(null);
+                          setConfirmDelete(plant);
+                        }}
+                        className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm text-red-600 transition-colors hover:bg-red-50 touch-manipulation"
+                      >
+                        <Trash2 size={16} />
+                        Elimina Impianto
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
