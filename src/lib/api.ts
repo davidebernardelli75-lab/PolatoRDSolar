@@ -44,13 +44,6 @@ export async function updatePlant(id: string, input: PlantUpdate): Promise<Plant
 export async function deletePlant(id: string): Promise<void> {
   const { error } = await supabase.from('plants').delete().eq('id', id);
   if (error) throw error;
-  await Promise.all(materials.map(async (material) => {
-    const { error: rememberError } = await supabase.rpc('remember_work_report_material', {
-      p_description: material.description,
-      p_unit: material.unit || 'PZ',
-    });
-    if (rememberError) throw rememberError;
-  }));
 }
 
 export async function fetchWorkReportMaterialCatalog(): Promise<WorkReportMaterialCatalogEntry[]> {
@@ -767,4 +760,11 @@ export async function replaceWorkReportMaterials(reportId: string, materials: Wo
     })),
   );
   if (error) throw error;
+  await Promise.all(materials.map(async (material) => {
+    const { error: rememberError } = await supabase.rpc('remember_work_report_material', {
+      p_description: material.description,
+      p_unit: material.unit || 'PZ',
+    });
+    if (rememberError) throw rememberError;
+  }));
 }
