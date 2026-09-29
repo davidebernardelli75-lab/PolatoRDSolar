@@ -95,7 +95,7 @@ export function Dashboard({ plants, loading, roadmapProgress, onOpenPlant, onNew
 
       {/* Content */}
       {loading ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 items-start gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {[1, 2, 3, 4, 5, 6].map((i) => (
             <div key={i} className="bg-white rounded-2xl border border-slate-200 p-5 animate-pulse">
               <div className="h-4 bg-slate-200 rounded w-3/4 mb-3" />
@@ -128,11 +128,11 @@ export function Dashboard({ plants, loading, roadmapProgress, onOpenPlant, onNew
         </div>
       ) : (
         /* Plant grid */
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 items-start gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {filtered.map((plant) => (
             <div
               key={plant.id}
-              className="group relative bg-white rounded-2xl border border-slate-200 p-5 hover:border-red-400 hover:shadow-lg transition-all duration-200"
+              className="group relative self-start bg-white rounded-2xl border border-slate-200 p-5 hover:border-red-400 hover:shadow-lg transition-all duration-200"
             >
               {/* Clickable area opens plant detail */}
               <button
