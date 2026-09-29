@@ -200,6 +200,7 @@ export interface QuoteRequest {
   client: string;
   client_email: string | null;
   client_phone: string | null;
+  site_visit_at: string | null;
   quote_type: string | null;
   value_ex_vat: number | null;
   status: QuoteStatus;
