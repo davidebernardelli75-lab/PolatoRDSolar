@@ -50,6 +50,7 @@ export function QuoteDashboard() {
   const [rows, setRows] = useState<QuoteRequest[]>([]);
   const [quoteFiles, setQuoteFiles] = useState<QuoteRequestFile[]>([]);
   const [uploadingQuoteId, setUploadingQuoteId] = useState<string | null>(null);
+  const [clearingNoteId, setClearingNoteId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [editing, setEditing] = useState<QuoteRequest | 'new' | null>(null);
@@ -180,6 +181,19 @@ export function QuoteDashboard() {
     }
   };
 
+  const clearNote = async (row: QuoteRequest) => {
+    setClearingNoteId(row.id);
+    setError(null);
+    try {
+      const saved = await updateQuoteRequest(row.id, { notes: null });
+      setRows((prev) => prev.map((item) => item.id === saved.id ? saved : item));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Impossibile chiudere la nota. Riprova.');
+    } finally {
+      setClearingNoteId(null);
+    }
+  };
+
   return (
     <div className="mx-auto max-w-6xl p-4 pb-24 lg:p-8">
       <header className="mb-6 rounded-2xl bg-blue-900 p-5 text-white lg:p-6">
@@ -279,10 +293,20 @@ export function QuoteDashboard() {
                     {r.notes && (
                       <div className="mt-2 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-2 text-xs text-slate-700">
                         <StickyNote size={14} className="mt-0.5 shrink-0 text-amber-700" />
-                        <div>
+                        <div className="min-w-0 flex-1">
                           <span className="font-semibold text-amber-900">Note</span>
                           <span className="ml-1.5 whitespace-pre-wrap">{r.notes}</span>
                         </div>
+                        <button
+                          type="button"
+                          disabled={clearingNoteId === r.id}
+                          onClick={() => { void clearNote(r); }}
+                          className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-amber-300 bg-white px-2 py-1 text-[10px] font-semibold text-amber-900 hover:bg-amber-100 disabled:opacity-50"
+                          aria-label={`Segna come svolta la nota di ${r.client}`}
+                        >
+                          {clearingNoteId === r.id ? <Loader2 size={11} className="animate-spin" /> : <CheckCircle2 size={11} />}
+                          Svolto
+                        </button>
                       </div>
                     )}
                     <QuoteAttachments
