@@ -120,8 +120,8 @@ SECURITY DEFINER
 SET search_path = ''
 AS $$
 DECLARE
-  v_description text := regexp_replace(upper(btrim(coalesce(p_description, ''))), '\\s+', ' ', 'g');
-  v_unit text := regexp_replace(upper(btrim(coalesce(p_unit, 'PZ'))), '\\s+', ' ', 'g');
+  v_description text := regexp_replace(upper(btrim(coalesce(p_description, ''))), '[[:space:]]+', ' ', 'g');
+  v_unit text := regexp_replace(upper(btrim(coalesce(p_unit, 'PZ'))), '[[:space:]]+', ' ', 'g');
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM public.app_members m WHERE m.user_id = auth.uid()) THEN
     RAISE EXCEPTION 'Not authorized';
@@ -152,7 +152,7 @@ SECURITY DEFINER
 SET search_path = ''
 AS $$
 DECLARE
-  v_name text := regexp_replace(upper(btrim(coalesce(p_worker_name, ''))), '\\s+', ' ', 'g');
+  v_name text := regexp_replace(upper(btrim(coalesce(p_worker_name, ''))), '[[:space:]]+', ' ', 'g');
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM public.app_members m WHERE m.user_id = auth.uid()) THEN
     RAISE EXCEPTION 'Not authorized';
@@ -189,8 +189,8 @@ BEGIN
     RAISE EXCEPTION 'Invalid unit price';
   END IF;
 
-  SELECT regexp_replace(upper(btrim(description)), '\\s+', ' ', 'g'),
-         regexp_replace(upper(btrim(unit)), '\\s+', ' ', 'g')
+  SELECT regexp_replace(upper(btrim(description)), '[[:space:]]+', ' ', 'g'),
+         regexp_replace(upper(btrim(unit)), '[[:space:]]+', ' ', 'g')
   INTO v_description, v_unit
   FROM public.work_report_materials
   WHERE id = p_report_material_id;
@@ -240,8 +240,8 @@ BEGIN
     RAISE EXCEPTION 'Invalid hourly rate';
   END IF;
 
-  SELECT regexp_replace(upper(btrim(worker_name)), '\\s+', ' ', 'g'),
-         regexp_replace(upper(btrim(coalesce(rate_type, 'ORDINARIA'))), '\\s+', ' ', 'g')
+  SELECT regexp_replace(upper(btrim(worker_name)), '[[:space:]]+', ' ', 'g'),
+         regexp_replace(upper(btrim(coalesce(rate_type, 'ORDINARIA'))), '[[:space:]]+', ' ', 'g')
   INTO v_name, v_rate_type
   FROM public.work_report_workers
   WHERE id = p_report_worker_id;
@@ -286,9 +286,9 @@ INSERT INTO public.work_report_material_catalog (
   description, normalized_description, default_unit, usage_count, last_used_at
 )
 SELECT
-  regexp_replace(upper(btrim(m.description)), '\\s+', ' ', 'g'),
-  regexp_replace(upper(btrim(m.description)), '\\s+', ' ', 'g'),
-  coalesce(nullif(regexp_replace(upper(btrim(m.unit)), '\\s+', ' ', 'g'), ''), 'PZ'),
+  regexp_replace(upper(btrim(m.description)), '[[:space:]]+', ' ', 'g'),
+  regexp_replace(upper(btrim(m.description)), '[[:space:]]+', ' ', 'g'),
+  coalesce(nullif(regexp_replace(upper(btrim(m.unit)), '[[:space:]]+', ' ', 'g'), ''), 'PZ'),
   count(*)::integer,
   max(m.created_at)
 FROM public.work_report_materials m
@@ -300,8 +300,8 @@ INSERT INTO public.work_report_worker_catalog (
   worker_name, normalized_worker_name, usage_count, last_used_at
 )
 SELECT
-  regexp_replace(upper(btrim(w.worker_name)), '\\s+', ' ', 'g'),
-  regexp_replace(upper(btrim(w.worker_name)), '\\s+', ' ', 'g'),
+  regexp_replace(upper(btrim(w.worker_name)), '[[:space:]]+', ' ', 'g'),
+  regexp_replace(upper(btrim(w.worker_name)), '[[:space:]]+', ' ', 'g'),
   count(*)::integer,
   max(w.created_at)
 FROM public.work_report_workers w
