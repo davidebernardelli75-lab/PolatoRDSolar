@@ -32,6 +32,7 @@ import {
   createWorkReport,
   deleteWorkReport,
   fetchPlants,
+  fetchWorkReportAdminSummary,
   fetchWorkReportLaborRateDefaults,
   fetchWorkReportMaterialCatalog,
   fetchWorkReportMaterialCostDefaults,
@@ -44,6 +45,7 @@ import {
   replaceWorkReportMaterials,
   replaceWorkReportWorkers,
   setWorkReportMaterialCost,
+  setWorkReportMaterialMarkup,
   setWorkReportWorkerCost,
   updateWorkReport,
 } from '@/lib/api';
@@ -56,6 +58,7 @@ type WorkerDraft = { worker_name: string; hours: string; rate_type: string; note
 type MaterialDraft = { source_id: string | null; description: string; quantity: string; unit: string; notes: string; unit_price: string };
 
 const inputClass = 'w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-red-400 focus:ring-2 focus:ring-red-100';
+const WORK_REPORT_UNITS = ['PZ', 'MT', 'M²', 'M³', 'KG', 'L', 'ROTOLO', 'BOBINA', 'CONF.', 'SCATOLA', 'KIT', 'COPPIA', 'SET'] as const;
 
 function statusClass(status: WorkReportStatus): string {
   if (status === 'APPROVATO') return 'bg-green-100 text-green-700';
@@ -298,6 +301,7 @@ export function WorkReportDashboard({ isAdmin }: WorkReportDashboardProps) {
 
                 {expanded && isAdmin && (
                   <AdminReportCostEditor
+                    reportId={report.id}
                     workers={reportWorkers}
                     materials={reportMaterials}
                     workerCatalog={workerCatalog}
@@ -364,11 +368,13 @@ function normalizeCatalogValue(value: string): string {
 }
 
 function AdminReportCostEditor({
+  reportId,
   workers,
   materials,
   workerCatalog,
   materialCatalog,
 }: {
+  reportId: string;
   workers: WorkReportWorker[];
   materials: WorkReportMaterial[];
   workerCatalog: WorkReportWorkerCatalogEntry[];
@@ -376,6 +382,7 @@ function AdminReportCostEditor({
 }) {
   const [workerRates, setWorkerRates] = useState<Record<string, string>>({});
   const [materialPrices, setMaterialPrices] = useState<Record<string, string>>({});
+  const [materialMarkupPercent, setMaterialMarkupPercent] = useState('0');
   const [loadingCosts, setLoadingCosts] = useState(true);
   const [savingCosts, setSavingCosts] = useState(false);
   const [costError, setCostError] = useState<string | null>(null);
@@ -387,11 +394,12 @@ function AdminReportCostEditor({
       setLoadingCosts(true);
       setCostError(null);
       try {
-        const [materialDefaults, laborDefaults, materialSnapshots, workerSnapshots] = await Promise.all([
+        const [materialDefaults, laborDefaults, materialSnapshots, workerSnapshots, adminSummary] = await Promise.all([
           fetchWorkReportMaterialCostDefaults(),
           fetchWorkReportLaborRateDefaults(),
           fetchWorkReportMaterialCosts(),
           fetchWorkReportWorkerCosts(),
+          fetchWorkReportAdminSummary(reportId),
         ]);
         if (!active) return;
 
@@ -427,6 +435,7 @@ function AdminReportCostEditor({
 
         setMaterialPrices(nextMaterialPrices);
         setWorkerRates(nextWorkerRates);
+        setMaterialMarkupPercent(String(adminSummary?.material_markup_percent ?? 0));
       } catch (err) {
         if (active) setCostError(err instanceof Error ? err.message : 'Impossibile caricare i costi amministrativi.');
       } finally {
@@ -435,7 +444,7 @@ function AdminReportCostEditor({
     };
     void loadCosts();
     return () => { active = false; };
-  }, [materials, workers, materialCatalog, workerCatalog]);
+  }, [reportId, materials, workers, materialCatalog, workerCatalog]);
 
   const laborTotal = workers.reduce((sum, worker) => {
     const rate = Number(workerRates[worker.id]);
@@ -445,13 +454,37 @@ function AdminReportCostEditor({
     const price = Number(materialPrices[material.id]);
     return sum + (Number.isFinite(price) ? Number(material.quantity) * price : 0);
   }, 0);
+  const markupPercent = Number(materialMarkupPercent);
+  const safeMarkupPercent = Number.isFinite(markupPercent) ? markupPercent : 0;
+  const markedMaterialsTotal = materialsTotal * (1 + safeMarkupPercent / 100);
+  const materialEconomicPercent = materialsTotal > 0
+    ? ((markedMaterialsTotal - materialsTotal) / materialsTotal) * 100
+    : null;
+  const economicClass = materialEconomicPercent == null
+    ? 'bg-slate-100 text-slate-600'
+    : materialEconomicPercent > 0.005
+      ? 'bg-green-100 text-green-800'
+      : materialEconomicPercent < -0.005
+        ? 'bg-red-100 text-red-800'
+        : 'bg-amber-100 text-amber-800';
+  const economicLabel = materialEconomicPercent == null
+    ? 'N/D'
+    : materialEconomicPercent > 0.005
+      ? `GUADAGNO +${materialEconomicPercent.toLocaleString('it-IT', { maximumFractionDigits: 2 })}%`
+      : materialEconomicPercent < -0.005
+        ? `PERDITA ${materialEconomicPercent.toLocaleString('it-IT', { maximumFractionDigits: 2 })}%`
+        : 'PARI 0%';
 
   const saveCosts = async () => {
     setSavingCosts(true);
     setCostError(null);
     setSaved(false);
     try {
+      if (safeMarkupPercent < -100 || safeMarkupPercent > 1000) {
+        throw new Error('La percentuale di ricarico deve essere compresa tra -100% e 1000%.');
+      }
       await Promise.all([
+        setWorkReportMaterialMarkup(reportId, safeMarkupPercent),
         ...workers
           .filter((worker) => workerRates[worker.id] !== '' && Number(workerRates[worker.id]) >= 0)
           .map((worker) => setWorkReportWorkerCost(worker.id, Number(workerRates[worker.id]))),
@@ -528,28 +561,53 @@ function AdminReportCostEditor({
           </section>
 
           <section className="rounded-2xl border border-slate-200 bg-white p-3 sm:p-4">
-            <div className="mb-3">
-              <h5 className="text-sm font-bold uppercase tracking-wide text-slate-800">Materiale</h5>
-              <p className="mt-0.5 text-[11px] text-slate-500">Inserisci il prezzo unitario: il totale di ogni riga viene calcolato automaticamente.</p>
+            <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
+              <div>
+                <h5 className="text-sm font-bold uppercase tracking-wide text-slate-800">Materiale</h5>
+                <p className="mt-0.5 text-[11px] text-slate-500">Costo aziendale, ricarico e valore ricaricato vengono calcolati riga per riga.</p>
+              </div>
+              <div className="flex flex-wrap items-end gap-2">
+                <label className="text-[11px] font-semibold text-slate-600">
+                  Ricarico %
+                  <input
+                    type="number"
+                    min="-100"
+                    max="1000"
+                    step="0.01"
+                    value={materialMarkupPercent}
+                    onChange={(e) => setMaterialMarkupPercent(e.target.value)}
+                    className="ml-2 w-28 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-red-400 focus:ring-2 focus:ring-red-100"
+                    aria-label="Percentuale di ricarico materiale"
+                  />
+                </label>
+                <div className={`rounded-full px-3 py-2 text-xs font-bold ${economicClass}`}>
+                  {economicLabel}
+                </div>
+              </div>
             </div>
 
             {materials.length === 0 ? (
               <p className="rounded-xl bg-slate-50 p-3 text-xs text-slate-400">Nessun materiale registrato.</p>
             ) : (
               <div className="overflow-x-auto">
-                <div className="min-w-[780px] space-y-2">
-                  <div className="grid grid-cols-[2.4fr_0.65fr_0.65fr_1fr_1fr] gap-2 px-2 text-[10px] font-bold uppercase tracking-wide text-slate-400">
+                <div className="min-w-[1120px] space-y-2">
+                  <div className="grid grid-cols-[2.2fr_0.6fr_0.55fr_1fr_1fr_1fr_1fr] gap-2 px-2 text-[10px] font-bold uppercase tracking-wide text-slate-400">
                     <span>Materiale</span>
                     <span>Quantità</span>
                     <span>U.M.</span>
-                    <span>Prezzo unitario €</span>
-                    <span className="text-right">Totale</span>
+                    <span>Costo unitario €</span>
+                    <span>Prezzo rincarato €</span>
+                    <span className="text-right">Totale costo</span>
+                    <span className="text-right">Totale rincarato</span>
                   </div>
                   {materials.map((material) => {
                     const price = materialPrices[material.id] ?? '';
-                    const lineTotal = price === '' ? null : Number(material.quantity) * Number(price);
+                    const numericPrice = Number(price);
+                    const lineTotal = price === '' || !Number.isFinite(numericPrice) ? null : Number(material.quantity) * numericPrice;
+                    const markedUnitPrice = price === '' || !Number.isFinite(numericPrice) ? null : numericPrice * (1 + safeMarkupPercent / 100);
+                    const markedLineTotal = markedUnitPrice == null ? null : Number(material.quantity) * markedUnitPrice;
                     return (
-                      <div key={material.id} className="grid grid-cols-[2.4fr_0.65fr_0.65fr_1fr_1fr] items-center gap-2 rounded-xl bg-slate-50 p-2">
+                      <div key={material.id} className="grid grid-cols-[2.2fr_0.6fr_0.55fr_1fr_1fr_1fr_1fr] items-center gap-2 rounded-xl bg-slate-50 p-2">
                         <div className="rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm font-semibold text-slate-900">{material.description}</div>
                         <div className="rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700">{Number(material.quantity).toLocaleString('it-IT')}</div>
                         <div className="rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700">{material.unit}</div>
@@ -561,15 +619,32 @@ function AdminReportCostEditor({
                           onChange={(e) => setMaterialPrices((current) => ({ ...current, [material.id]: e.target.value }))}
                           className={inputClass}
                           placeholder="€/unità"
-                          aria-label={`Prezzo unitario di ${material.description}`}
+                          aria-label={`Costo unitario di ${material.description}`}
                         />
+                        <div className="rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm font-semibold text-slate-700">
+                          {markedUnitPrice == null ? '—' : markedUnitPrice.toLocaleString('it-IT', { style: 'currency', currency: 'EUR' })}
+                        </div>
+                        <div className="rounded-lg bg-slate-100 px-3 py-2.5 text-right text-sm font-bold text-slate-800">
+                          {lineTotal == null ? '—' : lineTotal.toLocaleString('it-IT', { style: 'currency', currency: 'EUR' })}
+                        </div>
                         <div className="rounded-lg bg-emerald-50 px-3 py-2.5 text-right text-sm font-bold text-emerald-900">
-                          {lineTotal == null || !Number.isFinite(lineTotal) ? '—' : lineTotal.toLocaleString('it-IT', { style: 'currency', currency: 'EUR' })}
+                          {markedLineTotal == null ? '—' : markedLineTotal.toLocaleString('it-IT', { style: 'currency', currency: 'EUR' })}
                         </div>
                       </div>
                     );
                   })}
                 </div>
+              </div>
+            )}
+
+            {materials.length > 0 && (
+              <div className="mt-3 flex flex-wrap justify-end gap-2 text-xs">
+                <span className="rounded-lg bg-slate-100 px-3 py-2 text-slate-700">
+                  Totale costo materiale <strong>{materialsTotal.toLocaleString('it-IT', { style: 'currency', currency: 'EUR' })}</strong>
+                </span>
+                <span className="rounded-lg bg-emerald-100 px-3 py-2 text-emerald-900">
+                  Totale materiale rincarato <strong>{markedMaterialsTotal.toLocaleString('it-IT', { style: 'currency', currency: 'EUR' })}</strong>
+                </span>
               </div>
             )}
           </section>
@@ -581,9 +656,11 @@ function AdminReportCostEditor({
           <div className="text-sm text-slate-700">
             Manodopera <strong>{laborTotal.toLocaleString('it-IT', { style: 'currency', currency: 'EUR' })}</strong>
             <span className="mx-2 text-slate-300">·</span>
-            Materiali <strong>{materialsTotal.toLocaleString('it-IT', { style: 'currency', currency: 'EUR' })}</strong>
+            Materiale a costo <strong>{materialsTotal.toLocaleString('it-IT', { style: 'currency', currency: 'EUR' })}</strong>
             <span className="mx-2 text-slate-300">·</span>
-            Totale <strong className="text-emerald-900">{(laborTotal + materialsTotal).toLocaleString('it-IT', { style: 'currency', currency: 'EUR' })}</strong>
+            Costo sostenuto <strong>{(laborTotal + materialsTotal).toLocaleString('it-IT', { style: 'currency', currency: 'EUR' })}</strong>
+            <span className="mx-2 text-slate-300">·</span>
+            Materiale rincarato <strong className="text-emerald-900">{markedMaterialsTotal.toLocaleString('it-IT', { style: 'currency', currency: 'EUR' })}</strong>
           </div>
           <button
             type="button"
@@ -718,7 +795,7 @@ function WorkReportFormModal({
           team_name: teamName.trim().toUpperCase(),
           work_description: workDescription.trim().toUpperCase() || null,
           notes: notes.trim().toUpperCase() || null,
-          status: report.status === 'DA_CORREGGERE' ? 'DA_CORREGGERE' : 'BOZZA',
+          status: isAdmin ? report.status : (report.status === 'DA_CORREGGERE' ? 'DA_CORREGGERE' : 'BOZZA'),
         });
       } else {
         saved = await createWorkReport({
@@ -727,7 +804,7 @@ function WorkReportFormModal({
           team_name: teamName.trim().toUpperCase(),
           work_description: workDescription.trim().toUpperCase() || null,
           notes: notes.trim().toUpperCase() || null,
-          status: 'BOZZA',
+          status: isAdmin ? 'DA_VERIFICARE' : 'BOZZA',
         });
       }
 
@@ -868,7 +945,17 @@ function WorkReportFormModal({
                       placeholder="Descrizione materiale"
                     />
                     <input type="number" min="0.001" step="0.001" value={material.quantity} onChange={(e) => setMaterialRows((rows) => rows.map((row, i) => i === index ? { ...row, quantity: e.target.value } : row))} className={inputClass} placeholder="Q.tà" />
-                    <input value={material.unit} onChange={(e) => setMaterialRows((rows) => rows.map((row, i) => i === index ? { ...row, unit: e.target.value.toUpperCase() } : row))} className={inputClass} placeholder="PZ" />
+                    <select
+                      value={material.unit}
+                      onChange={(e) => setMaterialRows((rows) => rows.map((row, i) => i === index ? { ...row, unit: e.target.value } : row))}
+                      className={inputClass}
+                      aria-label="Unità di misura materiale"
+                    >
+                      {!WORK_REPORT_UNITS.includes(material.unit as typeof WORK_REPORT_UNITS[number]) && material.unit && (
+                        <option value={material.unit}>{material.unit}</option>
+                      )}
+                      {WORK_REPORT_UNITS.map((unit) => <option key={unit} value={unit}>{unit}</option>)}
+                    </select>
                     {isAdmin && (
                       <input
                         type="number"
@@ -899,12 +986,15 @@ function WorkReportFormModal({
         <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
           <button type="button" onClick={onClose} disabled={busy} className="rounded-xl bg-slate-100 px-4 py-3 text-sm font-semibold text-slate-700 disabled:opacity-50">Annulla</button>
           <button type="button" onClick={() => void save(false)} disabled={busy} className="inline-flex items-center justify-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm font-semibold text-blue-900 disabled:opacity-50">
-            <Save size={17} /> Salva bozza
+            {busy ? <Loader2 size={17} className="animate-spin" /> : <Save size={17} />}
+            {isAdmin ? 'Salva rapportino' : 'Salva bozza'}
           </button>
-          <button type="button" onClick={() => void save(true)} disabled={busy} className="inline-flex items-center justify-center gap-2 rounded-xl bg-red-500 px-4 py-3 text-sm font-semibold text-white disabled:opacity-50">
-            {busy ? <Loader2 size={17} className="animate-spin" /> : <Send size={17} />}
-            Invia in segreteria
-          </button>
+          {!isAdmin && (
+            <button type="button" onClick={() => void save(true)} disabled={busy} className="inline-flex items-center justify-center gap-2 rounded-xl bg-red-500 px-4 py-3 text-sm font-semibold text-white disabled:opacity-50">
+              {busy ? <Loader2 size={17} className="animate-spin" /> : <Send size={17} />}
+              Invia in segreteria
+            </button>
+          )}
         </div>
       </div>
     </div>
