@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { AlertCircle, CalendarDays, CheckCircle2, Download, Euro, FileSpreadsheet, Loader2, Mail, Paperclip, Pencil, Phone, Plus, Search, Trash2, Upload, X } from 'lucide-react';
+import { AlertCircle, CalendarClock, CalendarDays, CheckCircle2, Download, Euro, FileSpreadsheet, Loader2, Mail, Paperclip, Pencil, Phone, Plus, Search, StickyNote, Trash2, Upload, X } from 'lucide-react';
 import type { QuoteRequest, QuoteRequestFile, QuoteRequestInsert, QuoteStatus } from '@/lib/types';
 import { createQuoteRequest, deleteQuoteRequest, deleteQuoteRequestFile, downloadQuoteRequestFile, fetchQuoteRequestFiles, fetchQuoteRequests, updateQuoteRequest, uploadQuoteRequestFile } from '@/lib/api';
 import { saveAs } from 'file-saver';
@@ -10,6 +10,24 @@ const inputClass = 'w-full rounded-xl border border-slate-200 bg-white px-3 py-2
 
 const money = (value: number | null) => value == null ? '—' : value.toLocaleString('it-IT', { style: 'currency', currency: 'EUR' });
 const displayDate = (value: string | null) => value ? value.split('-').reverse().join('/') : '—';
+
+function displayDateTime(value: string | null): string {
+  if (!value) return '—';
+  return new Intl.DateTimeFormat('it-IT', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(new Date(value));
+}
+
+function toDateTimeLocal(value: string | null | undefined): string {
+  if (!value) return '';
+  const date = new Date(value);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
 
 function normalizeSource(value: string | null | undefined): string {
   const upper = (value ?? '').trim().toUpperCase().replace(/\s+/g, ' ');
@@ -248,7 +266,25 @@ export function QuoteDashboard() {
                       </div>
                     )}
                     <p className="mt-1 text-sm text-slate-700">{r.quote_type || 'TIPO PREVENTIVO NON INDICATO'}</p>
-                    {(r.value_ex_vat != null || r.notes) && <p className="mt-1 text-xs text-slate-500">{r.value_ex_vat != null ? `VALORE: ${money(r.value_ex_vat)}` : ''}{r.value_ex_vat != null && r.notes ? ' · ' : ''}{r.notes || ''}</p>}
+                    {r.value_ex_vat != null && <p className="mt-1 text-xs text-slate-500">VALORE: {money(r.value_ex_vat)}</p>}
+                    {r.site_visit_at && (
+                      <div className="mt-2 flex items-start gap-2 rounded-lg border border-blue-200 bg-blue-50 px-2.5 py-2 text-xs text-blue-900">
+                        <CalendarClock size={14} className="mt-0.5 shrink-0" />
+                        <div>
+                          <span className="font-semibold">Sopralluogo programmato</span>
+                          <span className="ml-1.5">{displayDateTime(r.site_visit_at)}</span>
+                        </div>
+                      </div>
+                    )}
+                    {r.notes && (
+                      <div className="mt-2 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-2 text-xs text-slate-700">
+                        <StickyNote size={14} className="mt-0.5 shrink-0 text-amber-700" />
+                        <div>
+                          <span className="font-semibold text-amber-900">Note</span>
+                          <span className="ml-1.5 whitespace-pre-wrap">{r.notes}</span>
+                        </div>
+                      </div>
+                    )}
                     <QuoteAttachments
                       files={filesByQuote.get(r.id) ?? []}
                       uploading={uploadingQuoteId === r.id}
@@ -345,6 +381,7 @@ function QuoteFormModal({ person, rows, onClose, onSave }: {
   const [client, setClient] = useState(person?.client ?? '');
   const [clientEmail, setClientEmail] = useState(person?.client_email ?? '');
   const [clientPhone, setClientPhone] = useState(person?.client_phone ?? '');
+  const [siteVisitAt, setSiteVisitAt] = useState(toDateTimeLocal(person?.site_visit_at));
   const [quoteType, setQuoteType] = useState(person?.quote_type ?? '');
   const [value, setValue] = useState(person?.value_ex_vat != null ? String(person.value_ex_vat) : '');
   const [status, setStatus] = useState<QuoteStatus>(person?.status ?? 'DA GESTIRE');
@@ -381,6 +418,7 @@ function QuoteFormModal({ person, rows, onClose, onSave }: {
         client: client.trim().toUpperCase(),
         client_email: clientEmail.trim().toLowerCase() || null,
         client_phone: clientPhone.trim() || null,
+        site_visit_at: siteVisitAt ? new Date(siteVisitAt).toISOString() : null,
         quote_type: quoteType.trim().toUpperCase() || null,
         value_ex_vat: value === '' ? null : Number(value),
         status,
@@ -415,6 +453,15 @@ function QuoteFormModal({ person, rows, onClose, onSave }: {
         </label>
         <label className="text-xs font-semibold text-slate-600">Telefono cliente
           <input type="tel" value={clientPhone} onChange={(e) => setClientPhone(e.target.value)} className={inputClass + ' mt-1'} placeholder="+39 ..." />
+        </label>
+        <label className="text-xs font-semibold text-slate-600 sm:col-span-2">Sopralluogo programmato
+          <input
+            type="datetime-local"
+            value={siteVisitAt}
+            onChange={(e) => setSiteVisitAt(e.target.value)}
+            className={inputClass + ' mt-1'}
+          />
+          <span className="mt-1 block text-[10px] font-normal text-slate-400">Seleziona giorno e orario del sopralluogo. Lascia vuoto se non è ancora programmato.</span>
         </label>
         <label className="text-xs font-semibold text-slate-600 sm:col-span-2">Tipo preventivo
           <input value={quoteType} onChange={(e) => setQuoteType(e.target.value.toUpperCase())} className={inputClass + ' mt-1'} placeholder="FOTOVOLTAICO, ACCUMULO, WALLBOX..." />
