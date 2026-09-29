@@ -432,7 +432,7 @@ export function WorkReportDashboard({ isAdmin }: WorkReportDashboardProps) {
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <ClipboardList size={18} className="text-blue-900" />
-          <h2 className="font-semibold text-slate-900">{isAdmin ? 'Tutti i rapportini' : 'I miei rapportini'}</h2>
+          <h2 className="font-semibold text-slate-900">{isAdmin ? 'Commesse e cantieri' : 'I miei rapportini'}</h2>
         </div>
         <select
           value={statusFilter}
@@ -456,140 +456,141 @@ export function WorkReportDashboard({ isAdmin }: WorkReportDashboardProps) {
         </div>
       ) : (
         <div className="space-y-3">
-          {filtered.map((report) => {
-            const plant = plantById.get(report.plant_id);
-            const reportWorkers = workers.filter((worker) => worker.report_id === report.id);
-            const reportMaterials = materials.filter((material) => material.report_id === report.id);
-            const hours = reportWorkers.reduce((sum, worker) => sum + Number(worker.hours || 0), 0);
-            const expanded = expandedId === report.id;
-            const editable = report.status === 'BOZZA' || report.status === 'DA_CORREGGERE';
+          {isAdmin ? adminGroups.map((group) => {
+            const plant = plantById.get(group.plantId);
+            const quote = group.quoteRequestId ? quoteById.get(group.quoteRequestId) : null;
+            const groupExpanded = expandedGroupKey === group.key;
+            const reportIds = new Set(group.reports.map((report) => report.id));
+            const groupWorkers = workers.filter((worker) => reportIds.has(worker.report_id));
+            const groupMaterials = materials.filter((material) => reportIds.has(material.report_id));
+            const groupHours = groupWorkers.reduce((sum, worker) => sum + Number(worker.hours || 0), 0);
+            const newestDate = group.reports[0]?.report_date ?? '';
+            const oldestDate = group.reports[group.reports.length - 1]?.report_date ?? '';
+            const dateLabel = newestDate === oldestDate
+              ? displayDate(newestDate)
+              : `${displayDate(oldestDate)} → ${displayDate(newestDate)}`;
+            const correctingAssociation = associationEditingPlantId === group.plantId;
+            const associationBusy = associationBusyPlantId === group.plantId;
 
             return (
-              <article key={report.id} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-                <div className="flex flex-wrap items-start gap-3">
-                  <div className="rounded-xl bg-blue-50 px-3 py-2 text-center text-blue-900">
-                    <div className="text-[10px] font-semibold uppercase">Data</div>
-                    <div className="text-sm font-bold">{displayDate(report.report_date)}</div>
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <h3 className="font-semibold text-slate-900">{plant?.owner_name ?? 'Impianto non disponibile'}</h3>
-                      <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${statusClass(report.status)}`}>
-                        {report.status.replace(/_/g, ' ')}
-                      </span>
+              <section key={group.key} className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                <div className="p-4 sm:p-5">
+                  <div className="flex flex-wrap items-start gap-4">
+                    <div className={`rounded-xl px-3 py-2 text-center ${quote ? 'bg-blue-900 text-white' : 'bg-amber-50 text-amber-900'}`}>
+                      <div className="text-[9px] font-bold uppercase tracking-wide">{quote ? 'Commessa' : 'Da associare'}</div>
+                      <div className="mt-0.5 text-sm font-bold">
+                        {quote ? `${quote.progressive_number}/${quote.series}` : `${group.reports.length} RAPP.`}
+                      </div>
                     </div>
-                    <p className="mt-0.5 text-xs text-slate-500">{plant?.address ?? ''}</p>
-                    <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-600">
-                      <span className="inline-flex items-center gap-1"><Users size={13} />{report.team_name}</span>
-                      <span className="inline-flex items-center gap-1"><Clock3 size={13} />{hours.toLocaleString('it-IT')} ore</span>
-                      <span className="inline-flex items-center gap-1"><PackagePlus size={13} />{reportMaterials.length} materiali</span>
+
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h3 className="text-base font-bold text-slate-900">
+                          {quote ? quote.client : (plant?.owner_name ?? 'Impianto non disponibile')}
+                        </h3>
+                        {quote && (
+                          <span className="rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-semibold text-green-800">
+                            {quote.status}
+                          </span>
+                        )}
+                        {!quote && (
+                          <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-800">
+                            NESSUN PREVENTIVO COLLEGATO
+                          </span>
+                        )}
+                      </div>
+                      <p className="mt-0.5 text-xs text-slate-500">
+                        {plant?.owner_name ?? 'Impianto non disponibile'} · {plant?.address ?? 'Indirizzo non disponibile'}
+                      </p>
+                      <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-600">
+                        <span><strong>{group.reports.length}</strong> rapportini</span>
+                        <span>{dateLabel}</span>
+                        <span><strong>{groupHours.toLocaleString('it-IT', { maximumFractionDigits: 2 })}</strong> ore</span>
+                        <span><strong>{groupMaterials.length}</strong> righe materiale</span>
+                        {quote?.value_ex_vat != null && (
+                          <span>Preventivo <strong>{Number(quote.value_ex_vat).toLocaleString('it-IT', { style: 'currency', currency: 'EUR' })}</strong></span>
+                        )}
+                      </div>
                     </div>
-                    {report.work_description && <p className="mt-2 text-sm text-slate-700">{report.work_description}</p>}
-                    {report.notes && <p className="mt-1 rounded-lg bg-amber-50 px-2.5 py-2 text-xs text-amber-900">NOTE: {report.notes}</p>}
+
+                    <div className="flex flex-wrap items-center justify-end gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setAssociationEditingPlantId(correctingAssociation ? null : group.plantId)}
+                        disabled={associationBusy}
+                        className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-900 hover:bg-blue-100 disabled:opacity-50"
+                      >
+                        Correggi abbinamento
+                      </button>
+                      {quote && (
+                        <button
+                          type="button"
+                          onClick={() => void updatePlantQuoteAssociation(group.plantId, null)}
+                          disabled={associationBusy}
+                          className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-700 hover:bg-red-100 disabled:opacity-50"
+                        >
+                          Scollega preventivo
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => setExpandedGroupKey(groupExpanded ? null : group.key)}
+                        className="rounded-lg p-2 text-blue-900 hover:bg-blue-50"
+                        aria-label={groupExpanded ? 'Chiudi commessa' : 'Apri commessa'}
+                      >
+                        {groupExpanded ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+                      </button>
+                    </div>
                   </div>
 
-                  <div className="flex flex-wrap items-center justify-end gap-1">
-                    {isAdmin && !expanded && (
-                      <button
-                        onClick={() => setExpandedId(report.id)}
-                        className="rounded-lg bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-800 hover:bg-emerald-100"
-                      >
-                        Inserisci prezzi e costi
-                      </button>
-                    )}
-                    {editable && (
-                      <button onClick={() => setEditing(report)} className="rounded-lg p-2 text-slate-500 hover:bg-slate-100" aria-label="Modifica rapportino">
-                        <Pencil size={17} />
-                      </button>
-                    )}
-                    {editable && (
-                      <button onClick={() => void remove(report)} disabled={busyId === report.id} className="rounded-lg p-2 text-red-600 hover:bg-red-50 disabled:opacity-50" aria-label="Elimina rapportino">
-                        <Trash2 size={17} />
-                      </button>
-                    )}
-                    <button onClick={() => setExpandedId(expanded ? null : report.id)} className="rounded-lg p-2 text-blue-900 hover:bg-blue-50" aria-label="Dettagli rapportino">
-                      {expanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
-                    </button>
-                  </div>
+                  {correctingAssociation && (
+                    <div className="mt-4 rounded-xl border border-blue-200 bg-blue-50/60 p-3">
+                      <div className="grid gap-2 lg:grid-cols-[1fr_auto] lg:items-center">
+                        <select
+                          value={group.quoteRequestId ?? ''}
+                          onChange={(e) => void updatePlantQuoteAssociation(group.plantId, e.target.value || null)}
+                          disabled={associationBusy}
+                          className="w-full rounded-xl border border-blue-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-blue-500 disabled:opacity-50"
+                        >
+                          <option value="">Nessun preventivo collegato</option>
+                          {quotes.map((option) => (
+                            <option key={option.id} value={option.id}>
+                              {option.progressive_number}/{option.series} · {option.client} · {option.status}
+                              {option.value_ex_vat != null ? ` · ${Number(option.value_ex_vat).toLocaleString('it-IT', { style: 'currency', currency: 'EUR' })}` : ''}
+                            </option>
+                          ))}
+                        </select>
+                        <button
+                          type="button"
+                          onClick={() => setAssociationEditingPlantId(null)}
+                          className="rounded-lg bg-white px-3 py-2.5 text-xs font-semibold text-slate-600 ring-1 ring-slate-200"
+                        >
+                          Annulla
+                        </button>
+                      </div>
+                      <p className="mt-2 text-[11px] text-blue-800">
+                        Cambiando preventivo, tutti i rapportini di questo cantiere vengono spostati nella nuova commessa. Se invece è solo un singolo rapportino ad avere il cantiere sbagliato, apri la commessa e usa la matita su quel rapportino per correggerne l’impianto.
+                      </p>
+                    </div>
+                  )}
                 </div>
 
-                {expanded && (
-                  <div className="mt-4 grid gap-4 border-t border-slate-100 pt-4 lg:grid-cols-2">
-                    <div>
-                      <h4 className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-500">Manodopera</h4>
-                      {reportWorkers.length === 0 ? <p className="text-xs text-slate-400">Nessuna ora registrata.</p> : (
-                        <div className="space-y-1.5">
-                          {reportWorkers.map((worker) => (
-                            <div key={worker.id} className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2 text-sm">
-                              <span>{worker.worker_name}<span className="ml-1 text-[10px] text-slate-400">({worker.rate_type || 'ORDINARIA'})</span></span>
-                              <span className="font-semibold">{Number(worker.hours).toLocaleString('it-IT')} h</span>
-                            </div>
-                          ))}
-                        </div>
-                      )}
+                {groupExpanded && (
+                  <div className="border-t border-slate-200 bg-slate-50/60 p-3 sm:p-4">
+                    <div className="mb-3 flex items-center justify-between gap-3">
+                      <div>
+                        <h4 className="text-xs font-bold uppercase tracking-wide text-slate-600">Rapportini della commessa</h4>
+                        <p className="mt-0.5 text-[11px] text-slate-500">Apri il singolo rapportino per costi, materiali, ore, approvazione o correzioni.</p>
+                      </div>
                     </div>
-                    <div>
-                      <h4 className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-500">Materiali utilizzati</h4>
-                      {reportMaterials.length === 0 ? <p className="text-xs text-slate-400">Nessun materiale registrato.</p> : (
-                        <div className="space-y-1.5">
-                          {reportMaterials.map((material) => (
-                            <div key={material.id} className="rounded-lg bg-slate-50 px-3 py-2 text-sm">
-                              <div className="flex items-start justify-between gap-3">
-                                <span>{material.description}</span>
-                                <span className="shrink-0 font-semibold">{Number(material.quantity).toLocaleString('it-IT')} {material.unit}</span>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
+                    <div className="space-y-3">
+                      {group.reports.map((report) => renderReportCard(report, true))}
                     </div>
                   </div>
                 )}
-
-                {expanded && isAdmin && (
-                  <AdminReportCostEditor
-                    reportId={report.id}
-                    plantId={report.plant_id}
-                    workers={reportWorkers}
-                    materials={reportMaterials}
-                    allReports={reports}
-                    allWorkers={workers}
-                    allMaterials={materials}
-                    workerCatalog={workerCatalog}
-                    materialCatalog={materialCatalog}
-                    quoteOptions={quotes}
-                    linkedQuoteRequestId={quoteLinkByPlant.get(report.plant_id) ?? null}
-                    onQuoteLinkChanged={(quoteRequestId) => {
-                      setQuoteLinks((current) => {
-                        const remaining = current.filter((link) => link.plant_id !== report.plant_id);
-                        return quoteRequestId ? [...remaining, { plant_id: report.plant_id, quote_request_id: quoteRequestId }] : remaining;
-                      });
-                    }}
-                  />
-                )}
-
-                {isAdmin && report.status === 'DA_VERIFICARE' && (
-                  <div className="mt-4 flex flex-wrap justify-end gap-2 border-t border-slate-100 pt-3">
-                    <button
-                      onClick={() => void review(report, 'DA_CORREGGERE')}
-                      disabled={busyId === report.id}
-                      className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-900 disabled:opacity-50"
-                    >
-                      Da correggere
-                    </button>
-                    <button
-                      onClick={() => void review(report, 'APPROVATO')}
-                      disabled={busyId === report.id}
-                      className="inline-flex items-center gap-1.5 rounded-lg bg-green-600 px-3 py-2 text-xs font-semibold text-white disabled:opacity-50"
-                    >
-                      {busyId === report.id ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
-                      Approva
-                    </button>
-                  </div>
-                )}
-              </article>
+              </section>
             );
-          })}
+          }) : filtered.map((report) => renderReportCard(report))}
         </div>
       )}
 
