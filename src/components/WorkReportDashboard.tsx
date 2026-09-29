@@ -19,6 +19,8 @@ import {
 } from 'lucide-react';
 import type {
   Plant,
+  PlantQuoteLink,
+  QuoteRequest,
   WorkReport,
   WorkReportMaterial,
   WorkReportMaterialCatalogEntry,
@@ -32,6 +34,8 @@ import {
   createWorkReport,
   deleteWorkReport,
   fetchPlants,
+  fetchPlantQuoteLinks,
+  fetchQuoteRequests,
   fetchWorkReportAdminSummary,
   fetchWorkReportLaborRateDefaults,
   fetchWorkReportMaterialCatalog,
@@ -44,6 +48,7 @@ import {
   fetchWorkReportWorkers,
   replaceWorkReportMaterials,
   replaceWorkReportWorkers,
+  setPlantQuoteLink,
   setWorkReportMaterialCost,
   setWorkReportMaterialMarkup,
   setWorkReportWorkerCost,
@@ -78,6 +83,8 @@ export function WorkReportDashboard({ isAdmin }: WorkReportDashboardProps) {
   const [materialCatalog, setMaterialCatalog] = useState<WorkReportMaterialCatalogEntry[]>([]);
   const [workerCatalog, setWorkerCatalog] = useState<WorkReportWorkerCatalogEntry[]>([]);
   const [plants, setPlants] = useState<Plant[]>([]);
+  const [quotes, setQuotes] = useState<QuoteRequest[]>([]);
+  const [quoteLinks, setQuoteLinks] = useState<PlantQuoteLink[]>([]);
   const [editing, setEditing] = useState<WorkReport | 'new' | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<'TUTTI' | WorkReportStatus>('TUTTI');
@@ -96,23 +103,36 @@ export function WorkReportDashboard({ isAdmin }: WorkReportDashboardProps) {
         fetchWorkReportMaterialCatalog(),
         fetchWorkReportWorkerCatalog(),
       ]);
+
+      let quoteRows: QuoteRequest[] = [];
+      let plantQuoteRows: PlantQuoteLink[] = [];
+      if (isAdmin) {
+        [quoteRows, plantQuoteRows] = await Promise.all([
+          fetchQuoteRequests(),
+          fetchPlantQuoteLinks(),
+        ]);
+      }
+
       setReports(reportRows);
       setWorkers(workerRows);
       setMaterials(materialRows);
       setPlants(plantRows);
       setMaterialCatalog(materialOptions);
       setWorkerCatalog(workerOptions);
+      setQuotes(quoteRows);
+      setQuoteLinks(plantQuoteRows);
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Impossibile caricare i rapportini.');
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [isAdmin]);
 
   useEffect(() => { void load(); }, [load]);
 
   const plantById = useMemo(() => new Map(plants.map((plant) => [plant.id, plant])), [plants]);
+  const quoteLinkByPlant = useMemo(() => new Map(quoteLinks.map((link) => [link.plant_id, link.quote_request_id])), [quoteLinks]);
   const filtered = reports.filter((report) => statusFilter === 'TUTTI' || report.status === statusFilter);
   const pendingCount = reports.filter((report) => report.status === 'DA_VERIFICARE').length;
   const approvedCount = reports.filter((report) => report.status === 'APPROVATO').length;
@@ -302,10 +322,22 @@ export function WorkReportDashboard({ isAdmin }: WorkReportDashboardProps) {
                 {expanded && isAdmin && (
                   <AdminReportCostEditor
                     reportId={report.id}
+                    plantId={report.plant_id}
                     workers={reportWorkers}
                     materials={reportMaterials}
+                    allReports={reports}
+                    allWorkers={workers}
+                    allMaterials={materials}
                     workerCatalog={workerCatalog}
                     materialCatalog={materialCatalog}
+                    quoteOptions={quotes}
+                    linkedQuoteRequestId={quoteLinkByPlant.get(report.plant_id) ?? null}
+                    onQuoteLinkChanged={(quoteRequestId) => {
+                      setQuoteLinks((current) => {
+                        const remaining = current.filter((link) => link.plant_id !== report.plant_id);
+                        return quoteRequestId ? [...remaining, { plant_id: report.plant_id, quote_request_id: quoteRequestId }] : remaining;
+                      });
+                    }}
                   />
                 )}
 
