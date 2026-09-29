@@ -245,6 +245,7 @@ export interface WorkReportWorker {
   report_id: string;
   worker_name: string;
   hours: number;
+  rate_type: string;
   notes: string | null;
   created_at: string;
 }
@@ -261,5 +262,43 @@ export interface WorkReportMaterial {
 }
 
 export type WorkReportInsert = Omit<WorkReport, 'id' | 'created_by' | 'submitted_at' | 'approved_by' | 'approved_at' | 'created_at' | 'updated_at'>;
-export type WorkReportWorkerInput = Pick<WorkReportWorker, 'worker_name' | 'hours' | 'notes'>;
+export type WorkReportWorkerInput = Pick<WorkReportWorker, 'worker_name' | 'hours' | 'rate_type' | 'notes'>;
 export type WorkReportMaterialInput = Pick<WorkReportMaterial, 'item_code' | 'description' | 'quantity' | 'unit' | 'notes'>;
+
+export interface WorkReportMaterialCatalogEntry {
+  id: string;
+  description: string;
+  normalized_description: string;
+  default_unit: string;
+  usage_count: number;
+  last_used_at: string | null;
+}
+
+export interface WorkReportWorkerCatalogEntry {
+  id: string;
+  worker_name: string;
+  normalized_worker_name: string;
+  usage_count: number;
+  last_used_at: string | null;
+}
+
+export interface WorkReportMaterialCostDefault {
+  material_catalog_id: string;
+  unit_price: number;
+}
+
+export interface WorkReportLaborRateDefault {
+  worker_catalog_id: string;
+  rate_type: string;
+  hourly_rate: number;
+}
+
+export interface WorkReportMaterialCost {
+  report_material_id: string;
+  unit_price: number;
+}
+
+export interface WorkReportWorkerCost {
+  report_worker_id: string;
+  hourly_rate: number;
+}
