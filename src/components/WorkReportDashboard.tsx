@@ -53,7 +53,7 @@ interface WorkReportDashboardProps {
 }
 
 type WorkerDraft = { worker_name: string; hours: string; rate_type: string; notes: string };
-type MaterialDraft = { description: string; quantity: string; unit: string; notes: string };
+type MaterialDraft = { source_id: string | null; description: string; quantity: string; unit: string; notes: string; unit_price: string };
 
 const inputClass = 'w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-red-400 focus:ring-2 focus:ring-red-100';
 
@@ -338,6 +338,7 @@ export function WorkReportDashboard({ isAdmin }: WorkReportDashboardProps) {
           materials={editing === 'new' ? [] : materials.filter((material) => material.report_id === editing.id)}
           materialCatalog={materialCatalog}
           workerCatalog={workerCatalog}
+          isAdmin={isAdmin}
           onClose={() => setEditing(null)}
           onSaved={async () => {
             setEditing(null);
@@ -585,6 +586,7 @@ function WorkReportFormModal({
   materials,
   materialCatalog,
   workerCatalog,
+  isAdmin,
   onClose,
   onSaved,
 }: {
@@ -594,6 +596,7 @@ function WorkReportFormModal({
   materials: WorkReportMaterial[];
   materialCatalog: WorkReportMaterialCatalogEntry[];
   workerCatalog: WorkReportWorkerCatalogEntry[];
+  isAdmin: boolean;
   onClose: () => void;
   onSaved: () => Promise<void>;
 }) {
@@ -609,14 +612,53 @@ function WorkReportFormModal({
   );
   const [materialRows, setMaterialRows] = useState<MaterialDraft[]>(
     materials.map((material) => ({
+      source_id: material.id,
       description: material.description,
       quantity: String(material.quantity),
       unit: material.unit,
       notes: material.notes ?? '',
+      unit_price: '',
     })),
   );
+  const [materialDefaultPrices, setMaterialDefaultPrices] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!isAdmin) return;
+    let active = true;
+
+    const loadMaterialPrices = async () => {
+      try {
+        const [defaults, snapshots] = await Promise.all([
+          fetchWorkReportMaterialCostDefaults(),
+          fetchWorkReportMaterialCosts(),
+        ]);
+        if (!active) return;
+
+        const defaultByCatalogId = new Map(defaults.map((row) => [row.material_catalog_id, String(row.unit_price)]));
+        const defaultsByDescription: Record<string, string> = {};
+        materialCatalog.forEach((item) => {
+          const price = defaultByCatalogId.get(item.id);
+          if (price != null) defaultsByDescription[item.normalized_description] = price;
+        });
+        setMaterialDefaultPrices(defaultsByDescription);
+
+        const snapshotByMaterialId = new Map(snapshots.map((row) => [row.report_material_id, String(row.unit_price)]));
+        setMaterialRows((rows) => rows.map((row) => {
+          if (row.unit_price) return row;
+          const snapshot = row.source_id ? snapshotByMaterialId.get(row.source_id) : undefined;
+          const fallback = defaultsByDescription[normalizeCatalogValue(row.description)];
+          return { ...row, unit_price: snapshot ?? fallback ?? '' };
+        }));
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Impossibile caricare i prezzi dei materiali.');
+      }
+    };
+
+    void loadMaterialPrices();
+    return () => { active = false; };
+  }, [isAdmin, materialCatalog]);
 
   const save = async (submit: boolean) => {
     const cleanWorkers: WorkReportWorkerInput[] = workerRows
@@ -627,8 +669,9 @@ function WorkReportFormModal({
         rate_type: worker.rate_type || 'ORDINARIA',
         notes: worker.notes || null,
       }));
-    const cleanMaterials: WorkReportMaterialInput[] = materialRows
-      .filter((material) => material.description.trim() && Number(material.quantity) > 0)
+    const cleanMaterialRows = materialRows
+      .filter((material) => material.description.trim() && Number(material.quantity) > 0);
+    const cleanMaterials: WorkReportMaterialInput[] = cleanMaterialRows
       .map((material) => ({
         item_code: null,
         description: material.description,
@@ -666,7 +709,15 @@ function WorkReportFormModal({
       }
 
       await replaceWorkReportWorkers(saved.id, cleanWorkers);
-      await replaceWorkReportMaterials(saved.id, cleanMaterials);
+      const savedMaterials = await replaceWorkReportMaterials(saved.id, cleanMaterials);
+
+      if (isAdmin) {
+        await Promise.all(savedMaterials.map((material, index) => {
+          const value = cleanMaterialRows[index]?.unit_price ?? '';
+          if (value === '' || Number(value) < 0) return Promise.resolve();
+          return setWorkReportMaterialCost(material.id, Number(value));
+        }));
+      }
 
       if (submit) {
         await updateWorkReport(saved.id, {
@@ -753,10 +804,13 @@ function WorkReportFormModal({
 
         <section className="mt-4 rounded-2xl border border-slate-200 p-4">
           <div className="mb-3 flex items-center justify-between">
-            <h3 className="inline-flex items-center gap-2 font-semibold text-slate-900"><PackagePlus size={17} /> Materiali utilizzati</h3>
+            <div>
+              <h3 className="inline-flex items-center gap-2 font-semibold text-slate-900"><PackagePlus size={17} /> Materiali utilizzati</h3>
+              {isAdmin && <p className="mt-0.5 text-[11px] text-slate-500">In amministrazione puoi valorizzare direttamente il prezzo unitario; i valori già noti si auto-compilano.</p>}
+            </div>
             <button
               type="button"
-              onClick={() => setMaterialRows((rows) => [...rows, { description: '', quantity: '1', unit: 'PZ', notes: '' }])}
+              onClick={() => setMaterialRows((rows) => [...rows, { source_id: null, description: '', quantity: '1', unit: 'PZ', notes: '', unit_price: '' }])}
               className="inline-flex items-center gap-1 rounded-lg bg-blue-50 px-2.5 py-1.5 text-xs font-semibold text-blue-900"
             >
               <Plus size={14} /> Aggiungi
@@ -771,20 +825,39 @@ function WorkReportFormModal({
             <div className="space-y-3">
               {materialRows.map((material, index) => (
                 <div key={index} className="rounded-xl bg-slate-50 p-3">
-                  <div className="grid gap-2 sm:grid-cols-[2fr_0.6fr_0.6fr_auto]">
+                  <div className={`grid gap-2 ${isAdmin ? 'sm:grid-cols-[1.7fr_0.55fr_0.55fr_0.75fr_auto]' : 'sm:grid-cols-[2fr_0.6fr_0.6fr_auto]'}`}>
                     <input
                       list="work-report-material-options"
                       value={material.description}
                       onChange={(e) => {
                         const value = e.target.value.toUpperCase();
-                        const exact = materialCatalog.find((item) => item.normalized_description === value.trim().replace(/\s+/g, ' '));
-                        setMaterialRows((rows) => rows.map((row, i) => i === index ? { ...row, description: value, unit: exact?.default_unit ?? row.unit } : row));
+                        const normalized = normalizeCatalogValue(value);
+                        const exact = materialCatalog.find((item) => item.normalized_description === normalized);
+                        const defaultPrice = materialDefaultPrices[normalized];
+                        setMaterialRows((rows) => rows.map((row, i) => i === index ? {
+                          ...row,
+                          description: value,
+                          unit: exact?.default_unit ?? row.unit,
+                          unit_price: isAdmin && defaultPrice != null ? defaultPrice : row.unit_price,
+                        } : row));
                       }}
                       className={inputClass}
                       placeholder="Descrizione materiale"
                     />
                     <input type="number" min="0.001" step="0.001" value={material.quantity} onChange={(e) => setMaterialRows((rows) => rows.map((row, i) => i === index ? { ...row, quantity: e.target.value } : row))} className={inputClass} placeholder="Q.tà" />
                     <input value={material.unit} onChange={(e) => setMaterialRows((rows) => rows.map((row, i) => i === index ? { ...row, unit: e.target.value.toUpperCase() } : row))} className={inputClass} placeholder="PZ" />
+                    {isAdmin && (
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={material.unit_price}
+                        onChange={(e) => setMaterialRows((rows) => rows.map((row, i) => i === index ? { ...row, unit_price: e.target.value } : row))}
+                        className={inputClass}
+                        placeholder="Prezzo unit. €"
+                        aria-label="Prezzo unitario materiale"
+                      />
+                    )}
                     <button type="button" onClick={() => setMaterialRows((rows) => rows.filter((_, i) => i !== index))} className="rounded-lg p-2 text-red-600 hover:bg-red-50"><Trash2 size={17} /></button>
                   </div>
                   <input value={material.notes} onChange={(e) => setMaterialRows((rows) => rows.map((row, i) => i === index ? { ...row, notes: e.target.value.toUpperCase() } : row))} className={inputClass + ' mt-2'} placeholder="Nota materiale opzionale" />

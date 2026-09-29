@@ -745,26 +745,29 @@ export async function replaceWorkReportWorkers(reportId: string, workers: WorkRe
   }));
 }
 
-export async function replaceWorkReportMaterials(reportId: string, materials: WorkReportMaterialInput[]): Promise<void> {
+export async function replaceWorkReportMaterials(reportId: string, materials: WorkReportMaterialInput[]): Promise<WorkReportMaterial[]> {
   const { error: deleteError } = await supabase.from('work_report_materials').delete().eq('report_id', reportId);
   if (deleteError) throw deleteError;
-  if (materials.length === 0) return;
-  const { error } = await supabase.from('work_report_materials').insert(
-    materials.map((material) => ({
+  if (materials.length === 0) return [];
+
+  const inserted: WorkReportMaterial[] = [];
+  for (const material of materials) {
+    const { data, error } = await supabase.from('work_report_materials').insert({
       report_id: reportId,
       item_code: material.item_code?.trim().toUpperCase() || null,
       description: material.description.trim().toUpperCase(),
       quantity: material.quantity,
       unit: material.unit.trim().toUpperCase() || 'PZ',
       notes: material.notes?.trim().toUpperCase() || null,
-    })),
-  );
-  if (error) throw error;
-  await Promise.all(materials.map(async (material) => {
+    }).select().single();
+    if (error) throw error;
+    inserted.push(data);
+
     const { error: rememberError } = await supabase.rpc('remember_work_report_material', {
       p_description: material.description,
       p_unit: material.unit || 'PZ',
     });
     if (rememberError) throw rememberError;
-  }));
+  }
+  return inserted;
 }
