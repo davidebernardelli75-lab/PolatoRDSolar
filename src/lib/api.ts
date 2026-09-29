@@ -141,6 +141,17 @@ export async function setPlantQuoteLink(plantId: string, quoteRequestId: string 
   if (error) throw error;
 }
 
+export async function setWorkReportQuoteLink(reportId: string, quoteRequestId: string | null): Promise<void> {
+  const { error } = await supabase
+    .from('work_reports')
+    .update({
+      quote_request_id: quoteRequestId,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', reportId);
+  if (error) throw error;
+}
+
 export async function setWorkReportMaterialCost(reportMaterialId: string, unitPrice: number): Promise<void> {
   const { error } = await supabase.rpc('set_work_report_material_cost', {
     p_report_material_id: reportMaterialId,
