@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Sun, LayoutGrid, LogOut, X, KeyRound, Eye, EyeOff, Car, AlertTriangle, ShieldCheck, GraduationCap, FileSpreadsheet } from 'lucide-react';
+import { Sun, LayoutGrid, LogOut, X, KeyRound, Eye, EyeOff, Car, AlertTriangle, ShieldCheck, GraduationCap, FileSpreadsheet, ClipboardList } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import type { View } from '@/App';
 import { fetchVehicles } from '@/lib/api';
@@ -58,6 +58,7 @@ export function Sidebar({ open, onClose, onNavigate, currentView, isAdmin, onSig
 
   const items = [
     { id: 'dashboard' as const, label: 'Impianti FV', icon: LayoutGrid },
+    { id: 'reports' as const, label: 'Rapportini', icon: ClipboardList },
     ...(isAdmin ? [
       { id: 'vehicles' as const, label: 'Parco Automezzi', icon: Car, badge: vehicleAlerts },
       { id: 'insurances' as const, label: 'Assicurazioni', icon: ShieldCheck },
@@ -104,6 +105,7 @@ export function Sidebar({ open, onClose, onNavigate, currentView, isAdmin, onSig
             const Icon = item.icon;
             const active =
               (item.id === 'dashboard' && currentView.name === 'dashboard') ||
+              (item.id === 'reports' && currentView.name === 'reports') ||
               (item.id === 'vehicles' && currentView.name === 'vehicles') ||
               (item.id === 'insurances' && currentView.name === 'insurances') ||
               (item.id === 'training' && currentView.name === 'training') ||
