@@ -505,7 +505,6 @@ export async function fetchQuoteRequestFiles(): Promise<QuoteRequestFile[]> {
 }
 
 function quoteFileContentType(file: File): string {
-  if (file.type) return file.type;
   const ext = file.name.split('.').pop()?.toLowerCase();
   if (ext === 'pdf') return 'application/pdf';
   if (ext === 'jpg' || ext === 'jpeg') return 'image/jpeg';
