@@ -21,20 +21,30 @@ import type {
   Plant,
   WorkReport,
   WorkReportMaterial,
+  WorkReportMaterialCatalogEntry,
   WorkReportMaterialInput,
   WorkReportStatus,
   WorkReportWorker,
+  WorkReportWorkerCatalogEntry,
   WorkReportWorkerInput,
 } from '@/lib/types';
 import {
   createWorkReport,
   deleteWorkReport,
   fetchPlants,
+  fetchWorkReportLaborRateDefaults,
+  fetchWorkReportMaterialCatalog,
+  fetchWorkReportMaterialCostDefaults,
+  fetchWorkReportMaterialCosts,
   fetchWorkReportMaterials,
   fetchWorkReports,
+  fetchWorkReportWorkerCatalog,
+  fetchWorkReportWorkerCosts,
   fetchWorkReportWorkers,
   replaceWorkReportMaterials,
   replaceWorkReportWorkers,
+  setWorkReportMaterialCost,
+  setWorkReportWorkerCost,
   updateWorkReport,
 } from '@/lib/api';
 
@@ -42,8 +52,8 @@ interface WorkReportDashboardProps {
   isAdmin: boolean;
 }
 
-type WorkerDraft = { worker_name: string; hours: string; notes: string };
-type MaterialDraft = { item_code: string; description: string; quantity: string; unit: string; notes: string };
+type WorkerDraft = { worker_name: string; hours: string; rate_type: string; notes: string };
+type MaterialDraft = { description: string; quantity: string; unit: string; notes: string };
 
 const inputClass = 'w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-red-400 focus:ring-2 focus:ring-red-100';
 
@@ -62,6 +72,8 @@ export function WorkReportDashboard({ isAdmin }: WorkReportDashboardProps) {
   const [reports, setReports] = useState<WorkReport[]>([]);
   const [workers, setWorkers] = useState<WorkReportWorker[]>([]);
   const [materials, setMaterials] = useState<WorkReportMaterial[]>([]);
+  const [materialCatalog, setMaterialCatalog] = useState<WorkReportMaterialCatalogEntry[]>([]);
+  const [workerCatalog, setWorkerCatalog] = useState<WorkReportWorkerCatalogEntry[]>([]);
   const [plants, setPlants] = useState<Plant[]>([]);
   const [editing, setEditing] = useState<WorkReport | 'new' | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -73,16 +85,20 @@ export function WorkReportDashboard({ isAdmin }: WorkReportDashboardProps) {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [reportRows, workerRows, materialRows, plantRows] = await Promise.all([
+      const [reportRows, workerRows, materialRows, plantRows, materialOptions, workerOptions] = await Promise.all([
         fetchWorkReports(),
         fetchWorkReportWorkers(),
         fetchWorkReportMaterials(),
         fetchPlants(),
+        fetchWorkReportMaterialCatalog(),
+        fetchWorkReportWorkerCatalog(),
       ]);
       setReports(reportRows);
       setWorkers(workerRows);
       setMaterials(materialRows);
       setPlants(plantRows);
+      setMaterialCatalog(materialOptions);
+      setWorkerCatalog(workerOptions);
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Impossibile caricare i rapportini.');
@@ -247,7 +263,7 @@ export function WorkReportDashboard({ isAdmin }: WorkReportDashboardProps) {
                         <div className="space-y-1.5">
                           {reportWorkers.map((worker) => (
                             <div key={worker.id} className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2 text-sm">
-                              <span>{worker.worker_name}</span>
+                              <span>{worker.worker_name}<span className="ml-1 text-[10px] text-slate-400">({worker.rate_type || 'ORDINARIA'})</span></span>
                               <span className="font-semibold">{Number(worker.hours).toLocaleString('it-IT')} h</span>
                             </div>
                           ))}
@@ -264,13 +280,21 @@ export function WorkReportDashboard({ isAdmin }: WorkReportDashboardProps) {
                                 <span>{material.description}</span>
                                 <span className="shrink-0 font-semibold">{Number(material.quantity).toLocaleString('it-IT')} {material.unit}</span>
                               </div>
-                              {material.item_code && <div className="mt-0.5 text-[11px] text-slate-400">Codice: {material.item_code}</div>}
                             </div>
                           ))}
                         </div>
                       )}
                     </div>
                   </div>
+                )}
+
+                {expanded && isAdmin && (
+                  <AdminReportCostEditor
+                    workers={reportWorkers}
+                    materials={reportMaterials}
+                    workerCatalog={workerCatalog}
+                    materialCatalog={materialCatalog}
+                  />
                 )}
 
                 {isAdmin && report.status === 'DA_VERIFICARE' && (
@@ -304,6 +328,8 @@ export function WorkReportDashboard({ isAdmin }: WorkReportDashboardProps) {
           plants={plants}
           workers={editing === 'new' ? [] : workers.filter((worker) => worker.report_id === editing.id)}
           materials={editing === 'new' ? [] : materials.filter((material) => material.report_id === editing.id)}
+          materialCatalog={materialCatalog}
+          workerCatalog={workerCatalog}
           onClose={() => setEditing(null)}
           onSaved={async () => {
             setEditing(null);
@@ -324,11 +350,230 @@ function Kpi({ label, value }: { label: string; value: string }) {
   );
 }
 
+function normalizeCatalogValue(value: string): string {
+  return value.trim().toUpperCase().replace(/\s+/g, ' ');
+}
+
+function AdminReportCostEditor({
+  workers,
+  materials,
+  workerCatalog,
+  materialCatalog,
+}: {
+  workers: WorkReportWorker[];
+  materials: WorkReportMaterial[];
+  workerCatalog: WorkReportWorkerCatalogEntry[];
+  materialCatalog: WorkReportMaterialCatalogEntry[];
+}) {
+  const [workerRates, setWorkerRates] = useState<Record<string, string>>({});
+  const [materialPrices, setMaterialPrices] = useState<Record<string, string>>({});
+  const [loadingCosts, setLoadingCosts] = useState(true);
+  const [savingCosts, setSavingCosts] = useState(false);
+  const [costError, setCostError] = useState<string | null>(null);
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    const loadCosts = async () => {
+      setLoadingCosts(true);
+      setCostError(null);
+      try {
+        const [materialDefaults, laborDefaults, materialSnapshots, workerSnapshots] = await Promise.all([
+          fetchWorkReportMaterialCostDefaults(),
+          fetchWorkReportLaborRateDefaults(),
+          fetchWorkReportMaterialCosts(),
+          fetchWorkReportWorkerCosts(),
+        ]);
+        if (!active) return;
+
+        const materialSnapshotByRow = new Map(materialSnapshots.map((row) => [row.report_material_id, Number(row.unit_price)]));
+        const workerSnapshotByRow = new Map(workerSnapshots.map((row) => [row.report_worker_id, Number(row.hourly_rate)]));
+        const materialDefaultByCatalog = new Map(materialDefaults.map((row) => [row.material_catalog_id, Number(row.unit_price)]));
+        const laborDefaultByKey = new Map(laborDefaults.map((row) => [`${row.worker_catalog_id}::${normalizeCatalogValue(row.rate_type)}`, Number(row.hourly_rate)]));
+
+        const nextMaterialPrices: Record<string, string> = {};
+        materials.forEach((material) => {
+          const snapshot = materialSnapshotByRow.get(material.id);
+          if (snapshot != null) {
+            nextMaterialPrices[material.id] = String(snapshot);
+            return;
+          }
+          const catalog = materialCatalog.find((item) => item.normalized_description === normalizeCatalogValue(material.description));
+          const fallback = catalog ? materialDefaultByCatalog.get(catalog.id) : undefined;
+          nextMaterialPrices[material.id] = fallback != null ? String(fallback) : '';
+        });
+
+        const nextWorkerRates: Record<string, string> = {};
+        workers.forEach((worker) => {
+          const snapshot = workerSnapshotByRow.get(worker.id);
+          if (snapshot != null) {
+            nextWorkerRates[worker.id] = String(snapshot);
+            return;
+          }
+          const catalog = workerCatalog.find((item) => item.normalized_worker_name === normalizeCatalogValue(worker.worker_name));
+          const key = catalog ? `${catalog.id}::${normalizeCatalogValue(worker.rate_type || 'ORDINARIA')}` : '';
+          const fallback = key ? laborDefaultByKey.get(key) : undefined;
+          nextWorkerRates[worker.id] = fallback != null ? String(fallback) : '';
+        });
+
+        setMaterialPrices(nextMaterialPrices);
+        setWorkerRates(nextWorkerRates);
+      } catch (err) {
+        if (active) setCostError(err instanceof Error ? err.message : 'Impossibile caricare i costi amministrativi.');
+      } finally {
+        if (active) setLoadingCosts(false);
+      }
+    };
+    void loadCosts();
+    return () => { active = false; };
+  }, [materials, workers, materialCatalog, workerCatalog]);
+
+  const laborTotal = workers.reduce((sum, worker) => {
+    const rate = Number(workerRates[worker.id]);
+    return sum + (Number.isFinite(rate) ? Number(worker.hours) * rate : 0);
+  }, 0);
+  const materialsTotal = materials.reduce((sum, material) => {
+    const price = Number(materialPrices[material.id]);
+    return sum + (Number.isFinite(price) ? Number(material.quantity) * price : 0);
+  }, 0);
+
+  const saveCosts = async () => {
+    setSavingCosts(true);
+    setCostError(null);
+    setSaved(false);
+    try {
+      await Promise.all([
+        ...workers
+          .filter((worker) => workerRates[worker.id] !== '' && Number(workerRates[worker.id]) >= 0)
+          .map((worker) => setWorkReportWorkerCost(worker.id, Number(workerRates[worker.id]))),
+        ...materials
+          .filter((material) => materialPrices[material.id] !== '' && Number(materialPrices[material.id]) >= 0)
+          .map((material) => setWorkReportMaterialCost(material.id, Number(materialPrices[material.id]))),
+      ]);
+      setSaved(true);
+    } catch (err) {
+      setCostError(err instanceof Error ? err.message : 'Salvataggio costi non riuscito.');
+    } finally {
+      setSavingCosts(false);
+    }
+  };
+
+  return (
+    <div className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50/50 p-4">
+      <div className="mb-3">
+        <h4 className="font-semibold text-emerald-950">Valorizzazione amministrativa</h4>
+        <p className="text-xs text-emerald-800">
+          Prezzi e tariffe sono visibili solo in amministrazione. Dopo il primo inserimento vengono riproposti automaticamente nei rapportini successivi.
+        </p>
+      </div>
+
+      {loadingCosts ? (
+        <div className="py-5 text-center"><Loader2 className="mx-auto animate-spin text-emerald-700" /></div>
+      ) : (
+        <div className="grid gap-5 lg:grid-cols-2">
+          <div>
+            <h5 className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-600">Manodopera</h5>
+            <div className="space-y-2">
+              {workers.map((worker) => {
+                const rate = workerRates[worker.id] ?? '';
+                const lineTotal = rate === '' ? null : Number(worker.hours) * Number(rate);
+                return (
+                  <div key={worker.id} className="rounded-xl border border-white bg-white p-3">
+                    <div className="mb-2 flex items-start justify-between gap-3">
+                      <div>
+                        <div className="text-sm font-semibold text-slate-900">{worker.worker_name}</div>
+                        <div className="text-[11px] text-slate-500">{Number(worker.hours).toLocaleString('it-IT')} h · {worker.rate_type || 'ORDINARIA'}</div>
+                      </div>
+                      <div className="text-right text-xs font-semibold text-slate-700">
+                        {lineTotal == null || !Number.isFinite(lineTotal) ? '—' : lineTotal.toLocaleString('it-IT', { style: 'currency', currency: 'EUR' })}
+                      </div>
+                    </div>
+                    <label className="text-[11px] font-semibold text-slate-600">Costo orario €/h
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={rate}
+                        onChange={(e) => setWorkerRates((current) => ({ ...current, [worker.id]: e.target.value }))}
+                        className={inputClass + ' mt-1'}
+                        placeholder="Es. 24,00"
+                      />
+                    </label>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          <div>
+            <h5 className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-600">Materiali</h5>
+            <div className="space-y-2">
+              {materials.map((material) => {
+                const price = materialPrices[material.id] ?? '';
+                const lineTotal = price === '' ? null : Number(material.quantity) * Number(price);
+                return (
+                  <div key={material.id} className="rounded-xl border border-white bg-white p-3">
+                    <div className="mb-2 flex items-start justify-between gap-3">
+                      <div>
+                        <div className="text-sm font-semibold text-slate-900">{material.description}</div>
+                        <div className="text-[11px] text-slate-500">{Number(material.quantity).toLocaleString('it-IT')} {material.unit}</div>
+                      </div>
+                      <div className="text-right text-xs font-semibold text-slate-700">
+                        {lineTotal == null || !Number.isFinite(lineTotal) ? '—' : lineTotal.toLocaleString('it-IT', { style: 'currency', currency: 'EUR' })}
+                      </div>
+                    </div>
+                    <label className="text-[11px] font-semibold text-slate-600">Prezzo unitario €
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={price}
+                        onChange={(e) => setMaterialPrices((current) => ({ ...current, [material.id]: e.target.value }))}
+                        className={inputClass + ' mt-1'}
+                        placeholder="Es. 12,50"
+                      />
+                    </label>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {!loadingCosts && (
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-emerald-200 pt-4">
+          <div className="text-sm text-slate-700">
+            Manodopera <strong>{laborTotal.toLocaleString('it-IT', { style: 'currency', currency: 'EUR' })}</strong>
+            <span className="mx-2 text-slate-300">·</span>
+            Materiali <strong>{materialsTotal.toLocaleString('it-IT', { style: 'currency', currency: 'EUR' })}</strong>
+            <span className="mx-2 text-slate-300">·</span>
+            Totale <strong className="text-emerald-900">{(laborTotal + materialsTotal).toLocaleString('it-IT', { style: 'currency', currency: 'EUR' })}</strong>
+          </div>
+          <button
+            type="button"
+            onClick={() => void saveCosts()}
+            disabled={savingCosts}
+            className="inline-flex items-center gap-2 rounded-xl bg-emerald-700 px-4 py-2.5 text-xs font-semibold text-white disabled:opacity-50"
+          >
+            {savingCosts ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />}
+            Salva costi
+          </button>
+        </div>
+      )}
+      {saved && <p className="mt-2 text-xs font-semibold text-emerald-700">Costi salvati e impostati come valori predefiniti per i prossimi rapportini.</p>}
+      {costError && <p className="mt-2 rounded-lg bg-red-50 p-2 text-xs text-red-700">{costError}</p>}
+    </div>
+  );
+}
+
 function WorkReportFormModal({
   report,
   plants,
   workers,
   materials,
+  materialCatalog,
+  workerCatalog,
   onClose,
   onSaved,
 }: {
@@ -336,6 +581,8 @@ function WorkReportFormModal({
   plants: Plant[];
   workers: WorkReportWorker[];
   materials: WorkReportMaterial[];
+  materialCatalog: WorkReportMaterialCatalogEntry[];
+  workerCatalog: WorkReportWorkerCatalogEntry[];
   onClose: () => void;
   onSaved: () => Promise<void>;
 }) {
@@ -346,12 +593,11 @@ function WorkReportFormModal({
   const [notes, setNotes] = useState(report?.notes ?? '');
   const [workerRows, setWorkerRows] = useState<WorkerDraft[]>(
     workers.length > 0
-      ? workers.map((worker) => ({ worker_name: worker.worker_name, hours: String(worker.hours), notes: worker.notes ?? '' }))
-      : [{ worker_name: '', hours: '', notes: '' }],
+      ? workers.map((worker) => ({ worker_name: worker.worker_name, hours: String(worker.hours), rate_type: worker.rate_type || 'ORDINARIA', notes: worker.notes ?? '' }))
+      : [{ worker_name: '', hours: '', rate_type: 'ORDINARIA', notes: '' }],
   );
   const [materialRows, setMaterialRows] = useState<MaterialDraft[]>(
     materials.map((material) => ({
-      item_code: material.item_code ?? '',
       description: material.description,
       quantity: String(material.quantity),
       unit: material.unit,
@@ -367,12 +613,13 @@ function WorkReportFormModal({
       .map((worker) => ({
         worker_name: worker.worker_name,
         hours: Number(worker.hours),
+        rate_type: worker.rate_type || 'ORDINARIA',
         notes: worker.notes || null,
       }));
     const cleanMaterials: WorkReportMaterialInput[] = materialRows
       .filter((material) => material.description.trim() && Number(material.quantity) > 0)
       .map((material) => ({
-        item_code: material.item_code || null,
+        item_code: null,
         description: material.description,
         quantity: Number(material.quantity),
         unit: material.unit || 'PZ',
@@ -459,17 +706,33 @@ function WorkReportFormModal({
             <h3 className="inline-flex items-center gap-2 font-semibold text-slate-900"><Users size={17} /> Manodopera</h3>
             <button
               type="button"
-              onClick={() => setWorkerRows((rows) => [...rows, { worker_name: '', hours: '', notes: '' }])}
+              onClick={() => setWorkerRows((rows) => [...rows, { worker_name: '', hours: '', rate_type: 'ORDINARIA', notes: '' }])}
               className="inline-flex items-center gap-1 rounded-lg bg-blue-50 px-2.5 py-1.5 text-xs font-semibold text-blue-900"
             >
               <UserRoundPlus size={14} /> Aggiungi
             </button>
           </div>
+          <datalist id="work-report-worker-options">
+            {workerCatalog.map((worker) => <option key={worker.id} value={worker.worker_name} />)}
+          </datalist>
           <div className="space-y-3">
             {workerRows.map((worker, index) => (
-              <div key={index} className="grid gap-2 rounded-xl bg-slate-50 p-3 sm:grid-cols-[1.4fr_0.5fr_1fr_auto]">
-                <input value={worker.worker_name} onChange={(e) => setWorkerRows((rows) => rows.map((row, i) => i === index ? { ...row, worker_name: e.target.value.toUpperCase() } : row))} className={inputClass} placeholder="Nome lavoratore" />
+              <div key={index} className="grid gap-2 rounded-xl bg-slate-50 p-3 sm:grid-cols-[1.25fr_0.5fr_0.8fr_1fr_auto]">
+                <input
+                  list="work-report-worker-options"
+                  value={worker.worker_name}
+                  onChange={(e) => setWorkerRows((rows) => rows.map((row, i) => i === index ? { ...row, worker_name: e.target.value.toUpperCase() } : row))}
+                  className={inputClass}
+                  placeholder="Nome lavoratore"
+                />
                 <input type="number" min="0.25" max="24" step="0.25" value={worker.hours} onChange={(e) => setWorkerRows((rows) => rows.map((row, i) => i === index ? { ...row, hours: e.target.value } : row))} className={inputClass} placeholder="Ore" />
+                <select value={worker.rate_type} onChange={(e) => setWorkerRows((rows) => rows.map((row, i) => i === index ? { ...row, rate_type: e.target.value } : row))} className={inputClass}>
+                  <option value="ORDINARIA">Ordinaria</option>
+                  <option value="STRAORDINARIA">Straordinaria</option>
+                  <option value="FESTIVA">Festiva</option>
+                  <option value="NOTTURNA">Notturna</option>
+                  <option value="ALTRO">Altro</option>
+                </select>
                 <input value={worker.notes} onChange={(e) => setWorkerRows((rows) => rows.map((row, i) => i === index ? { ...row, notes: e.target.value.toUpperCase() } : row))} className={inputClass} placeholder="Nota opzionale" />
                 <button type="button" onClick={() => setWorkerRows((rows) => rows.filter((_, i) => i !== index))} className="rounded-lg p-2 text-red-600 hover:bg-red-50"><Trash2 size={17} /></button>
               </div>
@@ -482,21 +745,33 @@ function WorkReportFormModal({
             <h3 className="inline-flex items-center gap-2 font-semibold text-slate-900"><PackagePlus size={17} /> Materiali utilizzati</h3>
             <button
               type="button"
-              onClick={() => setMaterialRows((rows) => [...rows, { item_code: '', description: '', quantity: '1', unit: 'PZ', notes: '' }])}
+              onClick={() => setMaterialRows((rows) => [...rows, { description: '', quantity: '1', unit: 'PZ', notes: '' }])}
               className="inline-flex items-center gap-1 rounded-lg bg-blue-50 px-2.5 py-1.5 text-xs font-semibold text-blue-900"
             >
               <Plus size={14} /> Aggiungi
             </button>
           </div>
+          <datalist id="work-report-material-options">
+            {materialCatalog.map((material) => <option key={material.id} value={material.description} />)}
+          </datalist>
           {materialRows.length === 0 ? (
             <p className="rounded-xl bg-slate-50 p-4 text-center text-xs text-slate-400">Nessun materiale inserito.</p>
           ) : (
             <div className="space-y-3">
               {materialRows.map((material, index) => (
                 <div key={index} className="rounded-xl bg-slate-50 p-3">
-                  <div className="grid gap-2 sm:grid-cols-[0.8fr_1.8fr_0.55fr_0.55fr_auto]">
-                    <input value={material.item_code} onChange={(e) => setMaterialRows((rows) => rows.map((row, i) => i === index ? { ...row, item_code: e.target.value.toUpperCase() } : row))} className={inputClass} placeholder="Codice" />
-                    <input value={material.description} onChange={(e) => setMaterialRows((rows) => rows.map((row, i) => i === index ? { ...row, description: e.target.value.toUpperCase() } : row))} className={inputClass} placeholder="Descrizione materiale" />
+                  <div className="grid gap-2 sm:grid-cols-[2fr_0.6fr_0.6fr_auto]">
+                    <input
+                      list="work-report-material-options"
+                      value={material.description}
+                      onChange={(e) => {
+                        const value = e.target.value.toUpperCase();
+                        const exact = materialCatalog.find((item) => item.normalized_description === value.trim().replace(/\s+/g, ' '));
+                        setMaterialRows((rows) => rows.map((row, i) => i === index ? { ...row, description: value, unit: exact?.default_unit ?? row.unit } : row));
+                      }}
+                      className={inputClass}
+                      placeholder="Descrizione materiale"
+                    />
                     <input type="number" min="0.001" step="0.001" value={material.quantity} onChange={(e) => setMaterialRows((rows) => rows.map((row, i) => i === index ? { ...row, quantity: e.target.value } : row))} className={inputClass} placeholder="Q.tà" />
                     <input value={material.unit} onChange={(e) => setMaterialRows((rows) => rows.map((row, i) => i === index ? { ...row, unit: e.target.value.toUpperCase() } : row))} className={inputClass} placeholder="PZ" />
                     <button type="button" onClick={() => setMaterialRows((rows) => rows.filter((_, i) => i !== index))} className="rounded-lg p-2 text-red-600 hover:bg-red-50"><Trash2 size={17} /></button>
