@@ -32,6 +32,7 @@ import {
   createWorkReport,
   deleteWorkReport,
   fetchPlants,
+  fetchWorkReportAdminSummary,
   fetchWorkReportLaborRateDefaults,
   fetchWorkReportMaterialCatalog,
   fetchWorkReportMaterialCostDefaults,
@@ -44,6 +45,7 @@ import {
   replaceWorkReportMaterials,
   replaceWorkReportWorkers,
   setWorkReportMaterialCost,
+  setWorkReportMaterialMarkup,
   setWorkReportWorkerCost,
   updateWorkReport,
 } from '@/lib/api';
@@ -298,6 +300,7 @@ export function WorkReportDashboard({ isAdmin }: WorkReportDashboardProps) {
 
                 {expanded && isAdmin && (
                   <AdminReportCostEditor
+                    reportId={report.id}
                     workers={reportWorkers}
                     materials={reportMaterials}
                     workerCatalog={workerCatalog}
@@ -364,11 +367,13 @@ function normalizeCatalogValue(value: string): string {
 }
 
 function AdminReportCostEditor({
+  reportId,
   workers,
   materials,
   workerCatalog,
   materialCatalog,
 }: {
+  reportId: string;
   workers: WorkReportWorker[];
   materials: WorkReportMaterial[];
   workerCatalog: WorkReportWorkerCatalogEntry[];
@@ -376,6 +381,7 @@ function AdminReportCostEditor({
 }) {
   const [workerRates, setWorkerRates] = useState<Record<string, string>>({});
   const [materialPrices, setMaterialPrices] = useState<Record<string, string>>({});
+  const [materialMarkupPercent, setMaterialMarkupPercent] = useState('0');
   const [loadingCosts, setLoadingCosts] = useState(true);
   const [savingCosts, setSavingCosts] = useState(false);
   const [costError, setCostError] = useState<string | null>(null);
