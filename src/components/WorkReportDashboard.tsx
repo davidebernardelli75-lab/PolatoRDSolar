@@ -479,77 +479,100 @@ function AdminReportCostEditor({
       {loadingCosts ? (
         <div className="py-5 text-center"><Loader2 className="mx-auto animate-spin text-emerald-700" /></div>
       ) : (
-        <div className="grid gap-5 lg:grid-cols-2">
-          <div>
-            <h5 className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-600">Manodopera</h5>
-            <div className="space-y-2">
-              {workers.map((worker) => {
-                const rate = workerRates[worker.id] ?? '';
-                const lineTotal = rate === '' ? null : Number(worker.hours) * Number(rate);
-                return (
-                  <div key={worker.id} className="rounded-xl border border-white bg-white p-3">
-                    <div className="mb-2 flex items-start justify-between gap-3">
-                      <div>
-                        <div className="text-sm font-semibold text-slate-900">{worker.worker_name}</div>
-                        <div className="text-[11px] text-slate-500">{Number(worker.hours).toLocaleString('it-IT')} h · {worker.rate_type || 'ORDINARIA'}</div>
-                      </div>
-                      <div className="text-right text-xs font-semibold text-slate-700">
-                        {lineTotal == null || !Number.isFinite(lineTotal) ? '—' : lineTotal.toLocaleString('it-IT', { style: 'currency', currency: 'EUR' })}
-                      </div>
-                    </div>
-                    <label className="text-[11px] font-semibold text-slate-600">Costo orario €/h
-                      <input
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        value={rate}
-                        onChange={(e) => setWorkerRates((current) => ({ ...current, [worker.id]: e.target.value }))}
-                        className={inputClass + ' mt-1'}
-                        placeholder="Es. 24,00"
-                      />
-                    </label>
-                  </div>
-                );
-              })}
+        <div className="space-y-5">
+          <section className="rounded-2xl border border-slate-200 bg-white p-3 sm:p-4">
+            <div className="mb-3">
+              <h5 className="text-sm font-bold uppercase tracking-wide text-slate-800">Squadra</h5>
+              <p className="mt-0.5 text-[11px] text-slate-500">Valorizza il costo orario di ogni componente della squadra.</p>
             </div>
-          </div>
 
-          <div>
-            <div className="mb-2">
-              <h5 className="text-xs font-bold uppercase tracking-wide text-slate-600">Materiali</h5>
-              <p className="mt-0.5 text-[11px] text-slate-500">Inserisci il prezzo unitario del materiale: il totale riga viene calcolato automaticamente.</p>
-            </div>
-            <div className="space-y-2">
-              {materials.map((material) => {
-                const price = materialPrices[material.id] ?? '';
-                const lineTotal = price === '' ? null : Number(material.quantity) * Number(price);
-                return (
-                  <div key={material.id} className="rounded-xl border border-white bg-white p-3">
-                    <div className="mb-2 flex items-start justify-between gap-3">
-                      <div>
-                        <div className="text-sm font-semibold text-slate-900">{material.description}</div>
-                        <div className="text-[11px] text-slate-500">{Number(material.quantity).toLocaleString('it-IT')} {material.unit}</div>
-                      </div>
-                      <div className="text-right text-xs font-semibold text-slate-700">
-                        {lineTotal == null || !Number.isFinite(lineTotal) ? '—' : lineTotal.toLocaleString('it-IT', { style: 'currency', currency: 'EUR' })}
-                      </div>
-                    </div>
-                    <label className="text-[11px] font-semibold text-slate-600">Prezzo unitario €
-                      <input
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        value={price}
-                        onChange={(e) => setMaterialPrices((current) => ({ ...current, [material.id]: e.target.value }))}
-                        className={inputClass + ' mt-1'}
-                        placeholder="Es. 12,50"
-                      />
-                    </label>
+            {workers.length === 0 ? (
+              <p className="rounded-xl bg-slate-50 p-3 text-xs text-slate-400">Nessun componente della squadra registrato.</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <div className="min-w-[780px] space-y-2">
+                  <div className="grid grid-cols-[2fr_0.65fr_1fr_1fr_1fr] gap-2 px-2 text-[10px] font-bold uppercase tracking-wide text-slate-400">
+                    <span>Dipendente</span>
+                    <span>Ore</span>
+                    <span>Tipo ore</span>
+                    <span>Costo orario €/h</span>
+                    <span className="text-right">Totale</span>
                   </div>
-                );
-              })}
+                  {workers.map((worker) => {
+                    const rate = workerRates[worker.id] ?? '';
+                    const lineTotal = rate === '' ? null : Number(worker.hours) * Number(rate);
+                    return (
+                      <div key={worker.id} className="grid grid-cols-[2fr_0.65fr_1fr_1fr_1fr] items-center gap-2 rounded-xl bg-slate-50 p-2">
+                        <div className="rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm font-semibold text-slate-900">{worker.worker_name}</div>
+                        <div className="rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700">{Number(worker.hours).toLocaleString('it-IT')} h</div>
+                        <div className="rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-xs font-semibold text-slate-600">{worker.rate_type || 'ORDINARIA'}</div>
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={rate}
+                          onChange={(e) => setWorkerRates((current) => ({ ...current, [worker.id]: e.target.value }))}
+                          className={inputClass}
+                          placeholder="€/h"
+                          aria-label={`Costo orario di ${worker.worker_name}`}
+                        />
+                        <div className="rounded-lg bg-emerald-50 px-3 py-2.5 text-right text-sm font-bold text-emerald-900">
+                          {lineTotal == null || !Number.isFinite(lineTotal) ? '—' : lineTotal.toLocaleString('it-IT', { style: 'currency', currency: 'EUR' })}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </section>
+
+          <section className="rounded-2xl border border-slate-200 bg-white p-3 sm:p-4">
+            <div className="mb-3">
+              <h5 className="text-sm font-bold uppercase tracking-wide text-slate-800">Materiale</h5>
+              <p className="mt-0.5 text-[11px] text-slate-500">Inserisci il prezzo unitario: il totale di ogni riga viene calcolato automaticamente.</p>
             </div>
-          </div>
+
+            {materials.length === 0 ? (
+              <p className="rounded-xl bg-slate-50 p-3 text-xs text-slate-400">Nessun materiale registrato.</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <div className="min-w-[780px] space-y-2">
+                  <div className="grid grid-cols-[2.4fr_0.65fr_0.65fr_1fr_1fr] gap-2 px-2 text-[10px] font-bold uppercase tracking-wide text-slate-400">
+                    <span>Materiale</span>
+                    <span>Quantità</span>
+                    <span>U.M.</span>
+                    <span>Prezzo unitario €</span>
+                    <span className="text-right">Totale</span>
+                  </div>
+                  {materials.map((material) => {
+                    const price = materialPrices[material.id] ?? '';
+                    const lineTotal = price === '' ? null : Number(material.quantity) * Number(price);
+                    return (
+                      <div key={material.id} className="grid grid-cols-[2.4fr_0.65fr_0.65fr_1fr_1fr] items-center gap-2 rounded-xl bg-slate-50 p-2">
+                        <div className="rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm font-semibold text-slate-900">{material.description}</div>
+                        <div className="rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700">{Number(material.quantity).toLocaleString('it-IT')}</div>
+                        <div className="rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700">{material.unit}</div>
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={price}
+                          onChange={(e) => setMaterialPrices((current) => ({ ...current, [material.id]: e.target.value }))}
+                          className={inputClass}
+                          placeholder="€/unità"
+                          aria-label={`Prezzo unitario di ${material.description}`}
+                        />
+                        <div className="rounded-lg bg-emerald-50 px-3 py-2.5 text-right text-sm font-bold text-emerald-900">
+                          {lineTotal == null || !Number.isFinite(lineTotal) ? '—' : lineTotal.toLocaleString('it-IT', { style: 'currency', currency: 'EUR' })}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </section>
         </div>
       )}
 
