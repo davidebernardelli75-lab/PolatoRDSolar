@@ -302,3 +302,8 @@ export interface WorkReportWorkerCost {
   report_worker_id: string;
   hourly_rate: number;
 }
+
+export interface WorkReportAdminSummary {
+  report_id: string;
+  material_markup_percent: number;
+}
