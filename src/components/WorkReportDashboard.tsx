@@ -453,13 +453,37 @@ function AdminReportCostEditor({
     const price = Number(materialPrices[material.id]);
     return sum + (Number.isFinite(price) ? Number(material.quantity) * price : 0);
   }, 0);
+  const markupPercent = Number(materialMarkupPercent);
+  const safeMarkupPercent = Number.isFinite(markupPercent) ? markupPercent : 0;
+  const markedMaterialsTotal = materialsTotal * (1 + safeMarkupPercent / 100);
+  const materialEconomicPercent = materialsTotal > 0
+    ? ((markedMaterialsTotal - materialsTotal) / materialsTotal) * 100
+    : null;
+  const economicClass = materialEconomicPercent == null
+    ? 'bg-slate-100 text-slate-600'
+    : materialEconomicPercent > 0.005
+      ? 'bg-green-100 text-green-800'
+      : materialEconomicPercent < -0.005
+        ? 'bg-red-100 text-red-800'
+        : 'bg-amber-100 text-amber-800';
+  const economicLabel = materialEconomicPercent == null
+    ? 'N/D'
+    : materialEconomicPercent > 0.005
+      ? `GUADAGNO +${materialEconomicPercent.toLocaleString('it-IT', { maximumFractionDigits: 2 })}%`
+      : materialEconomicPercent < -0.005
+        ? `PERDITA ${materialEconomicPercent.toLocaleString('it-IT', { maximumFractionDigits: 2 })}%`
+        : 'PARI 0%';
 
   const saveCosts = async () => {
     setSavingCosts(true);
     setCostError(null);
     setSaved(false);
     try {
+      if (safeMarkupPercent < -100 || safeMarkupPercent > 1000) {
+        throw new Error('La percentuale di ricarico deve essere compresa tra -100% e 1000%.');
+      }
       await Promise.all([
+        setWorkReportMaterialMarkup(reportId, safeMarkupPercent),
         ...workers
           .filter((worker) => workerRates[worker.id] !== '' && Number(workerRates[worker.id]) >= 0)
           .map((worker) => setWorkReportWorkerCost(worker.id, Number(workerRates[worker.id]))),
