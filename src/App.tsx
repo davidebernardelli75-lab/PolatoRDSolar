@@ -3,7 +3,7 @@ import type { Session } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 import { fetchAppRole, type AppRole } from '@/lib/access';
 import type { Plant } from '@/lib/types';
-import { fetchPlants, deletePlant, fetchAllRoadmapProgress } from '@/lib/api';
+import { fetchPlants, deletePlant, fetchAllRoadmapProgress, updatePlant } from '@/lib/api';
 import { Sidebar } from '@/components/Sidebar';
 import { Dashboard } from '@/components/Dashboard';
 import { PlantEditor } from '@/components/PlantEditor';
@@ -137,6 +137,16 @@ export default function App() {
     }
   };
 
+  const handleClearPlantAlert = async (id: string) => {
+    try {
+      const updated = await updatePlant(id, { notes: null });
+      setPlants((current) => current.map((plant) => plant.id === id ? updated : plant));
+      setError(null);
+    } catch {
+      setError('Impossibile cancellare l\'alert dell\'impianto. Riprova.');
+    }
+  };
+
   const handleChangeArea = async () => {
     setSidebarOpen(false);
     setError(null);
@@ -195,6 +205,7 @@ export default function App() {
               onNewPlant={() => navigate({ name: 'new-plant' })}
               onEditPlant={(id) => navigate({ name: 'edit-plant', plantId: id })}
               onDeletePlant={handleDeletePlant}
+              onClearPlantAlert={handleClearPlantAlert}
             />
           )}
           {currentView.name === 'new-plant' && (

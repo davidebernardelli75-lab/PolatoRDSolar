@@ -49,7 +49,12 @@ export function PlantEditor({ plantId, onSaved, onCancel }: PlantEditorProps) {
     if (!form.owner_name.trim() || !form.address.trim()) { setError('Nome proprietario e indirizzo sono obbligatori.'); return; }
     setSaving(true); setError(null);
     try {
-      const payload = { ...form, owner_name: form.owner_name.trim(), address: form.address.trim() };
+      const payload = {
+        ...form,
+        owner_name: form.owner_name.trim(),
+        address: form.address.trim(),
+        notes: form.notes?.trim().toUpperCase() || null,
+      };
       if (plantId) { const updated = await updatePlant(plantId, payload); onSaved(updated.id); }
       else { const created = await createPlant(payload); onSaved(created.id); }
     } catch { setError("Impossibile salvare l'impianto. Riprova."); }
@@ -103,6 +108,19 @@ export function PlantEditor({ plantId, onSaved, onCancel }: PlantEditorProps) {
               <Field label="Telefono" value={form.phone ?? ''} onChange={(v) => update('phone', v)} />
               <Field label="Email" value={form.email ?? ''} onChange={(v) => update('email', v)} type="email" />
             </div>
+            <div className="rounded-xl border border-amber-200 bg-amber-50 p-3">
+              <label className="block text-sm font-semibold text-amber-900 mb-1.5">Nota / alert operativo</label>
+              <textarea
+                value={form.notes ?? ''}
+                onChange={(e) => update('notes', e.target.value.toUpperCase())}
+                rows={3}
+                placeholder="ES. RICHIAMARE CLIENTE, MANCA DOCUMENTO, VERIFICARE PRATICA..."
+                className="w-full px-3 py-2.5 bg-white border border-amber-200 rounded-xl text-sm uppercase focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent resize-none"
+              />
+              <p className="mt-1.5 text-xs text-amber-800">
+                Se compilato, l&apos;alert sarà visibile direttamente nella scheda dell&apos;impianto in dashboard. Lascialo vuoto quando non serve.
+              </p>
+            </div>
           </div>
         </section>
         <section className="bg-white rounded-2xl border border-slate-200 p-5">
@@ -125,11 +143,6 @@ export function PlantEditor({ plantId, onSaved, onCancel }: PlantEditorProps) {
                   onChange={(e) => update('installation_date', e.target.value || null)}
                   className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-red-400 focus:border-transparent" />
               </div>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1.5">Note</label>
-              <textarea value={form.notes ?? ''} onChange={(e) => update('notes', e.target.value.toUpperCase())} rows={3}
-                className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm uppercase focus:outline-none focus:ring-2 focus:ring-red-400 focus:border-transparent resize-none" />
             </div>
           </div>
         </section>

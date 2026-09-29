@@ -11,13 +11,15 @@ interface DashboardProps {
   onNewPlant: () => void;
   onEditPlant: (id: string) => void;
   onDeletePlant: (id: string) => Promise<void>;
+  onClearPlantAlert: (id: string) => Promise<void>;
 }
 
-export function Dashboard({ plants, loading, roadmapProgress, onOpenPlant, onNewPlant, onEditPlant, onDeletePlant }: DashboardProps) {
+export function Dashboard({ plants, loading, roadmapProgress, onOpenPlant, onNewPlant, onEditPlant, onDeletePlant, onClearPlantAlert }: DashboardProps) {
   const [search, setSearch] = useState('');
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<Plant | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [clearingAlertId, setClearingAlertId] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -184,6 +186,32 @@ export function Dashboard({ plants, loading, roadmapProgress, onOpenPlant, onNew
                   </div>
                 </div>
               </button>
+
+              {plant.notes?.trim() && (
+                <div className="mt-3 mr-8 rounded-xl border border-amber-300 bg-amber-50 p-3">
+                  <div className="flex items-start gap-2">
+                    <AlertTriangle size={16} className="mt-0.5 shrink-0 text-amber-700" />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[10px] font-bold uppercase tracking-wide text-amber-800">Alert operativo</p>
+                      <p className="mt-0.5 whitespace-pre-wrap break-words text-xs font-medium text-slate-800">{plant.notes}</p>
+                    </div>
+                    <button
+                      type="button"
+                      disabled={clearingAlertId === plant.id}
+                      onClick={async (e) => {
+                        e.stopPropagation();
+                        setClearingAlertId(plant.id);
+                        try { await onClearPlantAlert(plant.id); }
+                        finally { setClearingAlertId(null); }
+                      }}
+                      className="shrink-0 rounded-lg border border-amber-300 bg-white px-2 py-1 text-[10px] font-semibold text-amber-900 hover:bg-amber-100 disabled:opacity-50"
+                      aria-label={`Segna come svolto l'alert di ${plant.owner_name}`}
+                    >
+                      {clearingAlertId === plant.id ? '...' : 'Svolto'}
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {/* More menu trigger — bottom-right, away from owner_type badge */}
               <div className="absolute bottom-3 right-3" ref={openMenuId === plant.id ? menuRef : undefined}>
