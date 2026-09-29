@@ -19,7 +19,6 @@ import {
 } from 'lucide-react';
 import type {
   Plant,
-  PlantQuoteLink,
   QuoteRequest,
   WorkReport,
   WorkReportLaborRateDefault,
@@ -38,7 +37,6 @@ import {
   createWorkReport,
   deleteWorkReport,
   fetchPlants,
-  fetchPlantQuoteLinks,
   fetchQuoteRequests,
   fetchWorkReportAdminSummary,
   fetchWorkReportLaborRateDefaults,
@@ -52,7 +50,7 @@ import {
   fetchWorkReportWorkers,
   replaceWorkReportMaterials,
   replaceWorkReportWorkers,
-  setPlantQuoteLink,
+  setWorkReportQuoteLink,
   setWorkReportMaterialCost,
   setWorkReportMaterialMarkup,
   setWorkReportWorkerCost,
@@ -92,12 +90,11 @@ export function WorkReportDashboard({ isAdmin }: WorkReportDashboardProps) {
   const [workerCostSnapshots, setWorkerCostSnapshots] = useState<WorkReportWorkerCost[]>([]);
   const [plants, setPlants] = useState<Plant[]>([]);
   const [quotes, setQuotes] = useState<QuoteRequest[]>([]);
-  const [quoteLinks, setQuoteLinks] = useState<PlantQuoteLink[]>([]);
   const [editing, setEditing] = useState<WorkReport | 'new' | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [expandedGroupKey, setExpandedGroupKey] = useState<string | null>(null);
-  const [associationEditingPlantId, setAssociationEditingPlantId] = useState<string | null>(null);
-  const [associationBusyPlantId, setAssociationBusyPlantId] = useState<string | null>(null);
+  const [associationEditingGroupKey, setAssociationEditingGroupKey] = useState<string | null>(null);
+  const [associationBusyGroupKey, setAssociationBusyGroupKey] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<'TUTTI' | WorkReportStatus>('TUTTI');
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -116,7 +113,6 @@ export function WorkReportDashboard({ isAdmin }: WorkReportDashboardProps) {
       ]);
 
       let quoteRows: QuoteRequest[] = [];
-      let plantQuoteRows: PlantQuoteLink[] = [];
       let materialCostDefaultRows: WorkReportMaterialCostDefault[] = [];
       let laborRateDefaultRows: WorkReportLaborRateDefault[] = [];
       let materialCostRows: WorkReportMaterialCost[] = [];
@@ -124,14 +120,12 @@ export function WorkReportDashboard({ isAdmin }: WorkReportDashboardProps) {
       if (isAdmin) {
         [
           quoteRows,
-          plantQuoteRows,
           materialCostDefaultRows,
           laborRateDefaultRows,
           materialCostRows,
           workerCostRows,
         ] = await Promise.all([
           fetchQuoteRequests(),
-          fetchPlantQuoteLinks(),
           fetchWorkReportMaterialCostDefaults(),
           fetchWorkReportLaborRateDefaults(),
           fetchWorkReportMaterialCosts(),
@@ -146,7 +140,6 @@ export function WorkReportDashboard({ isAdmin }: WorkReportDashboardProps) {
       setMaterialCatalog(materialOptions);
       setWorkerCatalog(workerOptions);
       setQuotes(quoteRows);
-      setQuoteLinks(plantQuoteRows);
       setMaterialCostDefaults(materialCostDefaultRows);
       setLaborRateDefaults(laborRateDefaultRows);
       setMaterialCostSnapshots(materialCostRows);
@@ -163,7 +156,6 @@ export function WorkReportDashboard({ isAdmin }: WorkReportDashboardProps) {
 
   const plantById = useMemo(() => new Map(plants.map((plant) => [plant.id, plant])), [plants]);
   const quoteById = useMemo(() => new Map(quotes.map((quote) => [quote.id, quote])), [quotes]);
-  const quoteLinkByPlant = useMemo(() => new Map(quoteLinks.map((link) => [link.plant_id, link.quote_request_id])), [quoteLinks]);
   const materialCostByRow = useMemo(
     () => new Map(materialCostSnapshots.map((row) => [row.report_material_id, Number(row.unit_price)])),
     [materialCostSnapshots],
@@ -194,13 +186,11 @@ export function WorkReportDashboard({ isAdmin }: WorkReportDashboardProps) {
   const filtered = reports.filter((report) => statusFilter === 'TUTTI' || report.status === statusFilter);
 
   const adminGroups = useMemo(() => {
-    const map = new Map<string, { key: string; plantId: string; quoteRequestId: string | null; reports: WorkReport[] }>();
+    const map = new Map<string, { key: string; quoteRequestId: string | null; reports: WorkReport[] }>();
 
     filtered.forEach((report) => {
-      const quoteRequestId = quoteLinkByPlant.get(report.plant_id) ?? null;
-      const key = quoteRequestId
-        ? `${report.plant_id}::${quoteRequestId}`
-        : `UNLINKED::${report.id}`;
+      const quoteRequestId = report.quote_request_id ?? null;
+      const key = quoteRequestId ? `QUOTE::${quoteRequestId}` : `UNLINKED::${report.id}`;
 
       const current = map.get(key);
       if (current) {
@@ -208,7 +198,6 @@ export function WorkReportDashboard({ isAdmin }: WorkReportDashboardProps) {
       } else {
         map.set(key, {
           key,
-          plantId: report.plant_id,
           quoteRequestId,
           reports: [report],
         });
@@ -226,7 +215,7 @@ export function WorkReportDashboard({ isAdmin }: WorkReportDashboardProps) {
         const bDate = b.reports[0]?.report_date ?? '';
         return bDate.localeCompare(aDate);
       });
-  }, [filtered, quoteLinkByPlant]);
+  }, [filtered]);
   const pendingCount = reports.filter((report) => report.status === 'DA_VERIFICARE').length;
   const approvedCount = reports.filter((report) => report.status === 'APPROVATO').length;
   const totalHours = workers.reduce((sum, worker) => sum + Number(worker.hours || 0), 0);
@@ -247,40 +236,41 @@ export function WorkReportDashboard({ isAdmin }: WorkReportDashboardProps) {
     }
   };
 
-  const updatePlantQuoteAssociation = async (plantId: string, quoteRequestId: string | null) => {
-    const currentQuoteId = quoteLinkByPlant.get(plantId) ?? null;
+  const updateGroupQuoteAssociation = async (
+    groupKey: string,
+    reportIds: string[],
+    currentQuoteId: string | null,
+    quoteRequestId: string | null,
+  ) => {
     if (currentQuoteId === quoteRequestId) {
-      setAssociationEditingPlantId(null);
+      setAssociationEditingGroupKey(null);
       return;
     }
 
     const currentQuote = currentQuoteId ? quoteById.get(currentQuoteId) : null;
     const nextQuote = quoteRequestId ? quoteById.get(quoteRequestId) : null;
     const message = quoteRequestId
-      ? `Associare tutti i rapportini di questo cantiere al preventivo ${nextQuote?.progressive_number ?? ''}/${nextQuote?.series ?? ''} - ${nextQuote?.client ?? ''}?\n\nL'associazione attuale${currentQuote ? ` con ${currentQuote.progressive_number}/${currentQuote.series} - ${currentQuote.client}` : ''} verrà sostituita.`
-      : 'Scollegare il preventivo da questo cantiere? Tutti i rapportini del cantiere resteranno disponibili ma non saranno più aggregati a quel preventivo.';
+      ? `Associare ${reportIds.length === 1 ? 'questo rapportino' : `questi ${reportIds.length} rapportini`} al preventivo ${nextQuote?.progressive_number ?? ''}/${nextQuote?.series ?? ''} - ${nextQuote?.client ?? ''}?\n\nL'associazione attuale${currentQuote ? ` con ${currentQuote.progressive_number}/${currentQuote.series} - ${currentQuote.client}` : ''} verrà sostituita.`
+      : `Scollegare ${reportIds.length === 1 ? 'questo rapportino' : `questi ${reportIds.length} rapportini`} dal preventivo? I rapportini resteranno disponibili nella sezione da associare.`;
 
     if (!window.confirm(message)) return;
 
-    setAssociationBusyPlantId(plantId);
+    setAssociationBusyGroupKey(groupKey);
     setError(null);
     try {
-      await setPlantQuoteLink(plantId, quoteRequestId);
-      setQuoteLinks((current) => {
-        const remaining = current.filter((link) => link.plant_id !== plantId);
-        return quoteRequestId ? [...remaining, { plant_id: plantId, quote_request_id: quoteRequestId }] : remaining;
-      });
-      setAssociationEditingPlantId(null);
+      await Promise.all(reportIds.map((reportId) => setWorkReportQuoteLink(reportId, quoteRequestId)));
+      setAssociationEditingGroupKey(null);
       setExpandedGroupKey(null);
+      await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Correzione dell’associazione non riuscita.');
     } finally {
-      setAssociationBusyPlantId(null);
+      setAssociationBusyGroupKey(null);
     }
   };
 
   const remove = async (report: WorkReport) => {
-    if (!window.confirm(`Eliminare il rapportino del ${displayDate(report.report_date)}?`)) return;
+    if (!window.confirm(`Eliminare definitivamente il rapportino del ${displayDate(report.report_date)} relativo a "${report.client_reference}"?\n\nVerranno eliminati anche ore, materiali e costi collegati. Questa operazione non è annullabile.`)) return;
     setBusyId(report.id);
     try {
       await deleteWorkReport(report.id);
@@ -293,13 +283,13 @@ export function WorkReportDashboard({ isAdmin }: WorkReportDashboardProps) {
   };
 
   const renderReportCard = (report: WorkReport, nested = false) => {
-    const plant = plantById.get(report.plant_id);
+    const plant = report.plant_id ? plantById.get(report.plant_id) : undefined;
     const reportWorkers = workers.filter((worker) => worker.report_id === report.id);
     const reportMaterials = materials.filter((material) => material.report_id === report.id);
     const hours = reportWorkers.reduce((sum, worker) => sum + Number(worker.hours || 0), 0);
     const expanded = expandedId === report.id;
     const editable = isAdmin || report.status === 'BOZZA' || report.status === 'DA_CORREGGERE';
-    const deletable = report.status === 'BOZZA' || report.status === 'DA_CORREGGERE';
+    const deletable = isAdmin || report.status === 'BOZZA' || report.status === 'DA_CORREGGERE';
 
     return (
       <article
@@ -315,13 +305,17 @@ export function WorkReportDashboard({ isAdmin }: WorkReportDashboardProps) {
           </div>
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
-              {!nested && <h3 className="font-semibold text-slate-900">{plant?.owner_name ?? 'Impianto non disponibile'}</h3>}
-              {nested && <h4 className="font-semibold text-slate-900">{report.team_name}</h4>}
+              {!nested && <h3 className="font-semibold text-slate-900">{report.client_reference}</h3>}
+              {nested && <h4 className="font-semibold text-slate-900">{report.client_reference}</h4>}
               <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${statusClass(report.status)}`}>
                 {report.status.replace(/_/g, ' ')}
               </span>
             </div>
-            {!nested && <p className="mt-0.5 text-xs text-slate-500">{plant?.address ?? ''}</p>}
+            {!nested && (
+              <p className="mt-0.5 text-xs text-slate-500">
+                {plant ? `Impianto FV: ${plant.owner_name} · ${plant.address}` : 'Rapportino libero · nessun impianto FV collegato'}
+              </p>
+            )}
             <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-600">
               {!nested && <span className="inline-flex items-center gap-1"><Users size={13} />{report.team_name}</span>}
               <span className="inline-flex items-center gap-1"><Clock3 size={13} />{hours.toLocaleString('it-IT')} ore</span>
@@ -406,7 +400,6 @@ export function WorkReportDashboard({ isAdmin }: WorkReportDashboardProps) {
         {expanded && isAdmin && (
           <AdminReportCostEditor
             reportId={report.id}
-            plantId={report.plant_id}
             workers={reportWorkers}
             materials={reportMaterials}
             allReports={reports}
@@ -415,7 +408,7 @@ export function WorkReportDashboard({ isAdmin }: WorkReportDashboardProps) {
             workerCatalog={workerCatalog}
             materialCatalog={materialCatalog}
             quoteOptions={quotes}
-            linkedQuoteRequestId={quoteLinkByPlant.get(report.plant_id) ?? null}
+            linkedQuoteRequestId={report.quote_request_id}
             onCostsSaved={load}
           />
         )}
@@ -453,7 +446,7 @@ export function WorkReportDashboard({ isAdmin }: WorkReportDashboardProps) {
             </div>
             <h1 className="text-2xl font-bold">Rapportini di lavoro</h1>
             <p className="mt-1 text-sm text-slate-300">
-              Ore di manodopera, attività svolte e materiali utilizzati per ogni impianto.
+              Ore di manodopera, attività svolte e materiali utilizzati per ogni cantiere o intervento.
             </p>
           </div>
           <button
@@ -506,8 +499,8 @@ export function WorkReportDashboard({ isAdmin }: WorkReportDashboardProps) {
       ) : (
         <div className="space-y-3">
           {isAdmin ? adminGroups.map((group) => {
-            const plant = plantById.get(group.plantId);
             const quote = group.quoteRequestId ? quoteById.get(group.quoteRequestId) : null;
+            const primaryReport = group.reports[0];
             const groupExpanded = expandedGroupKey === group.key;
             const reportIds = new Set(group.reports.map((report) => report.id));
             const groupWorkers = workers.filter((worker) => reportIds.has(worker.report_id));
@@ -515,7 +508,9 @@ export function WorkReportDashboard({ isAdmin }: WorkReportDashboardProps) {
             const groupHours = groupWorkers.reduce((sum, worker) => sum + Number(worker.hours || 0), 0);
             const economicReportIds = new Set(
               reports
-                .filter((report) => report.plant_id === group.plantId)
+                .filter((report) => group.quoteRequestId
+                  ? report.quote_request_id === group.quoteRequestId
+                  : group.reports.some((groupReport) => groupReport.id === report.id))
                 .map((report) => report.id),
             );
             const economicWorkers = workers.filter((worker) => economicReportIds.has(worker.report_id));
@@ -591,8 +586,8 @@ export function WorkReportDashboard({ isAdmin }: WorkReportDashboardProps) {
             const dateLabel = newestDate === oldestDate
               ? displayDate(newestDate)
               : `${displayDate(oldestDate)} → ${displayDate(newestDate)}`;
-            const correctingAssociation = associationEditingPlantId === group.plantId;
-            const associationBusy = associationBusyPlantId === group.plantId;
+            const correctingAssociation = associationEditingGroupKey === group.key;
+            const associationBusy = associationBusyGroupKey === group.key;
 
             return (
               <section key={group.key} className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
@@ -608,7 +603,7 @@ export function WorkReportDashboard({ isAdmin }: WorkReportDashboardProps) {
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
                         <h3 className="text-base font-bold text-slate-900">
-                          {quote ? quote.client : (plant?.owner_name ?? 'Impianto non disponibile')}
+                          {quote ? quote.client : primaryReport.client_reference}
                         </h3>
                         {quote && (
                           <span className="rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-semibold text-green-800">
@@ -622,7 +617,11 @@ export function WorkReportDashboard({ isAdmin }: WorkReportDashboardProps) {
                         )}
                       </div>
                       <p className="mt-0.5 text-xs text-slate-500">
-                        {plant?.owner_name ?? 'Impianto non disponibile'} · {plant?.address ?? 'Indirizzo non disponibile'}
+                        {quote
+                          ? `Rif. operativo: ${primaryReport.client_reference}${group.reports.length > 1 ? ' · storico rapportini aggregato' : ''}`
+                          : primaryReport.plant_id
+                            ? `Rapportino da associare · impianto FV facoltativo presente`
+                            : 'Rapportino da associare · nessun impianto FV richiesto'}
                       </p>
                       <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-600">
                         <span><strong>{group.reports.length}</strong> rapportini</span>
@@ -638,7 +637,7 @@ export function WorkReportDashboard({ isAdmin }: WorkReportDashboardProps) {
                     <div className="flex flex-wrap items-center justify-end gap-2">
                       <button
                         type="button"
-                        onClick={() => setAssociationEditingPlantId(correctingAssociation ? null : group.plantId)}
+                        onClick={() => setAssociationEditingGroupKey(correctingAssociation ? null : group.key)}
                         disabled={associationBusy}
                         className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-900 hover:bg-blue-100 disabled:opacity-50"
                       >
@@ -647,7 +646,12 @@ export function WorkReportDashboard({ isAdmin }: WorkReportDashboardProps) {
                       {quote && (
                         <button
                           type="button"
-                          onClick={() => void updatePlantQuoteAssociation(group.plantId, null)}
+                          onClick={() => void updateGroupQuoteAssociation(
+                            group.key,
+                            group.reports.map((report) => report.id),
+                            group.quoteRequestId,
+                            null,
+                          )}
                           disabled={associationBusy}
                           className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-700 hover:bg-red-100 disabled:opacity-50"
                         >
@@ -767,7 +771,12 @@ export function WorkReportDashboard({ isAdmin }: WorkReportDashboardProps) {
                       <div className="grid gap-2 lg:grid-cols-[1fr_auto] lg:items-center">
                         <select
                           value={group.quoteRequestId ?? ''}
-                          onChange={(e) => void updatePlantQuoteAssociation(group.plantId, e.target.value || null)}
+                          onChange={(e) => void updateGroupQuoteAssociation(
+                            group.key,
+                            group.reports.map((report) => report.id),
+                            group.quoteRequestId,
+                            e.target.value || null,
+                          )}
                           disabled={associationBusy}
                           className="w-full rounded-xl border border-blue-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-blue-500 disabled:opacity-50"
                         >
@@ -781,14 +790,14 @@ export function WorkReportDashboard({ isAdmin }: WorkReportDashboardProps) {
                         </select>
                         <button
                           type="button"
-                          onClick={() => setAssociationEditingPlantId(null)}
+                          onClick={() => setAssociationEditingGroupKey(null)}
                           className="rounded-lg bg-white px-3 py-2.5 text-xs font-semibold text-slate-600 ring-1 ring-slate-200"
                         >
                           Annulla
                         </button>
                       </div>
                       <p className="mt-2 text-[11px] text-blue-800">
-                        Cambiando preventivo, tutti i rapportini di questo cantiere vengono spostati nella nuova commessa. Se invece è solo un singolo rapportino ad avere il cantiere sbagliato, apri la commessa e usa la matita su quel rapportino per correggerne l’impianto.
+                        Il collegamento al preventivo è amministrativo e non richiede che il rapportino appartenga a un impianto FV. Per correggere un solo rapportino di una commessa già raggruppata, aprilo con la matita e modifica il preventivo associato.
                       </p>
                     </div>
                   )}
@@ -821,6 +830,7 @@ export function WorkReportDashboard({ isAdmin }: WorkReportDashboardProps) {
           materials={editing === 'new' ? [] : materials.filter((material) => material.report_id === editing.id)}
           materialCatalog={materialCatalog}
           workerCatalog={workerCatalog}
+          quoteOptions={quotes}
           isAdmin={isAdmin}
           onClose={() => setEditing(null)}
           onSaved={async () => {
@@ -848,7 +858,6 @@ function normalizeCatalogValue(value: string): string {
 
 function AdminReportCostEditor({
   reportId,
-  plantId,
   workers,
   materials,
   allReports,
@@ -861,7 +870,6 @@ function AdminReportCostEditor({
   onCostsSaved,
 }: {
   reportId: string;
-  plantId: string;
   workers: WorkReportWorker[];
   materials: WorkReportMaterial[];
   allReports: WorkReport[];
@@ -935,7 +943,9 @@ function AdminReportCostEditor({
 
         const otherReportIds = new Set(
           allReports
-            .filter((report) => report.plant_id === plantId && report.id !== reportId)
+            .filter((report) => linkedQuoteRequestId
+              ? report.quote_request_id === linkedQuoteRequestId && report.id !== reportId
+              : false)
             .map((report) => report.id),
         );
 
@@ -997,7 +1007,7 @@ function AdminReportCostEditor({
     };
     void loadCosts();
     return () => { active = false; };
-  }, [reportId, plantId, materials, workers, allReports, allWorkers, allMaterials, materialCatalog, workerCatalog]);
+  }, [reportId, linkedQuoteRequestId, materials, workers, allReports, allWorkers, allMaterials, materialCatalog, workerCatalog]);
 
   const laborTotal = workers.reduce((sum, worker) => {
     const rate = Number(workerRates[worker.id]);
@@ -1301,6 +1311,7 @@ function WorkReportFormModal({
   materials,
   materialCatalog,
   workerCatalog,
+  quoteOptions,
   isAdmin,
   onClose,
   onSaved,
@@ -1311,11 +1322,14 @@ function WorkReportFormModal({
   materials: WorkReportMaterial[];
   materialCatalog: WorkReportMaterialCatalogEntry[];
   workerCatalog: WorkReportWorkerCatalogEntry[];
+  quoteOptions: QuoteRequest[];
   isAdmin: boolean;
   onClose: () => void;
   onSaved: () => Promise<void>;
 }) {
-  const [plantId, setPlantId] = useState(report?.plant_id ?? plants[0]?.id ?? '');
+  const [plantId, setPlantId] = useState(report?.plant_id ?? '');
+  const [clientReference, setClientReference] = useState(report?.client_reference ?? '');
+  const [quoteRequestId, setQuoteRequestId] = useState(report?.quote_request_id ?? '');
   const [reportDate, setReportDate] = useState(report?.report_date ?? new Date().toISOString().slice(0, 10));
   const [teamName, setTeamName] = useState(report?.team_name ?? '');
   const [workDescription, setWorkDescription] = useState(report?.work_description ?? '');
@@ -1395,7 +1409,7 @@ function WorkReportFormModal({
         notes: material.notes || null,
       }));
 
-    if (!plantId) { setError('Seleziona un impianto.'); return; }
+    if (!clientReference.trim()) { setError('Indica il cliente o il riferimento del cantiere.'); return; }
     if (!teamName.trim()) { setError('Indica la squadra.'); return; }
     if (cleanWorkers.length === 0) { setError('Inserisci almeno un lavoratore con le ore svolte.'); return; }
 
@@ -1405,7 +1419,9 @@ function WorkReportFormModal({
       let saved: WorkReport;
       if (report) {
         saved = await updateWorkReport(report.id, {
-          plant_id: plantId,
+          plant_id: plantId || null,
+          client_reference: clientReference.trim().toUpperCase(),
+          quote_request_id: isAdmin ? (quoteRequestId || null) : report.quote_request_id,
           report_date: reportDate,
           team_name: teamName.trim().toUpperCase(),
           work_description: workDescription.trim().toUpperCase() || null,
@@ -1414,7 +1430,9 @@ function WorkReportFormModal({
         });
       } else {
         saved = await createWorkReport({
-          plant_id: plantId,
+          plant_id: plantId || null,
+          client_reference: clientReference.trim().toUpperCase(),
+          quote_request_id: isAdmin ? (quoteRequestId || null) : null,
           report_date: reportDate,
           team_name: teamName.trim().toUpperCase(),
           work_description: workDescription.trim().toUpperCase() || null,
@@ -1455,18 +1473,51 @@ function WorkReportFormModal({
         <div className="mb-5 flex items-center justify-between">
           <div>
             <h2 className="text-lg font-bold text-slate-900">{report ? 'Modifica rapportino' : 'Nuovo rapportino'}</h2>
-            <p className="text-xs text-slate-500">Compila i dati della giornata. I costi economici saranno gestiti solo dall'amministrazione.</p>
+            <p className="text-xs text-slate-500">Compila i dati della giornata. Il riferimento cliente/cantiere è obbligatorio; l'impianto FV è facoltativo. Il preventivo viene gestito dall'amministrazione.</p>
           </div>
           <button onClick={onClose} className="rounded-lg p-2 text-slate-400 hover:bg-slate-100"><X size={20} /></button>
         </div>
 
         <div className="grid gap-3 sm:grid-cols-2">
-          <label className="text-xs font-semibold text-slate-600 sm:col-span-2">Impianto *
-            <select value={plantId} onChange={(e) => setPlantId(e.target.value)} className={inputClass + ' mt-1'} required>
-              <option value="">Seleziona impianto</option>
+          <label className="text-xs font-semibold text-slate-600 sm:col-span-2">Cliente / riferimento cantiere *
+            <input
+              value={clientReference}
+              onChange={(e) => setClientReference(e.target.value.toUpperCase())}
+              className={inputClass + ' mt-1'}
+              placeholder="ES. ROSSI MARIO - VIA ROMA 25 - RIFACIMENTO QUADRO"
+            />
+          </label>
+          <label className="text-xs font-semibold text-slate-600 sm:col-span-2">Impianto FV collegato (facoltativo)
+            <select
+              value={plantId}
+              onChange={(e) => {
+                const nextPlantId = e.target.value;
+                setPlantId(nextPlantId);
+                if (!clientReference.trim() && nextPlantId) {
+                  const selectedPlant = plants.find((plant) => plant.id === nextPlantId);
+                  if (selectedPlant) {
+                    setClientReference(`${selectedPlant.owner_name} - ${selectedPlant.address}`.toUpperCase());
+                  }
+                }
+              }}
+              className={inputClass + ' mt-1'}
+            >
+              <option value="">Nessun impianto FV / intervento libero</option>
               {plants.map((plant) => <option key={plant.id} value={plant.id}>{plant.owner_name} — {plant.address}</option>)}
             </select>
           </label>
+          {isAdmin && (
+            <label className="text-xs font-semibold text-slate-600 sm:col-span-2">Preventivo / commessa associata
+              <select value={quoteRequestId} onChange={(e) => setQuoteRequestId(e.target.value)} className={inputClass + ' mt-1'}>
+                <option value="">Da associare</option>
+                {quoteOptions.map((quote) => (
+                  <option key={quote.id} value={quote.id}>
+                    {quote.progressive_number}/{quote.series} · {quote.client} · {quote.status}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
           <label className="text-xs font-semibold text-slate-600">Data *
             <input type="date" value={reportDate} onChange={(e) => setReportDate(e.target.value)} className={inputClass + ' mt-1'} />
           </label>
