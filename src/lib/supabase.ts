@@ -6,3 +6,4 @@ const supabasePublishableKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
 export const supabase = createClient(supabaseUrl, supabasePublishableKey);
 
 export const STORAGE_BUCKET = 'solar-archive';
+export const QUOTE_FILES_BUCKET = 'quote-files';

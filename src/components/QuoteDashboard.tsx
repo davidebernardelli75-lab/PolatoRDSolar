@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { AlertCircle, CalendarDays, CheckCircle2, Euro, FileSpreadsheet, Loader2, Pencil, Plus, Search, Trash2, X } from 'lucide-react';
-import type { QuoteRequest, QuoteRequestInsert, QuoteStatus } from '@/lib/types';
-import { createQuoteRequest, deleteQuoteRequest, fetchQuoteRequests, updateQuoteRequest } from '@/lib/api';
+import { AlertCircle, CalendarDays, CheckCircle2, Download, Euro, FileSpreadsheet, Loader2, Paperclip, Pencil, Plus, Search, Trash2, Upload, X } from 'lucide-react';
+import type { QuoteRequest, QuoteRequestFile, QuoteRequestInsert, QuoteStatus } from '@/lib/types';
+import { createQuoteRequest, deleteQuoteRequest, deleteQuoteRequestFile, downloadQuoteRequestFile, fetchQuoteRequestFiles, fetchQuoteRequests, updateQuoteRequest, uploadQuoteRequestFile } from '@/lib/api';
+import { saveAs } from 'file-saver';
 
 const STATUSES: QuoteStatus[] = ['DA VERIFICARE','DA GESTIRE','IN PREPARAZIONE','INVIATO','ACCETTATO','RIFIUTATO','SOSPESO'];
 const COLORS = ['#2563eb','#ef4444','#16a34a','#f59e0b','#8b5cf6','#06b6d4','#ec4899','#64748b'];
@@ -29,6 +30,8 @@ function statusClass(status: QuoteStatus) {
 
 export function QuoteDashboard() {
   const [rows, setRows] = useState<QuoteRequest[]>([]);
+  const [quoteFiles, setQuoteFiles] = useState<QuoteRequestFile[]>([]);
+  const [uploadingQuoteId, setUploadingQuoteId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [editing, setEditing] = useState<QuoteRequest | 'new' | null>(null);
@@ -39,7 +42,12 @@ export function QuoteDashboard() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    try { setRows(await fetchQuoteRequests()); setError(null); }
+    try {
+      const [requests, files] = await Promise.all([fetchQuoteRequests(), fetchQuoteRequestFiles()]);
+      setRows(requests);
+      setQuoteFiles(files);
+      setError(null);
+    }
     catch (err) { setError(err instanceof Error ? err.message : 'Impossibile caricare i preventivi.'); }
     finally { setLoading(false); }
   }, []);
@@ -50,6 +58,16 @@ export function QuoteDashboard() {
     ys.add(currentYear);
     return [...ys].sort((a,b) => b-a);
   }, [rows, currentYear]);
+
+  const filesByQuote = useMemo(() => {
+    const map = new Map<string, QuoteRequestFile[]>();
+    quoteFiles.forEach((file) => {
+      const list = map.get(file.quote_request_id) ?? [];
+      list.push(file);
+      map.set(file.quote_request_id, list);
+    });
+    return map;
+  }, [quoteFiles]);
 
   const yearRows = rows.filter((r) => r.quote_year === year);
   const filtered = yearRows.filter((r) => {
@@ -99,9 +117,49 @@ export function QuoteDashboard() {
   };
 
   const remove = async (row: QuoteRequest) => {
-    if (!window.confirm(`Eliminare definitivamente il preventivo ${row.progressive_number}/${row.series} - ${row.client}?`)) return;
-    await deleteQuoteRequest(row.id);
-    setRows((prev) => prev.filter((r) => r.id !== row.id));
+    if (!window.confirm(`Eliminare definitivamente il preventivo ${row.progressive_number}/${row.series} - ${row.client}? Verranno eliminati anche i file allegati.`)) return;
+    try {
+      await deleteQuoteRequest(row.id);
+      setRows((prev) => prev.filter((r) => r.id !== row.id));
+      setQuoteFiles((prev) => prev.filter((file) => file.quote_request_id !== row.id));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Eliminazione preventivo non riuscita.');
+    }
+  };
+
+  const uploadFiles = async (quoteId: string, files: File[]) => {
+    if (files.length === 0) return;
+    setUploadingQuoteId(quoteId);
+    setError(null);
+    try {
+      for (const file of files) {
+        const uploaded = await uploadQuoteRequestFile(quoteId, file);
+        setQuoteFiles((prev) => [uploaded, ...prev]);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Caricamento file non riuscito.');
+    } finally {
+      setUploadingQuoteId(null);
+    }
+  };
+
+  const downloadFile = async (file: QuoteRequestFile) => {
+    try {
+      const blob = await downloadQuoteRequestFile(file);
+      saveAs(blob, file.file_name);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Download file non riuscito.');
+    }
+  };
+
+  const removeFile = async (file: QuoteRequestFile) => {
+    if (!window.confirm(`Eliminare definitivamente il file "${file.file_name}"?`)) return;
+    try {
+      await deleteQuoteRequestFile(file);
+      setQuoteFiles((prev) => prev.filter((item) => item.id !== file.id));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Eliminazione file non riuscita.');
+    }
   };
 
   return (
@@ -185,6 +243,13 @@ export function QuoteDashboard() {
                     <p className="mt-0.5 text-xs text-slate-500">{displayDate(r.request_date)} · {normalizeSource(r.source) || 'REF. NON INDICATA'}</p>
                     <p className="mt-1 text-sm text-slate-700">{r.quote_type || 'TIPO PREVENTIVO NON INDICATO'}</p>
                     {(r.value_ex_vat != null || r.notes) && <p className="mt-1 text-xs text-slate-500">{r.value_ex_vat != null ? `VALORE: ${money(r.value_ex_vat)}` : ''}{r.value_ex_vat != null && r.notes ? ' · ' : ''}{r.notes || ''}</p>}
+                    <QuoteAttachments
+                      files={filesByQuote.get(r.id) ?? []}
+                      uploading={uploadingQuoteId === r.id}
+                      onUpload={(selected) => { void uploadFiles(r.id, selected); }}
+                      onDownload={(file) => { void downloadFile(file); }}
+                      onDelete={(file) => { void removeFile(file); }}
+                    />
                   </div>
                   <button onClick={() => setEditing(r)} className="rounded-lg p-2 text-slate-500 hover:bg-slate-100" aria-label="Modifica preventivo"><Pencil size={16}/></button>
                   <button onClick={() => void remove(r)} className="rounded-lg p-2 text-red-600 hover:bg-red-50" aria-label="Elimina preventivo"><Trash2 size={16}/></button>
@@ -198,6 +263,56 @@ export function QuoteDashboard() {
       {editing && <QuoteFormModal person={editing === 'new' ? null : editing} rows={rows} onClose={() => setEditing(null)} onSave={save} />}
     </div>
   );
+}
+
+function QuoteAttachments({ files, uploading, onUpload, onDownload, onDelete }: {
+  files: QuoteRequestFile[];
+  uploading: boolean;
+  onUpload: (files: File[]) => void;
+  onDownload: (file: QuoteRequestFile) => void;
+  onDelete: (file: QuoteRequestFile) => void;
+}) {
+  return <div className="mt-2 border-t border-slate-100 pt-2">
+    <div className="flex flex-wrap items-center gap-2">
+      <label className={`inline-flex cursor-pointer items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium ${uploading ? 'cursor-wait border-slate-200 bg-slate-100 text-slate-400' : 'border-blue-200 bg-blue-50 text-blue-800 hover:bg-blue-100'}`}>
+        {uploading ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
+        {uploading ? 'Caricamento...' : 'Carica preventivo'}
+        <input
+          type="file"
+          multiple
+          disabled={uploading}
+          accept=".pdf,.jpg,.jpeg,.png,.webp,.heic,.doc,.docx,.xls,.xlsx"
+          className="hidden"
+          onChange={(e) => {
+            const selected = Array.from(e.currentTarget.files ?? []);
+            e.currentTarget.value = '';
+            onUpload(selected);
+          }}
+        />
+      </label>
+      {files.length > 0 && <span className="inline-flex items-center gap-1 text-[11px] text-slate-500"><Paperclip size={12}/>{files.length} {files.length === 1 ? 'allegato' : 'allegati'}</span>}
+    </div>
+    {files.length > 0 && (
+      <div className="mt-2 flex flex-wrap gap-1.5">
+        {files.map((file) => (
+          <div key={file.id} className="inline-flex max-w-full items-center rounded-lg border border-slate-200 bg-slate-50 text-xs">
+            <button type="button" onClick={() => onDownload(file)}
+              className="inline-flex min-w-0 items-center gap-1.5 px-2 py-1.5 text-slate-700 hover:text-blue-900"
+              title={file.file_name}>
+              <Download size={13} className="shrink-0" />
+              <span className="max-w-[180px] truncate">{file.file_name}</span>
+            </button>
+            <button type="button" onClick={() => onDelete(file)}
+              className="border-l border-slate-200 p-1.5 text-red-600 hover:bg-red-50"
+              aria-label={`Elimina ${file.file_name}`}>
+              <Trash2 size={13} />
+            </button>
+          </div>
+        ))}
+      </div>
+    )}
+    <p className="mt-1 text-[10px] text-slate-400">PDF, foto, Word o Excel · massimo 20 MB per file</p>
+  </div>;
 }
 
 function Kpi({ icon: Icon, label, value }: { icon: typeof FileSpreadsheet; label: string; value: string }) {

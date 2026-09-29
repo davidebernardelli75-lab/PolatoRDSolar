@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Car, Truck, Bike, Plus, Trash2, FileText, Loader2, ChevronDown, AlertTriangle, Calendar, Wrench, Shield, Receipt, Flame, FileDown, User, Building2, RefreshCw, StickyNote } from 'lucide-react';
+import { Car, Truck, Bike, Plus, Trash2, FileText, Loader2, ChevronDown, AlertTriangle, Calendar, Wrench, Shield, Receipt, Flame, FileDown, User, Building2, RefreshCw, StickyNote, Search } from 'lucide-react';
 import type { Vehicle, VehicleInsert } from '@/lib/types';
 import { fetchVehicles, createVehicle, updateVehicle, deleteVehicle } from '@/lib/api';
 import { DetailItem, VehicleEditCard, VehicleFormModal, formatMonthYear } from './vehicle-forms';
@@ -79,6 +79,7 @@ export function VehicleDashboard() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [reportYear, setReportYear] = useState(new Date().getFullYear());
   const [showAllVehicles, setShowAllVehicles] = useState(true);
+  const [brandSearch, setBrandSearch] = useState('');
   const report = calculateVehicleCosts(vehicles, reportYear);
   const registered = calculateRegisteredVehicleCosts(vehicles);
 
@@ -101,12 +102,16 @@ export function VehicleDashboard() {
   const alertCount = alertVehicles.length;
   const dangerCount = alertVehicles.filter((v) => getOverallStatus(v) === 'danger').length;
   const warningCount = alertVehicles.filter((v) => getOverallStatus(v) === 'warning').length;
-  const visibleVehicles = showAllVehicles
+  const baseVisibleVehicles = showAllVehicles
     ? vehicles
     : [...alertVehicles].sort((a, b) => {
         const rank = { danger: 0, warning: 1, ok: 2 } as const;
         return rank[getOverallStatus(a)] - rank[getOverallStatus(b)];
       });
+  const brandQuery = brandSearch.trim().toLocaleLowerCase('it');
+  const visibleVehicles = brandQuery
+    ? baseVisibleVehicles.filter((v) => v.brand.toLocaleLowerCase('it').includes(brandQuery))
+    : baseVisibleVehicles;
 
   return (
     <div className="p-4 lg:p-8 max-w-5xl mx-auto pb-24">
@@ -229,7 +234,17 @@ export function VehicleDashboard() {
           <h2 className="font-semibold text-slate-900">{showAllVehicles ? 'Tutti i veicoli' : 'Veicoli con alert'}</h2>
           {!showAllVehicles && <p className="text-xs text-slate-500 mt-0.5">Sono mostrati solo gli automezzi che richiedono attenzione.</p>}
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <label className="relative min-w-[210px]">
+            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              value={brandSearch}
+              onChange={(e) => setBrandSearch(e.target.value)}
+              placeholder="Cerca per marca..."
+              aria-label="Cerca automezzi per marca"
+              className="w-full rounded-lg border border-slate-300 bg-white py-2 pl-9 pr-3 text-sm outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
+            />
+          </label>
           <button type="button" onClick={() => { setShowAllVehicles((v) => !v); setExpandedId(null); }}
             className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
             {showAllVehicles ? 'Riepilogo alert' : 'Gestisci parco completo'}
@@ -251,11 +266,19 @@ export function VehicleDashboard() {
           <p className="text-slate-500 text-sm">Nessun veicolo registrato.</p>
         </div>
       ) : visibleVehicles.length === 0 ? (
-        <div className="bg-green-50 rounded-2xl border border-green-200 p-8 text-center">
-          <Shield className="mx-auto text-green-600 mb-2" size={32} />
-          <p className="font-semibold text-green-800">Nessun alert attivo.</p>
-          <p className="text-green-700 text-sm mt-1">Tutti gli automezzi risultano regolari rispetto alle scadenze monitorate.</p>
-        </div>
+        brandQuery ? (
+          <div className="bg-white rounded-2xl border border-slate-200 p-8 text-center">
+            <Search className="mx-auto text-slate-300 mb-2" size={32} />
+            <p className="font-semibold text-slate-700">Nessun veicolo trovato.</p>
+            <p className="text-slate-500 text-sm mt-1">Nessuna marca corrisponde a “{brandSearch.trim()}”.</p>
+          </div>
+        ) : (
+          <div className="bg-green-50 rounded-2xl border border-green-200 p-8 text-center">
+            <Shield className="mx-auto text-green-600 mb-2" size={32} />
+            <p className="font-semibold text-green-800">Nessun alert attivo.</p>
+            <p className="text-green-700 text-sm mt-1">Tutti gli automezzi risultano regolari rispetto alle scadenze monitorate.</p>
+          </div>
+        )
       ) : (
         <div className="space-y-3">
           {visibleVehicles.map((v) => (

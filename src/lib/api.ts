@@ -1,5 +1,5 @@
-import { supabase, STORAGE_BUCKET } from './supabase';
-import type { Plant, Panel, PanelPhoto, PlantInsert, PlantUpdate, PanelInsert, RoadmapTask, PlantInverter, PlantStorage, PlantCharger, PlantInverterInsert, PlantStorageInsert, PlantChargerInsert, PlantPowerMeter, PlantPowerMeterInsert, Vehicle, VehicleInsert, Insurance, InsuranceInsert, EquipmentCatalogEntry, EquipmentCategory, QuoteRequest, QuoteRequestInsert } from './types';
+import { supabase, STORAGE_BUCKET, QUOTE_FILES_BUCKET } from './supabase';
+import type { Plant, Panel, PanelPhoto, PlantInsert, PlantUpdate, PanelInsert, RoadmapTask, PlantInverter, PlantStorage, PlantCharger, PlantInverterInsert, PlantStorageInsert, PlantChargerInsert, PlantPowerMeter, PlantPowerMeterInsert, Vehicle, VehicleInsert, Insurance, InsuranceInsert, EquipmentCatalogEntry, EquipmentCategory, QuoteRequest, QuoteRequestInsert, QuoteRequestFile } from './types';
 
 export async function fetchPlants(): Promise<Plant[]> {
   const { data, error } = await supabase
@@ -495,7 +495,97 @@ export async function updateQuoteRequest(id: string, input: Partial<QuoteRequest
   return data;
 }
 
+export async function fetchQuoteRequestFiles(): Promise<QuoteRequestFile[]> {
+  const { data, error } = await supabase
+    .from('quote_request_files')
+    .select('*')
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  return data ?? [];
+}
+
+function quoteFileContentType(file: File): string {
+  const ext = file.name.split('.').pop()?.toLowerCase();
+  if (ext === 'pdf') return 'application/pdf';
+  if (ext === 'jpg' || ext === 'jpeg') return 'image/jpeg';
+  if (ext === 'png') return 'image/png';
+  if (ext === 'webp') return 'image/webp';
+  if (ext === 'heic') return 'image/heic';
+  if (ext === 'doc') return 'application/msword';
+  if (ext === 'docx') return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+  if (ext === 'xls') return 'application/vnd.ms-excel';
+  if (ext === 'xlsx') return 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+  return '';
+}
+
+export async function uploadQuoteRequestFile(quoteRequestId: string, file: File): Promise<QuoteRequestFile> {
+  if (file.size > 20 * 1024 * 1024) throw new Error('Il file supera il limite di 20 MB.');
+  const contentType = quoteFileContentType(file);
+  if (!contentType) throw new Error('Formato file non supportato.');
+
+  const ext = file.name.split('.').pop()?.toLowerCase() || 'bin';
+  const storagePath = `${quoteRequestId}/${Date.now()}_${Math.random().toString(36).slice(2, 10)}.${ext}`;
+
+  const { error: uploadError } = await supabase.storage
+    .from(QUOTE_FILES_BUCKET)
+    .upload(storagePath, file, { contentType, upsert: false });
+  if (uploadError) throw uploadError;
+
+  const { data, error } = await supabase
+    .from('quote_request_files')
+    .insert({
+      quote_request_id: quoteRequestId,
+      storage_path: storagePath,
+      file_name: file.name,
+      content_type: contentType,
+      file_size: file.size,
+    })
+    .select()
+    .single();
+
+  if (error) {
+    await supabase.storage.from(QUOTE_FILES_BUCKET).remove([storagePath]);
+    throw error;
+  }
+  return data;
+}
+
+export async function downloadQuoteRequestFile(file: QuoteRequestFile): Promise<Blob> {
+  const { data, error } = await supabase.storage
+    .from(QUOTE_FILES_BUCKET)
+    .download(file.storage_path);
+  if (error) throw error;
+  return data;
+}
+
+export async function deleteQuoteRequestFile(file: QuoteRequestFile): Promise<void> {
+  const { error: storageError } = await supabase.storage
+    .from(QUOTE_FILES_BUCKET)
+    .remove([file.storage_path]);
+  if (storageError) throw storageError;
+
+  const { error } = await supabase
+    .from('quote_request_files')
+    .delete()
+    .eq('id', file.id);
+  if (error) throw error;
+}
+
 export async function deleteQuoteRequest(id: string): Promise<void> {
+  const { data: files, error: filesError } = await supabase
+    .from('quote_request_files')
+    .select('storage_path')
+    .eq('quote_request_id', id);
+  if (filesError) throw filesError;
+
+  const paths = (files ?? []).map((file) => file.storage_path);
+  if (paths.length > 0) {
+    const { error: storageError } = await supabase.storage
+      .from(QUOTE_FILES_BUCKET)
+      .remove(paths);
+    if (storageError) throw storageError;
+  }
+
   const { error } = await supabase.from('quote_requests').delete().eq('id', id);
   if (error) throw error;
 }

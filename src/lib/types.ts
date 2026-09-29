@@ -207,3 +207,13 @@ export interface QuoteRequest {
 }
 
 export type QuoteRequestInsert = Omit<QuoteRequest, 'id' | 'created_at' | 'updated_at'>;
+
+export interface QuoteRequestFile {
+  id: string;
+  quote_request_id: string;
+  storage_path: string;
+  file_name: string;
+  content_type: string;
+  file_size: number;
+  created_at: string;
+}
