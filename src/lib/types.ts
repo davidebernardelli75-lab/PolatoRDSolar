@@ -198,6 +198,8 @@ export interface QuoteRequest {
   request_date: string | null;
   source: string | null;
   client: string;
+  client_email: string | null;
+  client_phone: string | null;
   quote_type: string | null;
   value_ex_vat: number | null;
   status: QuoteStatus;
