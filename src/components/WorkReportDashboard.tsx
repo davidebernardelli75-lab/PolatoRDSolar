@@ -87,6 +87,9 @@ export function WorkReportDashboard({ isAdmin }: WorkReportDashboardProps) {
   const [quoteLinks, setQuoteLinks] = useState<PlantQuoteLink[]>([]);
   const [editing, setEditing] = useState<WorkReport | 'new' | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [expandedGroupKey, setExpandedGroupKey] = useState<string | null>(null);
+  const [associationEditingPlantId, setAssociationEditingPlantId] = useState<string | null>(null);
+  const [associationBusyPlantId, setAssociationBusyPlantId] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<'TUTTI' | WorkReportStatus>('TUTTI');
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -132,8 +135,44 @@ export function WorkReportDashboard({ isAdmin }: WorkReportDashboardProps) {
   useEffect(() => { void load(); }, [load]);
 
   const plantById = useMemo(() => new Map(plants.map((plant) => [plant.id, plant])), [plants]);
+  const quoteById = useMemo(() => new Map(quotes.map((quote) => [quote.id, quote])), [quotes]);
   const quoteLinkByPlant = useMemo(() => new Map(quoteLinks.map((link) => [link.plant_id, link.quote_request_id])), [quoteLinks]);
   const filtered = reports.filter((report) => statusFilter === 'TUTTI' || report.status === statusFilter);
+
+  const adminGroups = useMemo(() => {
+    const map = new Map<string, { key: string; plantId: string; quoteRequestId: string | null; reports: WorkReport[] }>();
+
+    filtered.forEach((report) => {
+      const quoteRequestId = quoteLinkByPlant.get(report.plant_id) ?? null;
+      const key = quoteRequestId
+        ? `${report.plant_id}::${quoteRequestId}`
+        : `UNLINKED::${report.id}`;
+
+      const current = map.get(key);
+      if (current) {
+        current.reports.push(report);
+      } else {
+        map.set(key, {
+          key,
+          plantId: report.plant_id,
+          quoteRequestId,
+          reports: [report],
+        });
+      }
+    });
+
+    return [...map.values()]
+      .map((group) => ({
+        ...group,
+        reports: [...group.reports].sort((a, b) =>
+          b.report_date.localeCompare(a.report_date) || b.created_at.localeCompare(a.created_at)),
+      }))
+      .sort((a, b) => {
+        const aDate = a.reports[0]?.report_date ?? '';
+        const bDate = b.reports[0]?.report_date ?? '';
+        return bDate.localeCompare(aDate);
+      });
+  }, [filtered, quoteLinkByPlant]);
   const pendingCount = reports.filter((report) => report.status === 'DA_VERIFICARE').length;
   const approvedCount = reports.filter((report) => report.status === 'APPROVATO').length;
   const totalHours = workers.reduce((sum, worker) => sum + Number(worker.hours || 0), 0);
@@ -151,6 +190,38 @@ export function WorkReportDashboard({ isAdmin }: WorkReportDashboardProps) {
       setError(err instanceof Error ? err.message : 'Aggiornamento rapportino non riuscito.');
     } finally {
       setBusyId(null);
+    }
+  };
+
+  const updatePlantQuoteAssociation = async (plantId: string, quoteRequestId: string | null) => {
+    const currentQuoteId = quoteLinkByPlant.get(plantId) ?? null;
+    if (currentQuoteId === quoteRequestId) {
+      setAssociationEditingPlantId(null);
+      return;
+    }
+
+    const currentQuote = currentQuoteId ? quoteById.get(currentQuoteId) : null;
+    const nextQuote = quoteRequestId ? quoteById.get(quoteRequestId) : null;
+    const message = quoteRequestId
+      ? `Associare tutti i rapportini di questo cantiere al preventivo ${nextQuote?.progressive_number ?? ''}/${nextQuote?.series ?? ''} - ${nextQuote?.client ?? ''}?\n\nL'associazione attuale${currentQuote ? ` con ${currentQuote.progressive_number}/${currentQuote.series} - ${currentQuote.client}` : ''} verrà sostituita.`
+      : 'Scollegare il preventivo da questo cantiere? Tutti i rapportini del cantiere resteranno disponibili ma non saranno più aggregati a quel preventivo.';
+
+    if (!window.confirm(message)) return;
+
+    setAssociationBusyPlantId(plantId);
+    setError(null);
+    try {
+      await setPlantQuoteLink(plantId, quoteRequestId);
+      setQuoteLinks((current) => {
+        const remaining = current.filter((link) => link.plant_id !== plantId);
+        return quoteRequestId ? [...remaining, { plant_id: plantId, quote_request_id: quoteRequestId }] : remaining;
+      });
+      setAssociationEditingPlantId(null);
+      setExpandedGroupKey(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Correzione dell’associazione non riuscita.');
+    } finally {
+      setAssociationBusyPlantId(null);
     }
   };
 
