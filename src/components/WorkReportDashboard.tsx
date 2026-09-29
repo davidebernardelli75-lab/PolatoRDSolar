@@ -21,20 +21,30 @@ import type {
   Plant,
   WorkReport,
   WorkReportMaterial,
+  WorkReportMaterialCatalogEntry,
   WorkReportMaterialInput,
   WorkReportStatus,
   WorkReportWorker,
+  WorkReportWorkerCatalogEntry,
   WorkReportWorkerInput,
 } from '@/lib/types';
 import {
   createWorkReport,
   deleteWorkReport,
   fetchPlants,
+  fetchWorkReportLaborRateDefaults,
+  fetchWorkReportMaterialCatalog,
+  fetchWorkReportMaterialCostDefaults,
+  fetchWorkReportMaterialCosts,
   fetchWorkReportMaterials,
   fetchWorkReports,
+  fetchWorkReportWorkerCatalog,
+  fetchWorkReportWorkerCosts,
   fetchWorkReportWorkers,
   replaceWorkReportMaterials,
   replaceWorkReportWorkers,
+  setWorkReportMaterialCost,
+  setWorkReportWorkerCost,
   updateWorkReport,
 } from '@/lib/api';
 
@@ -42,8 +52,8 @@ interface WorkReportDashboardProps {
   isAdmin: boolean;
 }
 
-type WorkerDraft = { worker_name: string; hours: string; notes: string };
-type MaterialDraft = { item_code: string; description: string; quantity: string; unit: string; notes: string };
+type WorkerDraft = { worker_name: string; hours: string; rate_type: string; notes: string };
+type MaterialDraft = { description: string; quantity: string; unit: string; notes: string };
 
 const inputClass = 'w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-red-400 focus:ring-2 focus:ring-red-100';
 
@@ -62,6 +72,8 @@ export function WorkReportDashboard({ isAdmin }: WorkReportDashboardProps) {
   const [reports, setReports] = useState<WorkReport[]>([]);
   const [workers, setWorkers] = useState<WorkReportWorker[]>([]);
   const [materials, setMaterials] = useState<WorkReportMaterial[]>([]);
+  const [materialCatalog, setMaterialCatalog] = useState<WorkReportMaterialCatalogEntry[]>([]);
+  const [workerCatalog, setWorkerCatalog] = useState<WorkReportWorkerCatalogEntry[]>([]);
   const [plants, setPlants] = useState<Plant[]>([]);
   const [editing, setEditing] = useState<WorkReport | 'new' | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -73,16 +85,20 @@ export function WorkReportDashboard({ isAdmin }: WorkReportDashboardProps) {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [reportRows, workerRows, materialRows, plantRows] = await Promise.all([
+      const [reportRows, workerRows, materialRows, plantRows, materialOptions, workerOptions] = await Promise.all([
         fetchWorkReports(),
         fetchWorkReportWorkers(),
         fetchWorkReportMaterials(),
         fetchPlants(),
+        fetchWorkReportMaterialCatalog(),
+        fetchWorkReportWorkerCatalog(),
       ]);
       setReports(reportRows);
       setWorkers(workerRows);
       setMaterials(materialRows);
       setPlants(plantRows);
+      setMaterialCatalog(materialOptions);
+      setWorkerCatalog(workerOptions);
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Impossibile caricare i rapportini.');
@@ -264,13 +280,21 @@ export function WorkReportDashboard({ isAdmin }: WorkReportDashboardProps) {
                                 <span>{material.description}</span>
                                 <span className="shrink-0 font-semibold">{Number(material.quantity).toLocaleString('it-IT')} {material.unit}</span>
                               </div>
-                              {material.item_code && <div className="mt-0.5 text-[11px] text-slate-400">Codice: {material.item_code}</div>}
                             </div>
                           ))}
                         </div>
                       )}
                     </div>
                   </div>
+                )}
+
+                {expanded && isAdmin && (
+                  <AdminReportCostEditor
+                    workers={reportWorkers}
+                    materials={reportMaterials}
+                    workerCatalog={workerCatalog}
+                    materialCatalog={materialCatalog}
+                  />
                 )}
 
                 {isAdmin && report.status === 'DA_VERIFICARE' && (
@@ -304,6 +328,8 @@ export function WorkReportDashboard({ isAdmin }: WorkReportDashboardProps) {
           plants={plants}
           workers={editing === 'new' ? [] : workers.filter((worker) => worker.report_id === editing.id)}
           materials={editing === 'new' ? [] : materials.filter((material) => material.report_id === editing.id)}
+          materialCatalog={materialCatalog}
+          workerCatalog={workerCatalog}
           onClose={() => setEditing(null)}
           onSaved={async () => {
             setEditing(null);
