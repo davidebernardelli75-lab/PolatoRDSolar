@@ -362,12 +362,6 @@ export function WorkReportDashboard({ isAdmin }: WorkReportDashboardProps) {
             materialCatalog={materialCatalog}
             quoteOptions={quotes}
             linkedQuoteRequestId={quoteLinkByPlant.get(report.plant_id) ?? null}
-            onQuoteLinkChanged={(quoteRequestId) => {
-              setQuoteLinks((current) => {
-                const remaining = current.filter((link) => link.plant_id !== report.plant_id);
-                return quoteRequestId ? [...remaining, { plant_id: report.plant_id, quote_request_id: quoteRequestId }] : remaining;
-              });
-            }}
           />
         )}
 
@@ -639,7 +633,6 @@ function AdminReportCostEditor({
   materialCatalog,
   quoteOptions,
   linkedQuoteRequestId,
-  onQuoteLinkChanged,
 }: {
   reportId: string;
   plantId: string;
@@ -652,13 +645,10 @@ function AdminReportCostEditor({
   materialCatalog: WorkReportMaterialCatalogEntry[];
   quoteOptions: QuoteRequest[];
   linkedQuoteRequestId: string | null;
-  onQuoteLinkChanged: (quoteRequestId: string | null) => void;
 }) {
   const [workerRates, setWorkerRates] = useState<Record<string, string>>({});
   const [materialPrices, setMaterialPrices] = useState<Record<string, string>>({});
   const [materialMarkupPercent, setMaterialMarkupPercent] = useState('0');
-  const [selectedQuoteId, setSelectedQuoteId] = useState(linkedQuoteRequestId ?? '');
-  const [linkingQuote, setLinkingQuote] = useState(false);
   const [otherPlantLaborCost, setOtherPlantLaborCost] = useState(0);
   const [otherPlantMaterialCost, setOtherPlantMaterialCost] = useState(0);
   const [otherPlantMissingCosts, setOtherPlantMissingCosts] = useState(0);
@@ -666,10 +656,6 @@ function AdminReportCostEditor({
   const [savingCosts, setSavingCosts] = useState(false);
   const [costError, setCostError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
-
-  useEffect(() => {
-    setSelectedQuoteId(linkedQuoteRequestId ?? '');
-  }, [linkedQuoteRequestId]);
 
   useEffect(() => {
     let active = true;
@@ -805,7 +791,7 @@ function AdminReportCostEditor({
   const jobLaborCost = otherPlantLaborCost + laborTotal;
   const jobMaterialCost = otherPlantMaterialCost + materialsTotal;
   const jobCostToDate = jobLaborCost + jobMaterialCost;
-  const selectedQuote = quoteOptions.find((quote) => quote.id === selectedQuoteId) ?? null;
+  const selectedQuote = quoteOptions.find((quote) => quote.id === linkedQuoteRequestId) ?? null;
   const quoteValue = selectedQuote?.value_ex_vat == null ? null : Number(selectedQuote.value_ex_vat);
   const jobResult = quoteValue == null ? null : quoteValue - jobCostToDate;
   const jobMarginPercent = quoteValue != null && quoteValue > 0 && jobResult != null
@@ -825,20 +811,6 @@ function AdminReportCostEditor({
       : jobMarginPercent < -0.005
         ? `PERDITA ${jobMarginPercent.toLocaleString('it-IT', { maximumFractionDigits: 2 })}%`
         : 'PARI 0%';
-
-  const saveQuoteLink = async () => {
-    setLinkingQuote(true);
-    setCostError(null);
-    try {
-      const quoteRequestId = selectedQuoteId || null;
-      await setPlantQuoteLink(plantId, quoteRequestId);
-      onQuoteLinkChanged(quoteRequestId);
-    } catch (err) {
-      setCostError(err instanceof Error ? err.message : 'Collegamento al preventivo non riuscito.');
-    } finally {
-      setLinkingQuote(false);
-    }
-  };
 
   const saveCosts = async () => {
     setSavingCosts(true);
@@ -883,39 +855,12 @@ function AdminReportCostEditor({
               <div>
                 <h5 className="text-sm font-bold uppercase tracking-wide text-blue-950">Andamento commessa vs preventivo</h5>
                 <p className="mt-0.5 text-[11px] text-blue-800">
-                  Collega l'impianto al preventivo: il confronto usa tutti i rapportini registrati per questo impianto.
+                  Il confronto usa tutti i rapportini registrati nella stessa commessa. L'abbinamento si corregge dalla maschera principale del cantiere.
                 </p>
               </div>
               <div className={`rounded-full px-3 py-2 text-xs font-bold ${economicClass}`}>
                 {economicLabel}
               </div>
-            </div>
-
-            <div className="grid gap-2 lg:grid-cols-[1fr_auto]">
-              <select
-                value={selectedQuoteId}
-                onChange={(e) => setSelectedQuoteId(e.target.value)}
-                className={inputClass}
-                aria-label="Preventivo collegato alla commessa"
-              >
-                <option value="">Nessun preventivo collegato</option>
-                {quoteOptions
-                  .filter((quote) => quote.status !== 'RIFIUTATO' && quote.value_ex_vat != null)
-                  .map((quote) => (
-                    <option key={quote.id} value={quote.id}>
-                      {quote.progressive_number}/{quote.series} · {quote.client} · {quote.status} · {Number(quote.value_ex_vat).toLocaleString('it-IT', { style: 'currency', currency: 'EUR' })}
-                    </option>
-                  ))}
-              </select>
-              <button
-                type="button"
-                onClick={() => void saveQuoteLink()}
-                disabled={linkingQuote}
-                className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-900 px-4 py-2.5 text-xs font-semibold text-white disabled:opacity-50"
-              >
-                {linkingQuote ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
-                Collega preventivo
-              </button>
             </div>
 
             <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
