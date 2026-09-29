@@ -546,23 +546,48 @@ function AdminReportCostEditor({
   const markupPercent = Number(materialMarkupPercent);
   const safeMarkupPercent = Number.isFinite(markupPercent) ? markupPercent : 0;
   const markedMaterialsTotal = materialsTotal * (1 + safeMarkupPercent / 100);
-  const materialEconomicPercent = materialsTotal > 0
-    ? ((markedMaterialsTotal - materialsTotal) / materialsTotal) * 100
+
+  const currentMissingCosts =
+    workers.filter((worker) => workerRates[worker.id] === '' || !Number.isFinite(Number(workerRates[worker.id]))).length
+    + materials.filter((material) => materialPrices[material.id] === '' || !Number.isFinite(Number(materialPrices[material.id]))).length;
+  const totalMissingCosts = otherPlantMissingCosts + currentMissingCosts;
+  const jobLaborCost = otherPlantLaborCost + laborTotal;
+  const jobMaterialCost = otherPlantMaterialCost + materialsTotal;
+  const jobCostToDate = jobLaborCost + jobMaterialCost;
+  const selectedQuote = quoteOptions.find((quote) => quote.id === selectedQuoteId) ?? null;
+  const quoteValue = selectedQuote?.value_ex_vat == null ? null : Number(selectedQuote.value_ex_vat);
+  const jobResult = quoteValue == null ? null : quoteValue - jobCostToDate;
+  const jobMarginPercent = quoteValue != null && quoteValue > 0 && jobResult != null
+    ? (jobResult / quoteValue) * 100
     : null;
-  const economicClass = materialEconomicPercent == null
+  const economicClass = jobMarginPercent == null
     ? 'bg-slate-100 text-slate-600'
-    : materialEconomicPercent > 0.005
+    : jobMarginPercent > 0.005
       ? 'bg-green-100 text-green-800'
-      : materialEconomicPercent < -0.005
+      : jobMarginPercent < -0.005
         ? 'bg-red-100 text-red-800'
         : 'bg-amber-100 text-amber-800';
-  const economicLabel = materialEconomicPercent == null
+  const economicLabel = jobMarginPercent == null
     ? 'N/D'
-    : materialEconomicPercent > 0.005
-      ? `GUADAGNO +${materialEconomicPercent.toLocaleString('it-IT', { maximumFractionDigits: 2 })}%`
-      : materialEconomicPercent < -0.005
-        ? `PERDITA ${materialEconomicPercent.toLocaleString('it-IT', { maximumFractionDigits: 2 })}%`
+    : jobMarginPercent > 0.005
+      ? `GUADAGNO +${jobMarginPercent.toLocaleString('it-IT', { maximumFractionDigits: 2 })}%`
+      : jobMarginPercent < -0.005
+        ? `PERDITA ${jobMarginPercent.toLocaleString('it-IT', { maximumFractionDigits: 2 })}%`
         : 'PARI 0%';
+
+  const saveQuoteLink = async () => {
+    setLinkingQuote(true);
+    setCostError(null);
+    try {
+      const quoteRequestId = selectedQuoteId || null;
+      await setPlantQuoteLink(plantId, quoteRequestId);
+      onQuoteLinkChanged(quoteRequestId);
+    } catch (err) {
+      setCostError(err instanceof Error ? err.message : 'Collegamento al preventivo non riuscito.');
+    } finally {
+      setLinkingQuote(false);
+    }
+  };
 
   const saveCosts = async () => {
     setSavingCosts(true);
