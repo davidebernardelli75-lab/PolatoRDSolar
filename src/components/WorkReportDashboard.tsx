@@ -401,24 +401,47 @@ function normalizeCatalogValue(value: string): string {
 
 function AdminReportCostEditor({
   reportId,
+  plantId,
   workers,
   materials,
+  allReports,
+  allWorkers,
+  allMaterials,
   workerCatalog,
   materialCatalog,
+  quoteOptions,
+  linkedQuoteRequestId,
+  onQuoteLinkChanged,
 }: {
   reportId: string;
+  plantId: string;
   workers: WorkReportWorker[];
   materials: WorkReportMaterial[];
+  allReports: WorkReport[];
+  allWorkers: WorkReportWorker[];
+  allMaterials: WorkReportMaterial[];
   workerCatalog: WorkReportWorkerCatalogEntry[];
   materialCatalog: WorkReportMaterialCatalogEntry[];
+  quoteOptions: QuoteRequest[];
+  linkedQuoteRequestId: string | null;
+  onQuoteLinkChanged: (quoteRequestId: string | null) => void;
 }) {
   const [workerRates, setWorkerRates] = useState<Record<string, string>>({});
   const [materialPrices, setMaterialPrices] = useState<Record<string, string>>({});
   const [materialMarkupPercent, setMaterialMarkupPercent] = useState('0');
+  const [selectedQuoteId, setSelectedQuoteId] = useState(linkedQuoteRequestId ?? '');
+  const [linkingQuote, setLinkingQuote] = useState(false);
+  const [otherPlantLaborCost, setOtherPlantLaborCost] = useState(0);
+  const [otherPlantMaterialCost, setOtherPlantMaterialCost] = useState(0);
+  const [otherPlantMissingCosts, setOtherPlantMissingCosts] = useState(0);
   const [loadingCosts, setLoadingCosts] = useState(true);
   const [savingCosts, setSavingCosts] = useState(false);
   const [costError, setCostError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    setSelectedQuoteId(linkedQuoteRequestId ?? '');
+  }, [linkedQuoteRequestId]);
 
   useEffect(() => {
     let active = true;
@@ -468,6 +491,40 @@ function AdminReportCostEditor({
         setMaterialPrices(nextMaterialPrices);
         setWorkerRates(nextWorkerRates);
         setMaterialMarkupPercent(String(adminSummary?.material_markup_percent ?? 0));
+
+        const otherReportIds = new Set(
+          allReports
+            .filter((report) => report.plant_id === plantId && report.id !== reportId)
+            .map((report) => report.id),
+        );
+
+        let historicalLaborCost = 0;
+        let historicalMaterialCost = 0;
+        let missingHistoricalCosts = 0;
+
+        allWorkers.forEach((worker) => {
+          if (!otherReportIds.has(worker.report_id)) return;
+          const rate = workerSnapshotByRow.get(worker.id);
+          if (rate == null) {
+            missingHistoricalCosts += 1;
+            return;
+          }
+          historicalLaborCost += Number(worker.hours) * rate;
+        });
+
+        allMaterials.forEach((material) => {
+          if (!otherReportIds.has(material.report_id)) return;
+          const unitPrice = materialSnapshotByRow.get(material.id);
+          if (unitPrice == null) {
+            missingHistoricalCosts += 1;
+            return;
+          }
+          historicalMaterialCost += Number(material.quantity) * unitPrice;
+        });
+
+        setOtherPlantLaborCost(historicalLaborCost);
+        setOtherPlantMaterialCost(historicalMaterialCost);
+        setOtherPlantMissingCosts(missingHistoricalCosts);
       } catch (err) {
         if (active) setCostError(err instanceof Error ? err.message : 'Impossibile caricare i costi amministrativi.');
       } finally {
@@ -476,7 +533,7 @@ function AdminReportCostEditor({
     };
     void loadCosts();
     return () => { active = false; };
-  }, [reportId, materials, workers, materialCatalog, workerCatalog]);
+  }, [reportId, plantId, materials, workers, allReports, allWorkers, allMaterials, materialCatalog, workerCatalog]);
 
   const laborTotal = workers.reduce((sum, worker) => {
     const rate = Number(workerRates[worker.id]);
