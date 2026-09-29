@@ -1,5 +1,5 @@
 import { supabase, STORAGE_BUCKET, QUOTE_FILES_BUCKET } from './supabase';
-import type { Plant, Panel, PanelPhoto, PlantInsert, PlantUpdate, PanelInsert, RoadmapTask, PlantInverter, PlantStorage, PlantCharger, PlantInverterInsert, PlantStorageInsert, PlantChargerInsert, PlantPowerMeter, PlantPowerMeterInsert, Vehicle, VehicleInsert, Insurance, InsuranceInsert, EquipmentCatalogEntry, EquipmentCategory, QuoteRequest, QuoteRequestInsert, QuoteRequestFile, WorkReport, WorkReportInsert, WorkReportMaterial, WorkReportMaterialInput, WorkReportWorker, WorkReportWorkerInput, WorkReportStatus } from './types';
+import type { Plant, Panel, PanelPhoto, PlantInsert, PlantUpdate, PanelInsert, RoadmapTask, PlantInverter, PlantStorage, PlantCharger, PlantInverterInsert, PlantStorageInsert, PlantChargerInsert, PlantPowerMeter, PlantPowerMeterInsert, Vehicle, VehicleInsert, Insurance, InsuranceInsert, EquipmentCatalogEntry, EquipmentCategory, QuoteRequest, QuoteRequestInsert, QuoteRequestFile, WorkReport, WorkReportInsert, WorkReportMaterial, WorkReportMaterialInput, WorkReportWorker, WorkReportWorkerInput, WorkReportStatus, WorkReportMaterialCatalogEntry, WorkReportWorkerCatalogEntry, WorkReportMaterialCostDefault, WorkReportLaborRateDefault, WorkReportMaterialCost, WorkReportWorkerCost } from './types';
 
 export async function fetchPlants(): Promise<Plant[]> {
   const { data, error } = await supabase
@@ -43,6 +43,81 @@ export async function updatePlant(id: string, input: PlantUpdate): Promise<Plant
 
 export async function deletePlant(id: string): Promise<void> {
   const { error } = await supabase.from('plants').delete().eq('id', id);
+  if (error) throw error;
+  await Promise.all(materials.map(async (material) => {
+    const { error: rememberError } = await supabase.rpc('remember_work_report_material', {
+      p_description: material.description,
+      p_unit: material.unit || 'PZ',
+    });
+    if (rememberError) throw rememberError;
+  }));
+}
+
+export async function fetchWorkReportMaterialCatalog(): Promise<WorkReportMaterialCatalogEntry[]> {
+  const { data, error } = await supabase
+    .from('work_report_material_catalog')
+    .select('id, description, normalized_description, default_unit, usage_count, last_used_at')
+    .order('usage_count', { ascending: false })
+    .order('last_used_at', { ascending: false });
+  if (error) throw error;
+  return data ?? [];
+}
+
+export async function fetchWorkReportWorkerCatalog(): Promise<WorkReportWorkerCatalogEntry[]> {
+  const { data, error } = await supabase
+    .from('work_report_worker_catalog')
+    .select('id, worker_name, normalized_worker_name, usage_count, last_used_at')
+    .order('usage_count', { ascending: false })
+    .order('last_used_at', { ascending: false });
+  if (error) throw error;
+  return data ?? [];
+}
+
+export async function fetchWorkReportMaterialCostDefaults(): Promise<WorkReportMaterialCostDefault[]> {
+  const { data, error } = await supabase
+    .from('work_report_material_cost_defaults')
+    .select('material_catalog_id, unit_price');
+  if (error) throw error;
+  return data ?? [];
+}
+
+export async function fetchWorkReportLaborRateDefaults(): Promise<WorkReportLaborRateDefault[]> {
+  const { data, error } = await supabase
+    .from('work_report_labor_rate_defaults')
+    .select('worker_catalog_id, rate_type, hourly_rate');
+  if (error) throw error;
+  return data ?? [];
+}
+
+export async function fetchWorkReportMaterialCosts(): Promise<WorkReportMaterialCost[]> {
+  const { data, error } = await supabase
+    .from('work_report_material_costs')
+    .select('report_material_id, unit_price');
+  if (error) throw error;
+  return data ?? [];
+}
+
+export async function fetchWorkReportWorkerCosts(): Promise<WorkReportWorkerCost[]> {
+  const { data, error } = await supabase
+    .from('work_report_worker_costs')
+    .select('report_worker_id, hourly_rate');
+  if (error) throw error;
+  return data ?? [];
+}
+
+export async function setWorkReportMaterialCost(reportMaterialId: string, unitPrice: number): Promise<void> {
+  const { error } = await supabase.rpc('set_work_report_material_cost', {
+    p_report_material_id: reportMaterialId,
+    p_unit_price: unitPrice,
+  });
+  if (error) throw error;
+}
+
+export async function setWorkReportWorkerCost(reportWorkerId: string, hourlyRate: number): Promise<void> {
+  const { error } = await supabase.rpc('set_work_report_worker_cost', {
+    p_report_worker_id: reportWorkerId,
+    p_hourly_rate: hourlyRate,
+  });
   if (error) throw error;
 }
 
@@ -664,10 +739,17 @@ export async function replaceWorkReportWorkers(reportId: string, workers: WorkRe
       report_id: reportId,
       worker_name: worker.worker_name.trim().toUpperCase(),
       hours: worker.hours,
+      rate_type: worker.rate_type.trim().toUpperCase() || 'ORDINARIA',
       notes: worker.notes?.trim().toUpperCase() || null,
     })),
   );
   if (error) throw error;
+  await Promise.all(workers.map(async (worker) => {
+    const { error: rememberError } = await supabase.rpc('remember_work_report_worker', {
+      p_worker_name: worker.worker_name,
+    });
+    if (rememberError) throw rememberError;
+  }));
 }
 
 export async function replaceWorkReportMaterials(reportId: string, materials: WorkReportMaterialInput[]): Promise<void> {
