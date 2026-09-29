@@ -1,5 +1,5 @@
 import { supabase, STORAGE_BUCKET, QUOTE_FILES_BUCKET } from './supabase';
-import type { Plant, Panel, PanelPhoto, PlantInsert, PlantUpdate, PanelInsert, RoadmapTask, PlantInverter, PlantStorage, PlantCharger, PlantInverterInsert, PlantStorageInsert, PlantChargerInsert, PlantPowerMeter, PlantPowerMeterInsert, Vehicle, VehicleInsert, Insurance, InsuranceInsert, EquipmentCatalogEntry, EquipmentCategory, QuoteRequest, QuoteRequestInsert, QuoteRequestFile, WorkReport, WorkReportInsert, WorkReportMaterial, WorkReportMaterialInput, WorkReportWorker, WorkReportWorkerInput, WorkReportStatus, WorkReportMaterialCatalogEntry, WorkReportWorkerCatalogEntry, WorkReportMaterialCostDefault, WorkReportLaborRateDefault, WorkReportMaterialCost, WorkReportWorkerCost, WorkReportAdminSummary } from './types';
+import type { Plant, Panel, PanelPhoto, PlantInsert, PlantUpdate, PanelInsert, RoadmapTask, PlantInverter, PlantStorage, PlantCharger, PlantInverterInsert, PlantStorageInsert, PlantChargerInsert, PlantPowerMeter, PlantPowerMeterInsert, Vehicle, VehicleInsert, Insurance, InsuranceInsert, EquipmentCatalogEntry, EquipmentCategory, QuoteRequest, QuoteRequestInsert, QuoteRequestFile, WorkReport, WorkReportInsert, WorkReportMaterial, WorkReportMaterialInput, WorkReportWorker, WorkReportWorkerInput, WorkReportStatus, WorkReportMaterialCatalogEntry, WorkReportWorkerCatalogEntry, WorkReportMaterialCostDefault, WorkReportLaborRateDefault, WorkReportMaterialCost, WorkReportWorkerCost, WorkReportAdminSummary, PlantQuoteLink } from './types';
 
 export async function fetchPlants(): Promise<Plant[]> {
   const { data, error } = await supabase
@@ -113,6 +113,31 @@ export async function setWorkReportMaterialMarkup(reportId: string, markupPercen
     p_report_id: reportId,
     p_markup_percent: markupPercent,
   });
+  if (error) throw error;
+}
+
+export async function fetchPlantQuoteLinks(): Promise<PlantQuoteLink[]> {
+  const { data, error } = await supabase
+    .from('plant_quote_links')
+    .select('plant_id, quote_request_id');
+  if (error) throw error;
+  return data ?? [];
+}
+
+export async function setPlantQuoteLink(plantId: string, quoteRequestId: string | null): Promise<void> {
+  if (!quoteRequestId) {
+    const { error } = await supabase.from('plant_quote_links').delete().eq('plant_id', plantId);
+    if (error) throw error;
+    return;
+  }
+
+  const { error } = await supabase
+    .from('plant_quote_links')
+    .upsert({
+      plant_id: plantId,
+      quote_request_id: quoteRequestId,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'plant_id' });
   if (error) throw error;
 }
 

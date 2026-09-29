@@ -19,6 +19,8 @@ import {
 } from 'lucide-react';
 import type {
   Plant,
+  PlantQuoteLink,
+  QuoteRequest,
   WorkReport,
   WorkReportMaterial,
   WorkReportMaterialCatalogEntry,
@@ -32,6 +34,8 @@ import {
   createWorkReport,
   deleteWorkReport,
   fetchPlants,
+  fetchPlantQuoteLinks,
+  fetchQuoteRequests,
   fetchWorkReportAdminSummary,
   fetchWorkReportLaborRateDefaults,
   fetchWorkReportMaterialCatalog,
@@ -44,6 +48,7 @@ import {
   fetchWorkReportWorkers,
   replaceWorkReportMaterials,
   replaceWorkReportWorkers,
+  setPlantQuoteLink,
   setWorkReportMaterialCost,
   setWorkReportMaterialMarkup,
   setWorkReportWorkerCost,
@@ -78,6 +83,8 @@ export function WorkReportDashboard({ isAdmin }: WorkReportDashboardProps) {
   const [materialCatalog, setMaterialCatalog] = useState<WorkReportMaterialCatalogEntry[]>([]);
   const [workerCatalog, setWorkerCatalog] = useState<WorkReportWorkerCatalogEntry[]>([]);
   const [plants, setPlants] = useState<Plant[]>([]);
+  const [quotes, setQuotes] = useState<QuoteRequest[]>([]);
+  const [quoteLinks, setQuoteLinks] = useState<PlantQuoteLink[]>([]);
   const [editing, setEditing] = useState<WorkReport | 'new' | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<'TUTTI' | WorkReportStatus>('TUTTI');
@@ -96,23 +103,36 @@ export function WorkReportDashboard({ isAdmin }: WorkReportDashboardProps) {
         fetchWorkReportMaterialCatalog(),
         fetchWorkReportWorkerCatalog(),
       ]);
+
+      let quoteRows: QuoteRequest[] = [];
+      let plantQuoteRows: PlantQuoteLink[] = [];
+      if (isAdmin) {
+        [quoteRows, plantQuoteRows] = await Promise.all([
+          fetchQuoteRequests(),
+          fetchPlantQuoteLinks(),
+        ]);
+      }
+
       setReports(reportRows);
       setWorkers(workerRows);
       setMaterials(materialRows);
       setPlants(plantRows);
       setMaterialCatalog(materialOptions);
       setWorkerCatalog(workerOptions);
+      setQuotes(quoteRows);
+      setQuoteLinks(plantQuoteRows);
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Impossibile caricare i rapportini.');
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [isAdmin]);
 
   useEffect(() => { void load(); }, [load]);
 
   const plantById = useMemo(() => new Map(plants.map((plant) => [plant.id, plant])), [plants]);
+  const quoteLinkByPlant = useMemo(() => new Map(quoteLinks.map((link) => [link.plant_id, link.quote_request_id])), [quoteLinks]);
   const filtered = reports.filter((report) => statusFilter === 'TUTTI' || report.status === statusFilter);
   const pendingCount = reports.filter((report) => report.status === 'DA_VERIFICARE').length;
   const approvedCount = reports.filter((report) => report.status === 'APPROVATO').length;
@@ -302,10 +322,22 @@ export function WorkReportDashboard({ isAdmin }: WorkReportDashboardProps) {
                 {expanded && isAdmin && (
                   <AdminReportCostEditor
                     reportId={report.id}
+                    plantId={report.plant_id}
                     workers={reportWorkers}
                     materials={reportMaterials}
+                    allReports={reports}
+                    allWorkers={workers}
+                    allMaterials={materials}
                     workerCatalog={workerCatalog}
                     materialCatalog={materialCatalog}
+                    quoteOptions={quotes}
+                    linkedQuoteRequestId={quoteLinkByPlant.get(report.plant_id) ?? null}
+                    onQuoteLinkChanged={(quoteRequestId) => {
+                      setQuoteLinks((current) => {
+                        const remaining = current.filter((link) => link.plant_id !== report.plant_id);
+                        return quoteRequestId ? [...remaining, { plant_id: report.plant_id, quote_request_id: quoteRequestId }] : remaining;
+                      });
+                    }}
                   />
                 )}
 
@@ -369,24 +401,47 @@ function normalizeCatalogValue(value: string): string {
 
 function AdminReportCostEditor({
   reportId,
+  plantId,
   workers,
   materials,
+  allReports,
+  allWorkers,
+  allMaterials,
   workerCatalog,
   materialCatalog,
+  quoteOptions,
+  linkedQuoteRequestId,
+  onQuoteLinkChanged,
 }: {
   reportId: string;
+  plantId: string;
   workers: WorkReportWorker[];
   materials: WorkReportMaterial[];
+  allReports: WorkReport[];
+  allWorkers: WorkReportWorker[];
+  allMaterials: WorkReportMaterial[];
   workerCatalog: WorkReportWorkerCatalogEntry[];
   materialCatalog: WorkReportMaterialCatalogEntry[];
+  quoteOptions: QuoteRequest[];
+  linkedQuoteRequestId: string | null;
+  onQuoteLinkChanged: (quoteRequestId: string | null) => void;
 }) {
   const [workerRates, setWorkerRates] = useState<Record<string, string>>({});
   const [materialPrices, setMaterialPrices] = useState<Record<string, string>>({});
   const [materialMarkupPercent, setMaterialMarkupPercent] = useState('0');
+  const [selectedQuoteId, setSelectedQuoteId] = useState(linkedQuoteRequestId ?? '');
+  const [linkingQuote, setLinkingQuote] = useState(false);
+  const [otherPlantLaborCost, setOtherPlantLaborCost] = useState(0);
+  const [otherPlantMaterialCost, setOtherPlantMaterialCost] = useState(0);
+  const [otherPlantMissingCosts, setOtherPlantMissingCosts] = useState(0);
   const [loadingCosts, setLoadingCosts] = useState(true);
   const [savingCosts, setSavingCosts] = useState(false);
   const [costError, setCostError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    setSelectedQuoteId(linkedQuoteRequestId ?? '');
+  }, [linkedQuoteRequestId]);
 
   useEffect(() => {
     let active = true;
@@ -436,6 +491,40 @@ function AdminReportCostEditor({
         setMaterialPrices(nextMaterialPrices);
         setWorkerRates(nextWorkerRates);
         setMaterialMarkupPercent(String(adminSummary?.material_markup_percent ?? 0));
+
+        const otherReportIds = new Set(
+          allReports
+            .filter((report) => report.plant_id === plantId && report.id !== reportId)
+            .map((report) => report.id),
+        );
+
+        let historicalLaborCost = 0;
+        let historicalMaterialCost = 0;
+        let missingHistoricalCosts = 0;
+
+        allWorkers.forEach((worker) => {
+          if (!otherReportIds.has(worker.report_id)) return;
+          const rate = workerSnapshotByRow.get(worker.id);
+          if (rate == null) {
+            missingHistoricalCosts += 1;
+            return;
+          }
+          historicalLaborCost += Number(worker.hours) * rate;
+        });
+
+        allMaterials.forEach((material) => {
+          if (!otherReportIds.has(material.report_id)) return;
+          const unitPrice = materialSnapshotByRow.get(material.id);
+          if (unitPrice == null) {
+            missingHistoricalCosts += 1;
+            return;
+          }
+          historicalMaterialCost += Number(material.quantity) * unitPrice;
+        });
+
+        setOtherPlantLaborCost(historicalLaborCost);
+        setOtherPlantMaterialCost(historicalMaterialCost);
+        setOtherPlantMissingCosts(missingHistoricalCosts);
       } catch (err) {
         if (active) setCostError(err instanceof Error ? err.message : 'Impossibile caricare i costi amministrativi.');
       } finally {
@@ -444,7 +533,7 @@ function AdminReportCostEditor({
     };
     void loadCosts();
     return () => { active = false; };
-  }, [reportId, materials, workers, materialCatalog, workerCatalog]);
+  }, [reportId, plantId, materials, workers, allReports, allWorkers, allMaterials, materialCatalog, workerCatalog]);
 
   const laborTotal = workers.reduce((sum, worker) => {
     const rate = Number(workerRates[worker.id]);
@@ -457,23 +546,48 @@ function AdminReportCostEditor({
   const markupPercent = Number(materialMarkupPercent);
   const safeMarkupPercent = Number.isFinite(markupPercent) ? markupPercent : 0;
   const markedMaterialsTotal = materialsTotal * (1 + safeMarkupPercent / 100);
-  const materialEconomicPercent = materialsTotal > 0
-    ? ((markedMaterialsTotal - materialsTotal) / materialsTotal) * 100
+
+  const currentMissingCosts =
+    workers.filter((worker) => workerRates[worker.id] === '' || !Number.isFinite(Number(workerRates[worker.id]))).length
+    + materials.filter((material) => materialPrices[material.id] === '' || !Number.isFinite(Number(materialPrices[material.id]))).length;
+  const totalMissingCosts = otherPlantMissingCosts + currentMissingCosts;
+  const jobLaborCost = otherPlantLaborCost + laborTotal;
+  const jobMaterialCost = otherPlantMaterialCost + materialsTotal;
+  const jobCostToDate = jobLaborCost + jobMaterialCost;
+  const selectedQuote = quoteOptions.find((quote) => quote.id === selectedQuoteId) ?? null;
+  const quoteValue = selectedQuote?.value_ex_vat == null ? null : Number(selectedQuote.value_ex_vat);
+  const jobResult = quoteValue == null ? null : quoteValue - jobCostToDate;
+  const jobMarginPercent = quoteValue != null && quoteValue > 0 && jobResult != null
+    ? (jobResult / quoteValue) * 100
     : null;
-  const economicClass = materialEconomicPercent == null
+  const economicClass = jobMarginPercent == null
     ? 'bg-slate-100 text-slate-600'
-    : materialEconomicPercent > 0.005
+    : jobMarginPercent > 0.005
       ? 'bg-green-100 text-green-800'
-      : materialEconomicPercent < -0.005
+      : jobMarginPercent < -0.005
         ? 'bg-red-100 text-red-800'
         : 'bg-amber-100 text-amber-800';
-  const economicLabel = materialEconomicPercent == null
+  const economicLabel = jobMarginPercent == null
     ? 'N/D'
-    : materialEconomicPercent > 0.005
-      ? `GUADAGNO +${materialEconomicPercent.toLocaleString('it-IT', { maximumFractionDigits: 2 })}%`
-      : materialEconomicPercent < -0.005
-        ? `PERDITA ${materialEconomicPercent.toLocaleString('it-IT', { maximumFractionDigits: 2 })}%`
+    : jobMarginPercent > 0.005
+      ? `GUADAGNO +${jobMarginPercent.toLocaleString('it-IT', { maximumFractionDigits: 2 })}%`
+      : jobMarginPercent < -0.005
+        ? `PERDITA ${jobMarginPercent.toLocaleString('it-IT', { maximumFractionDigits: 2 })}%`
         : 'PARI 0%';
+
+  const saveQuoteLink = async () => {
+    setLinkingQuote(true);
+    setCostError(null);
+    try {
+      const quoteRequestId = selectedQuoteId || null;
+      await setPlantQuoteLink(plantId, quoteRequestId);
+      onQuoteLinkChanged(quoteRequestId);
+    } catch (err) {
+      setCostError(err instanceof Error ? err.message : 'Collegamento al preventivo non riuscito.');
+    } finally {
+      setLinkingQuote(false);
+    }
+  };
 
   const saveCosts = async () => {
     setSavingCosts(true);
@@ -513,6 +627,88 @@ function AdminReportCostEditor({
         <div className="py-5 text-center"><Loader2 className="mx-auto animate-spin text-emerald-700" /></div>
       ) : (
         <div className="space-y-5">
+          <section className="rounded-2xl border border-blue-200 bg-blue-50/50 p-3 sm:p-4">
+            <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h5 className="text-sm font-bold uppercase tracking-wide text-blue-950">Andamento commessa vs preventivo</h5>
+                <p className="mt-0.5 text-[11px] text-blue-800">
+                  Collega l'impianto al preventivo: il confronto usa tutti i rapportini registrati per questo impianto.
+                </p>
+              </div>
+              <div className={`rounded-full px-3 py-2 text-xs font-bold ${economicClass}`}>
+                {economicLabel}
+              </div>
+            </div>
+
+            <div className="grid gap-2 lg:grid-cols-[1fr_auto]">
+              <select
+                value={selectedQuoteId}
+                onChange={(e) => setSelectedQuoteId(e.target.value)}
+                className={inputClass}
+                aria-label="Preventivo collegato alla commessa"
+              >
+                <option value="">Nessun preventivo collegato</option>
+                {quoteOptions
+                  .filter((quote) => quote.status !== 'RIFIUTATO' && quote.value_ex_vat != null)
+                  .map((quote) => (
+                    <option key={quote.id} value={quote.id}>
+                      {quote.progressive_number}/{quote.series} · {quote.client} · {quote.status} · {Number(quote.value_ex_vat).toLocaleString('it-IT', { style: 'currency', currency: 'EUR' })}
+                    </option>
+                  ))}
+              </select>
+              <button
+                type="button"
+                onClick={() => void saveQuoteLink()}
+                disabled={linkingQuote}
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-900 px-4 py-2.5 text-xs font-semibold text-white disabled:opacity-50"
+              >
+                {linkingQuote ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+                Collega preventivo
+              </button>
+            </div>
+
+            <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+              <div className="rounded-xl bg-white p-3">
+                <div className="text-[10px] font-bold uppercase text-slate-400">Valore preventivo</div>
+                <div className="mt-1 text-sm font-bold text-slate-900">
+                  {quoteValue == null ? '—' : quoteValue.toLocaleString('it-IT', { style: 'currency', currency: 'EUR' })}
+                </div>
+              </div>
+              <div className="rounded-xl bg-white p-3">
+                <div className="text-[10px] font-bold uppercase text-slate-400">Costo sostenuto finora</div>
+                <div className="mt-1 text-sm font-bold text-slate-900">
+                  {jobCostToDate.toLocaleString('it-IT', { style: 'currency', currency: 'EUR' })}
+                </div>
+                <div className="mt-1 text-[10px] text-slate-400">
+                  Manodopera {jobLaborCost.toLocaleString('it-IT', { style: 'currency', currency: 'EUR' })} · Materiali {jobMaterialCost.toLocaleString('it-IT', { style: 'currency', currency: 'EUR' })}
+                </div>
+              </div>
+              <div className="rounded-xl bg-white p-3">
+                <div className="text-[10px] font-bold uppercase text-slate-400">Risultato attuale</div>
+                <div className={`mt-1 text-sm font-bold ${jobResult == null ? 'text-slate-500' : jobResult >= 0 ? 'text-green-700' : 'text-red-700'}`}>
+                  {jobResult == null ? '—' : jobResult.toLocaleString('it-IT', { style: 'currency', currency: 'EUR' })}
+                </div>
+              </div>
+              <div className="rounded-xl bg-white p-3">
+                <div className="text-[10px] font-bold uppercase text-slate-400">Margine attuale</div>
+                <div className={`mt-1 text-sm font-bold ${jobMarginPercent == null ? 'text-slate-500' : jobMarginPercent > 0.005 ? 'text-green-700' : jobMarginPercent < -0.005 ? 'text-red-700' : 'text-amber-700'}`}>
+                  {jobMarginPercent == null ? '—' : `${jobMarginPercent.toLocaleString('it-IT', { maximumFractionDigits: 2 })}%`}
+                </div>
+              </div>
+            </div>
+
+            {selectedQuote && selectedQuote.status !== 'ACCETTATO' && (
+              <p className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-[11px] text-amber-900">
+                Il preventivo collegato è in stato {selectedQuote.status}. Il confronto è disponibile, ma il valore potrebbe non essere ancora definitivo.
+              </p>
+            )}
+            {totalMissingCosts > 0 && (
+              <p className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-[11px] text-amber-900">
+                Andamento parziale: {totalMissingCosts} voce/i di costo nei rapportini dell'impianto non sono ancora valorizzate.
+              </p>
+            )}
+          </section>
+
           <section className="rounded-2xl border border-slate-200 bg-white p-3 sm:p-4">
             <div className="mb-3">
               <h5 className="text-sm font-bold uppercase tracking-wide text-slate-800">Squadra</h5>
@@ -566,24 +762,19 @@ function AdminReportCostEditor({
                 <h5 className="text-sm font-bold uppercase tracking-wide text-slate-800">Materiale</h5>
                 <p className="mt-0.5 text-[11px] text-slate-500">Costo aziendale, ricarico e valore ricaricato vengono calcolati riga per riga.</p>
               </div>
-              <div className="flex flex-wrap items-end gap-2">
-                <label className="text-[11px] font-semibold text-slate-600">
-                  Ricarico %
-                  <input
-                    type="number"
-                    min="-100"
-                    max="1000"
-                    step="0.01"
-                    value={materialMarkupPercent}
-                    onChange={(e) => setMaterialMarkupPercent(e.target.value)}
-                    className="ml-2 w-28 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-red-400 focus:ring-2 focus:ring-red-100"
-                    aria-label="Percentuale di ricarico materiale"
-                  />
-                </label>
-                <div className={`rounded-full px-3 py-2 text-xs font-bold ${economicClass}`}>
-                  {economicLabel}
-                </div>
-              </div>
+              <label className="text-[11px] font-semibold text-slate-600">
+                Ricarico %
+                <input
+                  type="number"
+                  min="-100"
+                  max="1000"
+                  step="0.01"
+                  value={materialMarkupPercent}
+                  onChange={(e) => setMaterialMarkupPercent(e.target.value)}
+                  className="ml-2 w-28 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-red-400 focus:ring-2 focus:ring-red-100"
+                  aria-label="Percentuale di ricarico materiale"
+                />
+              </label>
             </div>
 
             {materials.length === 0 ? (
