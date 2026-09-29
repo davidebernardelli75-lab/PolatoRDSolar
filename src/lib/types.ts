@@ -220,3 +220,46 @@ export interface QuoteRequestFile {
   file_size: number;
   created_at: string;
 }
+
+
+export type WorkReportStatus = 'BOZZA' | 'DA_VERIFICARE' | 'APPROVATO' | 'DA_CORREGGERE';
+
+export interface WorkReport {
+  id: string;
+  plant_id: string;
+  report_date: string;
+  team_name: string;
+  work_description: string | null;
+  notes: string | null;
+  status: WorkReportStatus;
+  created_by: string;
+  submitted_at: string | null;
+  approved_by: string | null;
+  approved_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface WorkReportWorker {
+  id: string;
+  report_id: string;
+  worker_name: string;
+  hours: number;
+  notes: string | null;
+  created_at: string;
+}
+
+export interface WorkReportMaterial {
+  id: string;
+  report_id: string;
+  item_code: string | null;
+  description: string;
+  quantity: number;
+  unit: string;
+  notes: string | null;
+  created_at: string;
+}
+
+export type WorkReportInsert = Omit<WorkReport, 'id' | 'created_by' | 'submitted_at' | 'approved_by' | 'approved_at' | 'created_at' | 'updated_at'>;
+export type WorkReportWorkerInput = Pick<WorkReportWorker, 'worker_name' | 'hours' | 'notes'>;
+export type WorkReportMaterialInput = Pick<WorkReportMaterial, 'item_code' | 'description' | 'quantity' | 'unit' | 'notes'>;
