@@ -1,5 +1,5 @@
 import { supabase, STORAGE_BUCKET, QUOTE_FILES_BUCKET } from './supabase';
-import type { Plant, Panel, PanelPhoto, PlantInsert, PlantUpdate, PanelInsert, RoadmapTask, PlantInverter, PlantStorage, PlantCharger, PlantInverterInsert, PlantStorageInsert, PlantChargerInsert, PlantPowerMeter, PlantPowerMeterInsert, Vehicle, VehicleInsert, Insurance, InsuranceInsert, EquipmentCatalogEntry, EquipmentCategory, QuoteRequest, QuoteRequestInsert, QuoteRequestFile, WorkReport, WorkReportInsert, WorkReportMaterial, WorkReportMaterialInput, WorkReportWorker, WorkReportWorkerInput, WorkReportStatus, WorkReportMaterialCatalogEntry, WorkReportWorkerCatalogEntry, WorkReportMaterialCostDefault, WorkReportLaborRateDefault, WorkReportMaterialCost, WorkReportWorkerCost } from './types';
+import type { Plant, Panel, PanelPhoto, PlantInsert, PlantUpdate, PanelInsert, RoadmapTask, PlantInverter, PlantStorage, PlantCharger, PlantInverterInsert, PlantStorageInsert, PlantChargerInsert, PlantPowerMeter, PlantPowerMeterInsert, Vehicle, VehicleInsert, Insurance, InsuranceInsert, EquipmentCatalogEntry, EquipmentCategory, QuoteRequest, QuoteRequestInsert, QuoteRequestFile, WorkReport, WorkReportInsert, WorkReportMaterial, WorkReportMaterialInput, WorkReportWorker, WorkReportWorkerInput, WorkReportStatus, WorkReportMaterialCatalogEntry, WorkReportWorkerCatalogEntry, WorkReportMaterialCostDefault, WorkReportLaborRateDefault, WorkReportMaterialCost, WorkReportWorkerCost, WorkReportAdminSummary } from './types';
 
 export async function fetchPlants(): Promise<Plant[]> {
   const { data, error } = await supabase
@@ -96,6 +96,24 @@ export async function fetchWorkReportWorkerCosts(): Promise<WorkReportWorkerCost
     .select('report_worker_id, hourly_rate');
   if (error) throw error;
   return data ?? [];
+}
+
+export async function fetchWorkReportAdminSummary(reportId: string): Promise<WorkReportAdminSummary | null> {
+  const { data, error } = await supabase
+    .from('work_report_admin_summaries')
+    .select('report_id, material_markup_percent')
+    .eq('report_id', reportId)
+    .maybeSingle();
+  if (error) throw error;
+  return data;
+}
+
+export async function setWorkReportMaterialMarkup(reportId: string, markupPercent: number): Promise<void> {
+  const { error } = await supabase.rpc('set_work_report_material_markup', {
+    p_report_id: reportId,
+    p_markup_percent: markupPercent,
+  });
+  if (error) throw error;
 }
 
 export async function setWorkReportMaterialCost(reportMaterialId: string, unitPrice: number): Promise<void> {
