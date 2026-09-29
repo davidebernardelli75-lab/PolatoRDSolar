@@ -209,7 +209,7 @@ export function WorkReportDashboard({ isAdmin }: WorkReportDashboardProps) {
                     <div className="flex flex-wrap items-center gap-2">
                       <h3 className="font-semibold text-slate-900">{plant?.owner_name ?? 'Impianto non disponibile'}</h3>
                       <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${statusClass(report.status)}`}>
-                        {report.status.replaceAll('_', ' ')}
+                        {report.status.replace(/_/g, ' ')}
                       </span>
                     </div>
                     <p className="mt-0.5 text-xs text-slate-500">{plant?.address ?? ''}</p>
