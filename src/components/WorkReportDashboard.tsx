@@ -58,6 +58,7 @@ type WorkerDraft = { worker_name: string; hours: string; rate_type: string; note
 type MaterialDraft = { source_id: string | null; description: string; quantity: string; unit: string; notes: string; unit_price: string };
 
 const inputClass = 'w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-red-400 focus:ring-2 focus:ring-red-100';
+const WORK_REPORT_UNITS = ['PZ', 'MT', 'M²', 'M³', 'KG', 'L', 'ROTOLO', 'BOBINA', 'CONF.', 'SCATOLA', 'KIT', 'COPPIA', 'SET'] as const;
 
 function statusClass(status: WorkReportStatus): string {
   if (status === 'APPROVATO') return 'bg-green-100 text-green-700';
@@ -794,7 +795,7 @@ function WorkReportFormModal({
           team_name: teamName.trim().toUpperCase(),
           work_description: workDescription.trim().toUpperCase() || null,
           notes: notes.trim().toUpperCase() || null,
-          status: report.status === 'DA_CORREGGERE' ? 'DA_CORREGGERE' : 'BOZZA',
+          status: isAdmin ? report.status : (report.status === 'DA_CORREGGERE' ? 'DA_CORREGGERE' : 'BOZZA'),
         });
       } else {
         saved = await createWorkReport({
@@ -803,7 +804,7 @@ function WorkReportFormModal({
           team_name: teamName.trim().toUpperCase(),
           work_description: workDescription.trim().toUpperCase() || null,
           notes: notes.trim().toUpperCase() || null,
-          status: 'BOZZA',
+          status: isAdmin ? 'DA_VERIFICARE' : 'BOZZA',
         });
       }
 
@@ -944,7 +945,17 @@ function WorkReportFormModal({
                       placeholder="Descrizione materiale"
                     />
                     <input type="number" min="0.001" step="0.001" value={material.quantity} onChange={(e) => setMaterialRows((rows) => rows.map((row, i) => i === index ? { ...row, quantity: e.target.value } : row))} className={inputClass} placeholder="Q.tà" />
-                    <input value={material.unit} onChange={(e) => setMaterialRows((rows) => rows.map((row, i) => i === index ? { ...row, unit: e.target.value.toUpperCase() } : row))} className={inputClass} placeholder="PZ" />
+                    <select
+                      value={material.unit}
+                      onChange={(e) => setMaterialRows((rows) => rows.map((row, i) => i === index ? { ...row, unit: e.target.value } : row))}
+                      className={inputClass}
+                      aria-label="Unità di misura materiale"
+                    >
+                      {!WORK_REPORT_UNITS.includes(material.unit as typeof WORK_REPORT_UNITS[number]) && material.unit && (
+                        <option value={material.unit}>{material.unit}</option>
+                      )}
+                      {WORK_REPORT_UNITS.map((unit) => <option key={unit} value={unit}>{unit}</option>)}
+                    </select>
                     {isAdmin && (
                       <input
                         type="number"
@@ -975,12 +986,15 @@ function WorkReportFormModal({
         <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
           <button type="button" onClick={onClose} disabled={busy} className="rounded-xl bg-slate-100 px-4 py-3 text-sm font-semibold text-slate-700 disabled:opacity-50">Annulla</button>
           <button type="button" onClick={() => void save(false)} disabled={busy} className="inline-flex items-center justify-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm font-semibold text-blue-900 disabled:opacity-50">
-            <Save size={17} /> Salva bozza
+            {busy ? <Loader2 size={17} className="animate-spin" /> : <Save size={17} />}
+            {isAdmin ? 'Salva rapportino' : 'Salva bozza'}
           </button>
-          <button type="button" onClick={() => void save(true)} disabled={busy} className="inline-flex items-center justify-center gap-2 rounded-xl bg-red-500 px-4 py-3 text-sm font-semibold text-white disabled:opacity-50">
-            {busy ? <Loader2 size={17} className="animate-spin" /> : <Send size={17} />}
-            Invia in segreteria
-          </button>
+          {!isAdmin && (
+            <button type="button" onClick={() => void save(true)} disabled={busy} className="inline-flex items-center justify-center gap-2 rounded-xl bg-red-500 px-4 py-3 text-sm font-semibold text-white disabled:opacity-50">
+              {busy ? <Loader2 size={17} className="animate-spin" /> : <Send size={17} />}
+              Invia in segreteria
+            </button>
+          )}
         </div>
       </div>
     </div>
