@@ -393,11 +393,12 @@ function AdminReportCostEditor({
       setLoadingCosts(true);
       setCostError(null);
       try {
-        const [materialDefaults, laborDefaults, materialSnapshots, workerSnapshots] = await Promise.all([
+        const [materialDefaults, laborDefaults, materialSnapshots, workerSnapshots, adminSummary] = await Promise.all([
           fetchWorkReportMaterialCostDefaults(),
           fetchWorkReportLaborRateDefaults(),
           fetchWorkReportMaterialCosts(),
           fetchWorkReportWorkerCosts(),
+          fetchWorkReportAdminSummary(reportId),
         ]);
         if (!active) return;
 
@@ -433,6 +434,7 @@ function AdminReportCostEditor({
 
         setMaterialPrices(nextMaterialPrices);
         setWorkerRates(nextWorkerRates);
+        setMaterialMarkupPercent(String(adminSummary?.material_markup_percent ?? 0));
       } catch (err) {
         if (active) setCostError(err instanceof Error ? err.message : 'Impossibile caricare i costi amministrativi.');
       } finally {
@@ -441,7 +443,7 @@ function AdminReportCostEditor({
     };
     void loadCosts();
     return () => { active = false; };
-  }, [materials, workers, materialCatalog, workerCatalog]);
+  }, [reportId, materials, workers, materialCatalog, workerCatalog]);
 
   const laborTotal = workers.reduce((sum, worker) => {
     const rate = Number(workerRates[worker.id]);
