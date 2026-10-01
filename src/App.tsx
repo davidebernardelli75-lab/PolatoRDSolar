@@ -151,18 +151,11 @@ export default function App() {
     }
   };
 
-  const handleChangeArea = async () => {
+  const handleChangeArea = () => {
     setSidebarOpen(false);
     setError(null);
-    const { error: signOutError } = await supabase.auth.signOut();
-    if (signOutError) {
-      setError('Impossibile uscire dall’area corrente. Riprova.');
-      return;
-    }
     setArea('home');
     setView({ name: 'launcher' });
-    setAccess(null);
-    setSession(null);
   };
 
   return (
@@ -173,7 +166,7 @@ export default function App() {
         onNavigate={navigate}
         currentView={currentView}
         isAdmin={adminArea}
-        onChangeArea={() => { void handleChangeArea(); }}
+        onChangeArea={handleChangeArea}
         onSignOut={() => supabase.auth.signOut()}
       />
 
