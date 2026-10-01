@@ -495,11 +495,22 @@ export function CalendarDashboard() {
                                 e.stopPropagation();
                                 openEventSummary(event);
                               }}
-                              className={`flex w-full items-center gap-1.5 rounded-lg border px-2 py-1.5 text-left text-[10px] font-semibold ${style.soft} ${style.text} ${style.border}`}
+                              className={`w-full rounded-lg border px-2 py-1.5 text-left text-[10px] font-semibold ${style.soft} ${style.text} ${style.border}`}
                             >
-                              <span>{iconFor(category?.icon_key ?? 'star')}</span>
-                              <span className="min-w-0 flex-1 break-words">{event.title}</span>
-                              {!event.all_day && event.start_time && <span className="shrink-0 opacity-70">{event.start_time.slice(0, 5)}</span>}
+                              <span className="flex min-w-0 items-start gap-1.5">
+                                <span className="shrink-0 leading-[1.25]">{iconFor(category?.icon_key ?? 'star')}</span>
+                                <span
+                                  className="line-clamp-2 min-w-0 flex-1 whitespace-normal break-normal [overflow-wrap:normal] [word-break:normal] leading-[1.25]"
+                                  title={event.title}
+                                >
+                                  {event.title}
+                                </span>
+                              </span>
+                              {!event.all_day && event.start_time && (
+                                <span className="mt-1 block whitespace-nowrap text-right text-[9px] leading-none opacity-70">
+                                  {event.start_time.slice(0, 5)}
+                                </span>
+                              )}
                             </button>
                           );
                         })}
