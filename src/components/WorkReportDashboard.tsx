@@ -1217,7 +1217,10 @@ function WorkReportFormModal({
           team_name: teamName.trim().toUpperCase(),
           work_description: workDescription.trim().toUpperCase() || null,
           notes: notes.trim().toUpperCase() || null,
-          status: isAdmin ? report.status : (report.status === 'DA_CORREGGERE' ? 'DA_CORREGGERE' : 'BOZZA'),
+          status: isAdmin
+            ? report.status
+            : (report.status === 'APPROVATO' ? 'DA_VERIFICARE' : (report.status === 'DA_CORREGGERE' ? 'DA_CORREGGERE' : 'BOZZA')),
+          submitted_at: !isAdmin && report.status === 'APPROVATO' ? new Date().toISOString() : report.submitted_at,
         });
       } else {
         saved = await createWorkReport({
