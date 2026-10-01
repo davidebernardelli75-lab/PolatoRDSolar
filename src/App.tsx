@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { Session } from '@supabase/supabase-js';
-import { supabase } from '@/lib/supabase';
+import { clearLocalSupabaseAuth, supabase } from '@/lib/supabase';
 import { fetchAppRole, type AppRole } from '@/lib/access';
 import type { Plant } from '@/lib/types';
 import { fetchPlants, deletePlant, fetchAllRoadmapProgress, updatePlant } from '@/lib/api';
@@ -162,9 +162,20 @@ export default function App() {
     setSidebarOpen(false);
     setError(null);
 
-    const { error: signOutError } = await supabase.auth.signOut({ scope: 'local' });
-    if (signOutError) {
-      setError('Impossibile disconnettersi. Riprova.');
+    let requiresHardReset = false;
+    try {
+      const { error: signOutError } = await supabase.auth.signOut({ scope: 'local' });
+      requiresHardReset = Boolean(signOutError);
+    } catch {
+      requiresHardReset = true;
+    }
+
+    if (requiresHardReset) {
+      try {
+        clearLocalSupabaseAuth();
+      } finally {
+        window.location.replace(window.location.pathname);
+      }
       return;
     }
 
