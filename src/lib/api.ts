@@ -1,5 +1,5 @@
 import { supabase, STORAGE_BUCKET, QUOTE_FILES_BUCKET } from './supabase';
-import type { Plant, Panel, PanelPhoto, PlantInsert, PlantUpdate, PanelInsert, RoadmapTask, PlantInverter, PlantStorage, PlantCharger, PlantInverterInsert, PlantStorageInsert, PlantChargerInsert, PlantPowerMeter, PlantPowerMeterInsert, Vehicle, VehicleInsert, Insurance, InsuranceInsert, EquipmentCatalogEntry, EquipmentCategory, QuoteRequest, QuoteRequestInsert, QuoteRequestFile, WorkReport, WorkReportInsert, WorkReportMaterial, WorkReportMaterialInput, WorkReportWorker, WorkReportWorkerInput, WorkReportStatus, WorkReportMaterialCatalogEntry, WorkReportWorkerCatalogEntry, WorkReportMaterialCostDefault, WorkReportLaborRateDefault, WorkReportMaterialCost, WorkReportWorkerCost, WorkReportAdminSummary, PlantQuoteLink } from './types';
+import type { Plant, Panel, PanelPhoto, PlantInsert, PlantUpdate, PanelInsert, RoadmapTask, PlantInverter, PlantStorage, PlantCharger, PlantInverterInsert, PlantStorageInsert, PlantChargerInsert, PlantPowerMeter, PlantPowerMeterInsert, Vehicle, VehicleInsert, Insurance, InsuranceInsert, EquipmentCatalogEntry, EquipmentCategory, QuoteRequest, QuoteRequestInsert, QuoteRequestFile, WorkReport, WorkReportInsert, WorkReportMaterial, WorkReportMaterialInput, WorkReportWorker, WorkReportWorkerInput, WorkReportStatus, WorkReportMaterialCatalogEntry, WorkReportWorkerCatalogEntry, WorkReportMaterialCostDefault, WorkReportLaborRateDefault, WorkReportMaterialCost, WorkReportWorkerCost, WorkReportAdminSummary, PlantQuoteLink, CalendarEvent, CalendarEventInsert, CalendarEventCategory } from './types';
 
 export async function fetchPlants(): Promise<Plant[]> {
   const { data, error } = await supabase
@@ -836,4 +836,65 @@ export async function replaceWorkReportMaterials(reportId: string, materials: Wo
     if (rememberError) throw rememberError;
   }
   return inserted;
+}
+
+
+// ── Admin Calendar ─────────────────────────────────────────────────
+
+export async function fetchCalendarEventCategories(): Promise<CalendarEventCategory[]> {
+  const { data, error } = await supabase
+    .from('calendar_event_categories')
+    .select('*')
+    .eq('active', true)
+    .order('sort_order', { ascending: true })
+    .order('label', { ascending: true });
+  if (error) throw error;
+  return data ?? [];
+}
+
+export async function rememberCalendarCustomCategory(label: string): Promise<CalendarEventCategory> {
+  const { data, error } = await supabase.rpc('remember_calendar_custom_category', {
+    p_label: label,
+  });
+  if (error) throw error;
+  return data as CalendarEventCategory;
+}
+
+export async function fetchCalendarEvents(): Promise<CalendarEvent[]> {
+  const { data, error } = await supabase
+    .from('calendar_events')
+    .select('*')
+    .order('event_date', { ascending: true })
+    .order('start_time', { ascending: true, nullsFirst: true });
+  if (error) throw error;
+  return data ?? [];
+}
+
+export async function createCalendarEvent(input: CalendarEventInsert): Promise<CalendarEvent> {
+  const { data, error } = await supabase
+    .from('calendar_events')
+    .insert(input)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+export async function updateCalendarEvent(id: string, input: Partial<CalendarEventInsert>): Promise<CalendarEvent> {
+  const { data, error } = await supabase
+    .from('calendar_events')
+    .update({ ...input, updated_at: new Date().toISOString() })
+    .eq('id', id)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+export async function deleteCalendarEvent(id: string): Promise<void> {
+  const { error } = await supabase
+    .from('calendar_events')
+    .delete()
+    .eq('id', id);
+  if (error) throw error;
 }
