@@ -766,6 +766,11 @@ export async function deleteWorkReport(id: string): Promise<void> {
   if (error) throw error;
 }
 
+export async function deleteWorkReportJob(plantId: string): Promise<void> {
+  const { error } = await supabase.rpc('delete_work_report_job', { p_plant_id: plantId });
+  if (error) throw error;
+}
+
 export async function replaceWorkReportWorkers(reportId: string, workers: WorkReportWorkerInput[]): Promise<void> {
   const { error: deleteError } = await supabase.from('work_report_workers').delete().eq('report_id', reportId);
   if (deleteError) throw deleteError;
