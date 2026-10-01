@@ -15,6 +15,7 @@ import { InsuranceDashboard } from '@/components/InsuranceDashboard';
 import { TrainingDashboard } from '@/components/TrainingDashboard';
 import { QuoteDashboard } from '@/components/QuoteDashboard';
 import { WorkReportDashboard } from '@/components/WorkReportDashboard';
+import { CalendarDashboard } from '@/components/CalendarDashboard';
 import { ModuleLauncher } from '@/components/ModuleLauncher';
 
 export type View =
@@ -27,7 +28,8 @@ export type View =
   | { name: 'vehicles' }
   | { name: 'insurances' }
   | { name: 'training' }
-  | { name: 'quotes' };
+  | { name: 'quotes' }
+  | { name: 'calendar' };
 
 export default function App() {
   const [session, setSession] = useState<Session | null>(null);
@@ -124,7 +126,7 @@ export default function App() {
 
   const isAdmin = access?.userId === session.user.id && access.role === 'admin';
   const adminArea = isAdmin && area === 'admin';
-  const restricted = (v: View) => v.name === 'vehicles' || v.name === 'insurances' || v.name === 'training' || v.name === 'quotes';
+  const restricted = (v: View) => v.name === 'vehicles' || v.name === 'insurances' || v.name === 'training' || v.name === 'quotes' || v.name === 'calendar';
   const currentView: View = !adminArea && restricted(view) ? { name: 'dashboard' } : view;
   const navigate = (v: View) => {
     // Navigation is secondary. Supabase RLS is the real permission boundary.
@@ -283,6 +285,9 @@ export default function App() {
           )}
           {adminArea && currentView.name === 'quotes' && (
             <QuoteDashboard />
+          )}
+          {adminArea && currentView.name === 'calendar' && (
+            <CalendarDashboard />
           )}
         </main>
       </div>

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Sun, LayoutGrid, LogOut, X, KeyRound, Eye, EyeOff, Car, AlertTriangle, ShieldCheck, GraduationCap, FileSpreadsheet, ClipboardList } from 'lucide-react';
+import { Sun, LayoutGrid, LogOut, X, KeyRound, Eye, EyeOff, Car, AlertTriangle, ShieldCheck, GraduationCap, FileSpreadsheet, ClipboardList, CalendarDays } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import type { View } from '@/App';
 import { fetchVehicles } from '@/lib/api';
@@ -64,6 +64,7 @@ export function Sidebar({ open, onClose, onNavigate, currentView, isAdmin, onSig
       { id: 'insurances' as const, label: 'Assicurazioni', icon: ShieldCheck },
       { id: 'training' as const, label: 'Formazione personale', icon: GraduationCap },
       { id: 'quotes' as const, label: 'Preventivi', icon: FileSpreadsheet },
+      { id: 'calendar' as const, label: 'Calendario', icon: CalendarDays },
     ] : []),
   ];
 
@@ -109,7 +110,8 @@ export function Sidebar({ open, onClose, onNavigate, currentView, isAdmin, onSig
               (item.id === 'vehicles' && currentView.name === 'vehicles') ||
               (item.id === 'insurances' && currentView.name === 'insurances') ||
               (item.id === 'training' && currentView.name === 'training') ||
-              (item.id === 'quotes' && currentView.name === 'quotes');
+              (item.id === 'quotes' && currentView.name === 'quotes') ||
+              (item.id === 'calendar' && currentView.name === 'calendar');
             const badge = 'badge' in item && item.badge ? item.badge : 0;
             return (
               <button
