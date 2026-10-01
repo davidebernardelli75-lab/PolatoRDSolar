@@ -1,4 +1,5 @@
 import {
+  CalendarDays,
   Car,
   ClipboardList,
   FileSpreadsheet,
@@ -51,6 +52,12 @@ export function ModuleLauncher({ isAdmin, onNavigate }: ModuleLauncherProps) {
         label: 'Preventivi',
         description: 'Richieste, sopralluoghi, valori, allegati e stato dei preventivi.',
         icon: FileSpreadsheet,
+      },
+      {
+        id: 'calendar' as const,
+        label: 'Calendario',
+        description: 'Scadenze, appuntamenti, ricorrenze, task e promemoria aziendali o personali.',
+        icon: CalendarDays,
       },
     ] : []),
   ];
