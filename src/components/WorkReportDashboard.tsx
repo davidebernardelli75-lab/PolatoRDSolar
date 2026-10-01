@@ -558,6 +558,7 @@ export function WorkReportDashboard({ isAdmin }: WorkReportDashboardProps) {
                         onClick={() => void removeJob(group.plantId, group.reports.length)}
                         disabled={associationBusy}
                         className="rounded-lg border border-red-300 bg-white px-3 py-2 text-xs font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50"
+                        aria-label="Elimina definitivamente il cantiere e i relativi rapportini"
                       >
                         Elimina cantiere
                       </button>
