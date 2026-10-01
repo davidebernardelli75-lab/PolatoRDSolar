@@ -1704,7 +1704,7 @@ function WorkReportFormModal({
           <button type="button" onClick={onClose} disabled={busy} className="rounded-xl bg-slate-100 px-4 py-3 text-sm font-semibold text-slate-700 disabled:opacity-50">Annulla</button>
           <button type="button" onClick={() => void save(false)} disabled={busy} className="inline-flex items-center justify-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm font-semibold text-blue-900 disabled:opacity-50">
             {busy ? <Loader2 size={17} className="animate-spin" /> : <Save size={17} />}
-            {isAdmin ? 'Salva rapportino' : 'Salva bozza'}
+            {isAdmin ? 'Salva rapportino' : (report?.status === 'APPROVATO' ? 'Salva e reinvia' : 'Salva bozza')}
           </button>
           {!isAdmin && (
             <button type="button" onClick={() => void save(true)} disabled={busy} className="inline-flex items-center justify-center gap-2 rounded-xl bg-red-500 px-4 py-3 text-sm font-semibold text-white disabled:opacity-50">
