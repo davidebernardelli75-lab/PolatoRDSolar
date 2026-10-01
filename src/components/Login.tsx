@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useRef, useState, type FormEvent } from 'react';
 import { Building2, HardHat, LockKeyhole, Mail, Eye, EyeOff, ArrowLeft } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 
@@ -8,7 +8,7 @@ type Portal = 'admin' | 'fv';
 export function Login({ signedIn = false, canAdmin = true, onSignedIn, onSelectArea }: LoginProps) {
   const [portal, setPortal] = useState<Portal | null>(null);
   const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const passwordRef = useRef<HTMLInputElement>(null);
   const [visible, setVisible] = useState(false);
   const [busy, setBusy] = useState(false);
   const [recovering, setRecovering] = useState(false);
@@ -19,7 +19,6 @@ export function Login({ signedIn = false, canAdmin = true, onSignedIn, onSelectA
     if (signedIn) { if (choice === 'admin' && !canAdmin) return; onSelectArea?.(choice); return; }
     setPortal(choice);
     setEmail(choice === 'admin' ? 'amministrazione@polatord.it' : 'energia@polatord.it');
-    setPassword('');
     setMessage(null); setError(null);
   };
 
@@ -28,7 +27,7 @@ export function Login({ signedIn = false, canAdmin = true, onSignedIn, onSelectA
     setBusy(true); setError(null); setMessage(null);
     try {
       const { error: authError } = await supabase.auth.signInWithPassword({
-        email: email.trim().toLowerCase(), password,
+        email: email.trim().toLowerCase(), password: passwordRef.current?.value ?? '',
       });
       if (authError) setError('Accesso non riuscito. Verifica email e password.');
       else onSignedIn?.(portal ?? 'admin');
@@ -78,7 +77,7 @@ export function Login({ signedIn = false, canAdmin = true, onSignedIn, onSelectA
           </div>
         ) : (
           <div className="mx-auto max-w-md space-y-5 p-6 md:p-9">
-            <button type="button" onClick={() => { setPortal(null); setPassword(''); setError(null); }}
+            <button type="button" onClick={() => { setPortal(null); setError(null); }}
               className="flex items-center gap-2 text-sm text-slate-600 hover:text-blue-900"><ArrowLeft size={16} />Torna alla scelta</button>
             <div className="flex items-center gap-3 text-blue-900">
               {portal === 'admin' ? <Building2 size={27} /> : <HardHat size={27} />}
@@ -92,9 +91,19 @@ export function Login({ signedIn = false, canAdmin = true, onSignedIn, onSelectA
               </label>
               <label className="block text-sm font-semibold text-slate-700">Password
                 <div className="relative mt-1">
-                  <input type={visible ? 'text' : 'password'}  data-preserve-case="true" autoCapitalize="none" spellCheck={false} required autoComplete="current-password"
-                    value={password} onChange={(e) => setPassword(e.target.value)}
-                    className="w-full rounded-lg border border-slate-300 px-3 py-3 pr-12 focus:border-blue-900 focus:outline-none" />
+                  <input
+                    key={portal}
+                    ref={passwordRef}
+                    type={visible ? 'text' : 'password'}
+                    name={portal === 'fv' ? 'fv-portal-password' : 'admin-portal-password'}
+                    data-preserve-case="true"
+                    autoCapitalize="none"
+                    spellCheck={false}
+                    required
+                    autoComplete="current-password"
+                    defaultValue=""
+                    className="w-full rounded-lg border border-slate-300 px-3 py-3 pr-12 focus:border-blue-900 focus:outline-none"
+                  />
                   <button type="button" onClick={() => setVisible(v => !v)}
                     className="absolute right-3 top-3 text-slate-500" aria-label={visible ? 'Nascondi password' : 'Mostra password'}>
                     {visible ? <EyeOff size={19} /> : <Eye size={19} />}

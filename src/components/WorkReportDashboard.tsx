@@ -36,6 +36,7 @@ import type {
 import {
   createWorkReport,
   deleteWorkReport,
+  deleteWorkReportGroup,
   fetchPlants,
   fetchQuoteRequests,
   fetchWorkReportAdminSummary,
@@ -95,6 +96,7 @@ export function WorkReportDashboard({ isAdmin }: WorkReportDashboardProps) {
   const [expandedGroupKey, setExpandedGroupKey] = useState<string | null>(null);
   const [associationEditingGroupKey, setAssociationEditingGroupKey] = useState<string | null>(null);
   const [associationBusyGroupKey, setAssociationBusyGroupKey] = useState<string | null>(null);
+  const [deletingGroupKey, setDeletingGroupKey] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<'TUTTI' | WorkReportStatus>('TUTTI');
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -282,14 +284,39 @@ export function WorkReportDashboard({ isAdmin }: WorkReportDashboardProps) {
     }
   };
 
+  const removeGroup = async (
+    groupKey: string,
+    quoteRequestId: string | null,
+    reportIds: string[],
+    label: string,
+    totalReportCount: number,
+  ) => {
+    if (!window.confirm(
+      `Eliminare definitivamente il cantiere "${label}"?\n\nVerranno eliminati tutti i ${totalReportCount} rapportini del cantiere con ore, materiali e costi collegati. Il preventivo resterà nel registro preventivi. Questa operazione non è annullabile.`,
+    )) return;
+
+    setDeletingGroupKey(groupKey);
+    setError(null);
+    try {
+      await deleteWorkReportGroup(quoteRequestId, reportIds);
+      setExpandedGroupKey(null);
+      setAssociationEditingGroupKey(null);
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Eliminazione cantiere non riuscita.');
+    } finally {
+      setDeletingGroupKey(null);
+    }
+  };
+
   const renderReportCard = (report: WorkReport, nested = false) => {
     const plant = report.plant_id ? plantById.get(report.plant_id) : undefined;
     const reportWorkers = workers.filter((worker) => worker.report_id === report.id);
     const reportMaterials = materials.filter((material) => material.report_id === report.id);
     const hours = reportWorkers.reduce((sum, worker) => sum + Number(worker.hours || 0), 0);
     const expanded = expandedId === report.id;
-    const editable = isAdmin || report.status === 'BOZZA' || report.status === 'DA_CORREGGERE';
-    const deletable = isAdmin || report.status === 'BOZZA' || report.status === 'DA_CORREGGERE';
+    const editable = true;
+    const deletable = true;
 
     return (
       <article
@@ -588,6 +615,13 @@ export function WorkReportDashboard({ isAdmin }: WorkReportDashboardProps) {
               : `${displayDate(oldestDate)} → ${displayDate(newestDate)}`;
             const correctingAssociation = associationEditingGroupKey === group.key;
             const associationBusy = associationBusyGroupKey === group.key;
+            const deletingGroup = deletingGroupKey === group.key;
+            const totalGroupReports = group.quoteRequestId
+              ? reports.filter((report) => report.quote_request_id === group.quoteRequestId).length
+              : group.reports.length;
+            const groupLabel = quote
+              ? `${quote.progressive_number}/${quote.series} - ${quote.client}`
+              : primaryReport.client_reference;
 
             return (
               <section key={group.key} className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
@@ -652,12 +686,26 @@ export function WorkReportDashboard({ isAdmin }: WorkReportDashboardProps) {
                             group.quoteRequestId,
                             null,
                           )}
-                          disabled={associationBusy}
+                          disabled={associationBusy || deletingGroup}
                           className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-700 hover:bg-red-100 disabled:opacity-50"
                         >
                           Scollega preventivo
                         </button>
                       )}
+                      <button
+                        type="button"
+                        onClick={() => void removeGroup(
+                          group.key,
+                          group.quoteRequestId,
+                          group.reports.map((report) => report.id),
+                          groupLabel,
+                          totalGroupReports,
+                        )}
+                        disabled={associationBusy || deletingGroup}
+                        className="rounded-lg border border-red-300 bg-white px-3 py-2 text-xs font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50"
+                      >
+                        {deletingGroup ? 'Eliminazione…' : 'Elimina cantiere'}
+                      </button>
                       <button
                         type="button"
                         onClick={() => setExpandedGroupKey(groupExpanded ? null : group.key)}
@@ -1426,7 +1474,10 @@ function WorkReportFormModal({
           team_name: teamName.trim().toUpperCase(),
           work_description: workDescription.trim().toUpperCase() || null,
           notes: notes.trim().toUpperCase() || null,
-          status: isAdmin ? report.status : (report.status === 'DA_CORREGGERE' ? 'DA_CORREGGERE' : 'BOZZA'),
+          status: isAdmin
+            ? report.status
+            : (report.status === 'APPROVATO' ? 'DA_VERIFICARE' : (report.status === 'DA_CORREGGERE' ? 'DA_CORREGGERE' : 'BOZZA')),
+          submitted_at: !isAdmin && report.status === 'APPROVATO' ? new Date().toISOString() : report.submitted_at,
         });
       } else {
         saved = await createWorkReport({
@@ -1653,7 +1704,7 @@ function WorkReportFormModal({
           <button type="button" onClick={onClose} disabled={busy} className="rounded-xl bg-slate-100 px-4 py-3 text-sm font-semibold text-slate-700 disabled:opacity-50">Annulla</button>
           <button type="button" onClick={() => void save(false)} disabled={busy} className="inline-flex items-center justify-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm font-semibold text-blue-900 disabled:opacity-50">
             {busy ? <Loader2 size={17} className="animate-spin" /> : <Save size={17} />}
-            {isAdmin ? 'Salva rapportino' : 'Salva bozza'}
+            {isAdmin ? 'Salva rapportino' : (report?.status === 'APPROVATO' ? 'Salva e reinvia' : 'Salva bozza')}
           </button>
           {!isAdmin && (
             <button type="button" onClick={() => void save(true)} disabled={busy} className="inline-flex items-center justify-center gap-2 rounded-xl bg-red-500 px-4 py-3 text-sm font-semibold text-white disabled:opacity-50">

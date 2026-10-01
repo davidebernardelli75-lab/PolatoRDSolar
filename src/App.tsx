@@ -15,8 +15,10 @@ import { InsuranceDashboard } from '@/components/InsuranceDashboard';
 import { TrainingDashboard } from '@/components/TrainingDashboard';
 import { QuoteDashboard } from '@/components/QuoteDashboard';
 import { WorkReportDashboard } from '@/components/WorkReportDashboard';
+import { ModuleLauncher } from '@/components/ModuleLauncher';
 
 export type View =
+  | { name: 'launcher' }
   | { name: 'dashboard' }
   | { name: 'new-plant' }
   | { name: 'edit-plant'; plantId: string }
@@ -34,7 +36,7 @@ export default function App() {
   const [area, setArea] = useState<'home' | 'admin' | 'fv'>('home');
   const [access, setAccess] = useState<{ userId: string; role: AppRole } | null>(null);
   const [accessError, setAccessError] = useState<string | null>(null);
-  const [view, setView] = useState<View>({ name: 'dashboard' });
+  const [view, setView] = useState<View>({ name: 'launcher' });
   const [plants, setPlants] = useState<Plant[]>([]);
   const [roadmapProgress, setRoadmapProgress] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
@@ -107,18 +109,18 @@ export default function App() {
   if (passwordRecovery) return (
     <PasswordRecovery onComplete={() => {
       setPasswordRecovery(false);
-      setView({ name: 'dashboard' });
+      setView({ name: 'launcher' });
       window.history.replaceState(null, '', window.location.pathname);
     }} />
   );
-  if (!session) return <Login onSignedIn={(selected) => setArea(selected)} />;
+  if (!session) return <Login onSignedIn={(selected) => { setArea(selected); setView({ name: 'launcher' }); }} />;
   if (!access) return (
     <main className="flex min-h-screen flex-col items-center justify-center gap-4 bg-slate-100 p-5 text-center">
       <p className="text-sm text-slate-700">{accessError ?? 'Verifica dei permessi in corso…'}</p>
       {accessError && <button className="rounded-lg bg-blue-900 px-5 py-2 text-white" onClick={() => { void supabase.auth.signOut(); }}>Esci e riprova</button>}
     </main>
   );
-  if (area === 'home') return <Login signedIn canAdmin={access.role === 'admin'} onSelectArea={(selected) => { setArea(selected); setView({ name: 'dashboard' }); }} />;
+  if (area === 'home') return <Login signedIn canAdmin={access.role === 'admin'} onSelectArea={(selected) => { setArea(selected); setView({ name: 'launcher' }); }} />;
 
   const isAdmin = access?.userId === session.user.id && access.role === 'admin';
   const adminArea = isAdmin && area === 'admin';
@@ -158,7 +160,7 @@ export default function App() {
       return;
     }
     setArea('home');
-    setView({ name: 'dashboard' });
+    setView({ name: 'launcher' });
     setAccess(null);
     setSession(null);
   };
@@ -197,6 +199,9 @@ export default function App() {
               {error && <p>{error}</p>}
               {accessError && <p>{accessError}</p>}
             </div>
+          )}
+          {currentView.name === 'launcher' && (
+            <ModuleLauncher isAdmin={adminArea} onNavigate={navigate} />
           )}
           {currentView.name === 'dashboard' && (
             <Dashboard
