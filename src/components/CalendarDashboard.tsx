@@ -27,6 +27,7 @@ import {
 const inputClass = 'w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none transition focus:border-red-400 focus:ring-2 focus:ring-red-100';
 
 const WEEK_DAYS = ['Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab', 'Dom'];
+const MONTH_NAMES = ['Gennaio', 'Febbraio', 'Marzo', 'Aprile', 'Maggio', 'Giugno', 'Luglio', 'Agosto', 'Settembre', 'Ottobre', 'Novembre', 'Dicembre'];
 const OTHER_CATEGORY = '__OTHER__';
 
 const ICONS: Record<string, string> = {
@@ -128,10 +129,12 @@ export function CalendarDashboard() {
     const now = new Date();
     return new Date(now.getFullYear(), now.getMonth(), 1);
   });
+  const [cursorDate, setCursorDate] = useState(() => new Date());
   const [viewMode, setViewMode] = useState<'month' | 'list'>('month');
-  const [categoryFilter, setCategoryFilter] = useState('ALL');
   const [search, setSearch] = useState('');
   const [editing, setEditing] = useState<CalendarEvent | 'new' | null>(null);
+  const [selectedDay, setSelectedDay] = useState<string | null>(null);
+  const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
   const [newDate, setNewDate] = useState(localIsoDate(new Date()));
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -160,20 +163,31 @@ export function CalendarDashboard() {
     [categories],
   );
 
-  const filteredEvents = useMemo(() => {
+  const searchResults = useMemo(() => {
     const query = search.trim().toLocaleLowerCase('it');
-    return events.filter((event) => {
-      const category = categoryById.get(event.category_id);
-      const categoryHit = categoryFilter === 'ALL' || event.category_id === categoryFilter;
-      const textHit = !query || [event.title, event.notes ?? '', category?.label ?? '']
-        .some((value) => value.toLocaleLowerCase('it').includes(query));
-      return categoryHit && textHit;
-    });
-  }, [events, categoryById, categoryFilter, search]);
+    if (!query) return [];
+
+    return events
+      .filter((event) => {
+        const category = categoryById.get(event.category_id);
+        const searchableValues = [
+          event.title,
+          event.notes ?? '',
+          category?.label ?? '',
+          event.event_date,
+          displayDate(event.event_date),
+          event.start_time?.slice(0, 5) ?? '',
+        ];
+        return searchableValues.some((value) => value.toLocaleLowerCase('it').includes(query));
+      })
+      .sort((a, b) =>
+        a.event_date.localeCompare(b.event_date) || (a.start_time ?? '').localeCompare(b.start_time ?? ''),
+      );
+  }, [events, categoryById, search]);
 
   const eventsByDate = useMemo(() => {
     const map = new Map<string, CalendarEvent[]>();
-    filteredEvents.forEach((event) => {
+    events.forEach((event) => {
       const dayEvents = map.get(event.event_date) ?? [];
       dayEvents.push(event);
       map.set(event.event_date, dayEvents);
@@ -185,30 +199,79 @@ export function CalendarDashboard() {
       });
     });
     return map;
-  }, [filteredEvents]);
+  }, [events]);
 
   const calendarDays = useMemo(() => makeCalendarDays(month), [month]);
   const today = localIsoDate(new Date());
+  const cursorIso = localIsoDate(cursorDate);
 
-  const monthEvents = filteredEvents.filter((event) => {
+  const calendarYears = useMemo(() => {
+    const nowYear = new Date().getFullYear();
+    const years = new Set<number>();
+    for (let year = nowYear - 5; year <= nowYear + 10; year += 1) years.add(year);
+    events.forEach((event) => years.add(Number(event.event_date.slice(0, 4))));
+    return [...years].filter(Number.isFinite).sort((a, b) => a - b);
+  }, [events]);
+
+  const monthEvents = events.filter((event) => {
     const date = new Date(`${event.event_date}T12:00:00`);
     return date.getFullYear() === month.getFullYear() && date.getMonth() === month.getMonth();
   });
 
   const openNew = (date = today) => {
     setNewDate(date);
+    setSelectedDay(null);
+    setSelectedEvent(null);
     setEditing('new');
   };
 
+  const goToDate = (date: Date) => {
+    const normalized = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+    setCursorDate(normalized);
+    setMonth(new Date(normalized.getFullYear(), normalized.getMonth(), 1));
+  };
+
+  const shiftCursorDay = (days: number) => {
+    const next = new Date(cursorDate.getFullYear(), cursorDate.getMonth(), cursorDate.getDate() + days);
+    goToDate(next);
+  };
+
+  const goToday = () => goToDate(new Date());
+
+  const setDisplayedMonth = (year: number, monthIndex: number) => {
+    const maxDay = new Date(year, monthIndex + 1, 0).getDate();
+    const day = Math.min(cursorDate.getDate(), maxDay);
+    setMonth(new Date(year, monthIndex, 1));
+    setCursorDate(new Date(year, monthIndex, day));
+  };
+
+  const openDaySummary = (iso: string) => {
+    const date = new Date(`${iso}T12:00:00`);
+    goToDate(date);
+    setSelectedEvent(null);
+    setSelectedDay(iso);
+  };
+
+  const openEventSummary = (event: CalendarEvent) => {
+    const date = new Date(`${event.event_date}T12:00:00`);
+    goToDate(date);
+    setSelectedDay(null);
+    setSelectedEvent(event);
+  };
+
   const remove = async (event: CalendarEvent) => {
-    if (!window.confirm(`Eliminare l'evento "${event.title}" del ${displayDate(event.event_date)}?`)) return;
+    if (!window.confirm(`Eliminare l'evento "${event.title}" del ${displayDate(event.event_date)}?`)) return false;
     try {
       await deleteCalendarEvent(event.id);
       setEvents((current) => current.filter((item) => item.id !== event.id));
+      return true;
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Eliminazione evento non riuscita.');
+      return false;
     }
   };
+
+  const listEvents = search.trim() ? searchResults : events;
 
   return (
     <div className="mx-auto max-w-7xl p-4 pb-24 lg:p-8">
@@ -239,29 +302,53 @@ export function CalendarDashboard() {
         </div>
       )}
 
-      <div className="mb-4 grid gap-3 lg:grid-cols-[1fr_auto_auto]">
-        <label className="relative">
-          <Search size={16} className="absolute left-3 top-3.5 text-slate-400" />
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Cerca evento, categoria o nota..."
-            className={inputClass + ' pl-9'}
-          />
-        </label>
+      <div className="mb-4 grid gap-3 lg:grid-cols-[1fr_auto]">
+        <div className="relative z-30">
+          <label className="relative block">
+            <Search size={16} className="absolute left-3 top-3.5 text-slate-400" />
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Cerca qualunque evento salvato..."
+              className={inputClass + ' pl-9'}
+            />
+          </label>
 
-        <select
-          value={categoryFilter}
-          onChange={(e) => setCategoryFilter(e.target.value)}
-          className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm"
-        >
-          <option value="ALL">Tutte le categorie</option>
-          {categories.map((category) => (
-            <option key={category.id} value={category.id}>
-              {iconFor(category.icon_key)} {category.label}
-            </option>
-          ))}
-        </select>
+          {search.trim() && (
+            <div className="absolute left-0 right-0 top-full mt-2 max-h-80 overflow-y-auto rounded-2xl border border-slate-200 bg-white p-2 shadow-xl">
+              {searchResults.length === 0 ? (
+                <p className="px-3 py-4 text-sm text-slate-500">Nessun evento trovato.</p>
+              ) : (
+                searchResults.map((event) => {
+                  const category = categoryById.get(event.category_id);
+                  const style = styleFor(category?.color_key ?? 'slate');
+                  return (
+                    <button
+                      key={event.id}
+                      type="button"
+                      onClick={() => {
+                        setSearch('');
+                        openEventSummary(event);
+                      }}
+                      className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left hover:bg-slate-50"
+                    >
+                      <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-lg ring-1 ${style.sticker}`}>
+                        {iconFor(category?.icon_key ?? 'star')}
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm font-semibold text-slate-900">{event.title}</span>
+                        <span className="block text-xs text-slate-500">
+                          {displayDate(event.event_date)} · {displayTime(event.start_time, event.all_day)}
+                          {category?.label ? ` · ${category.label}` : ''}
+                        </span>
+                      </span>
+                    </button>
+                  );
+                })
+              )}
+            </div>
+          )}
+        </div>
 
         <div className="flex rounded-xl border border-slate-200 bg-white p-1">
           <button
@@ -283,35 +370,60 @@ export function CalendarDashboard() {
 
       <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-4 py-4 sm:px-5">
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setMonth((current) => new Date(current.getFullYear(), current.getMonth() - 1, 1))}
-              className="rounded-lg p-2 text-slate-600 hover:bg-slate-100"
-              aria-label="Mese precedente"
-            >
-              <ChevronLeft size={19} />
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                const now = new Date();
-                setMonth(new Date(now.getFullYear(), now.getMonth(), 1));
-              }}
-              className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
-            >
-              Oggi
-            </button>
-            <button
-              type="button"
-              onClick={() => setMonth((current) => new Date(current.getFullYear(), current.getMonth() + 1, 1))}
-              className="rounded-lg p-2 text-slate-600 hover:bg-slate-100"
-              aria-label="Mese successivo"
-            >
-              <ChevronRight size={19} />
-            </button>
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex items-center rounded-xl border border-slate-200 bg-white p-1">
+              <button
+                type="button"
+                onClick={() => shiftCursorDay(-1)}
+                className="rounded-lg p-2 text-slate-600 hover:bg-slate-100"
+                aria-label="Giorno precedente"
+              >
+                <ChevronLeft size={19} />
+              </button>
+              <button
+                type="button"
+                onClick={goToday}
+                className="rounded-lg px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+              >
+                Oggi
+              </button>
+              <button
+                type="button"
+                onClick={() => shiftCursorDay(1)}
+                className="rounded-lg p-2 text-slate-600 hover:bg-slate-100"
+                aria-label="Giorno successivo"
+              >
+                <ChevronRight size={19} />
+              </button>
+            </div>
+            <span className="text-xs font-semibold text-slate-500">
+              {new Intl.DateTimeFormat('it-IT', { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' }).format(cursorDate)}
+            </span>
           </div>
-          <div className="text-lg font-bold text-blue-950">{monthTitle(month)}</div>
+
+          <div className="flex items-center gap-2">
+            <select
+              value={month.getMonth()}
+              onChange={(e) => setDisplayedMonth(month.getFullYear(), Number(e.target.value))}
+              className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-blue-950"
+              aria-label="Seleziona mese"
+            >
+              {MONTH_NAMES.map((name, index) => (
+                <option key={name} value={index}>{name}</option>
+              ))}
+            </select>
+            <select
+              value={month.getFullYear()}
+              onChange={(e) => setDisplayedMonth(Number(e.target.value), month.getMonth())}
+              className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-blue-950"
+              aria-label="Seleziona anno"
+            >
+              {calendarYears.map((year) => (
+                <option key={year} value={year}>{year}</option>
+              ))}
+            </select>
+          </div>
+
           <div className="text-xs font-semibold text-slate-500">
             {monthEvents.length} event{monthEvents.length === 1 ? 'o' : 'i'}
           </div>
@@ -335,57 +447,64 @@ export function CalendarDashboard() {
               <div className="grid grid-cols-7">
                 {calendarDays.map((date) => {
                   const iso = localIsoDate(date);
-                  const inMonth = date.getMonth() === month.getMonth();
+                  const inMonth = date.getMonth() === month.getMonth() && date.getFullYear() === month.getFullYear();
                   const dayEvents = eventsByDate.get(iso) ?? [];
                   const isToday = iso === today;
+                  const isCursorDay = iso === cursorIso;
 
                   return (
-                    <button
+                    <div
                       key={iso}
-                      type="button"
-                      onClick={() => openNew(iso)}
-                      className={`group min-h-[150px] border-b border-r border-slate-100 p-2 text-left align-top transition hover:bg-blue-50/40 ${inMonth ? 'bg-white' : 'bg-slate-50/70'}`}
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => openDaySummary(iso)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          openDaySummary(iso);
+                        }
+                      }}
+                      className={`group min-h-[150px] cursor-pointer border-b border-r border-slate-100 p-2 text-left align-top transition hover:bg-blue-50/40 ${inMonth ? 'bg-white' : 'bg-slate-50/70'} ${isCursorDay ? 'ring-2 ring-inset ring-blue-300' : ''}`}
                     >
                       <div className="mb-2 flex items-center justify-between">
                         <span className={`flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold ${isToday ? 'bg-red-500 text-white' : inMonth ? 'text-slate-700' : 'text-slate-300'}`}>
                           {date.getDate()}
                         </span>
-                        <Plus size={14} className="text-slate-300 opacity-0 transition group-hover:opacity-100" />
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openNew(iso);
+                          }}
+                          className="rounded-md p-1 text-slate-400 transition hover:bg-white hover:text-blue-900"
+                          aria-label={`Aggiungi evento il ${displayDate(iso)}`}
+                        >
+                          <Plus size={15} />
+                        </button>
                       </div>
 
                       <div className="space-y-1">
-                        {dayEvents.slice(0, 3).map((event) => {
+                        {dayEvents.map((event) => {
                           const category = categoryById.get(event.category_id);
                           const style = styleFor(category?.color_key ?? 'slate');
                           return (
-                            <div
+                            <button
                               key={event.id}
-                              role="button"
-                              tabIndex={0}
+                              type="button"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                setEditing(event);
+                                openEventSummary(event);
                               }}
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter' || e.key === ' ') {
-                                  e.preventDefault();
-                                  e.stopPropagation();
-                                  setEditing(event);
-                                }
-                              }}
-                              className={`flex items-center gap-1.5 rounded-lg border px-2 py-1.5 text-[10px] font-semibold ${style.soft} ${style.text} ${style.border}`}
+                              className={`flex w-full items-center gap-1.5 rounded-lg border px-2 py-1.5 text-left text-[10px] font-semibold ${style.soft} ${style.text} ${style.border}`}
                             >
                               <span>{iconFor(category?.icon_key ?? 'star')}</span>
-                              <span className="min-w-0 flex-1 truncate">{event.title}</span>
+                              <span className="min-w-0 flex-1 break-words">{event.title}</span>
                               {!event.all_day && event.start_time && <span className="shrink-0 opacity-70">{event.start_time.slice(0, 5)}</span>}
-                            </div>
+                            </button>
                           );
                         })}
-                        {dayEvents.length > 3 && (
-                          <div className="px-1 text-[10px] font-semibold text-slate-500">+{dayEvents.length - 3} altri</div>
-                        )}
                       </div>
-                    </button>
+                    </div>
                   );
                 })}
               </div>
@@ -393,9 +512,9 @@ export function CalendarDashboard() {
           </div>
         ) : (
           <CalendarList
-            events={filteredEvents}
+            events={listEvents}
             categories={categoryById}
-            onEdit={setEditing}
+            onEdit={openEventSummary}
             onDelete={(event) => void remove(event)}
           />
         )}
@@ -418,6 +537,38 @@ export function CalendarDashboard() {
         </div>
       </section>
 
+      {selectedDay && (
+        <CalendarDaySummaryModal
+          date={selectedDay}
+          events={eventsByDate.get(selectedDay) ?? []}
+          categories={categoryById}
+          onClose={() => setSelectedDay(null)}
+          onEvent={(event) => {
+            setSelectedDay(null);
+            setSelectedEvent(event);
+          }}
+        />
+      )}
+
+      {selectedEvent && (
+        <CalendarEventSummaryModal
+          event={selectedEvent}
+          category={categoryById.get(selectedEvent.category_id)}
+          onClose={() => setSelectedEvent(null)}
+          onEdit={() => {
+            const event = selectedEvent;
+            setSelectedEvent(null);
+            setEditing(event);
+          }}
+          onDelete={() => {
+            const event = selectedEvent;
+            void remove(event).then((deleted) => {
+              if (deleted) setSelectedEvent(null);
+            });
+          }}
+        />
+      )}
+
       {editing && (
         <CalendarEventModal
           event={editing === 'new' ? null : editing}
@@ -430,6 +581,159 @@ export function CalendarDashboard() {
           }}
         />
       )}
+    </div>
+  );
+}
+
+function CalendarDaySummaryModal({
+  date,
+  events,
+  categories,
+  onClose,
+  onEvent,
+}: {
+  date: string;
+  events: CalendarEvent[];
+  categories: Map<string, CalendarEventCategory>;
+  onClose: () => void;
+  onEvent: (event: CalendarEvent) => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/55 p-3 sm:p-4">
+      <div className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-3xl bg-white shadow-2xl">
+        <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
+          <div>
+            <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-red-500">EVENTI DEL GIORNO</div>
+            <h2 className="mt-1 text-lg font-bold text-blue-950">
+              {new Intl.DateTimeFormat('it-IT', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).format(new Date(`${date}T12:00:00`))}
+            </h2>
+          </div>
+          <button type="button" onClick={onClose} className="rounded-lg p-2 text-slate-400 hover:bg-slate-100" aria-label="Chiudi">
+            <X size={20} />
+          </button>
+        </div>
+
+        <div className="p-5">
+          {events.length === 0 ? (
+            <p className="rounded-2xl bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">
+              Nessun evento programmato in questo giorno.
+            </p>
+          ) : (
+            <div className="space-y-2">
+              {events.map((event) => {
+                const category = categories.get(event.category_id);
+                const style = styleFor(category?.color_key ?? 'slate');
+                return (
+                  <button
+                    key={event.id}
+                    type="button"
+                    onClick={() => onEvent(event)}
+                    className={`flex w-full items-center gap-3 rounded-2xl border p-3 text-left transition hover:shadow-sm ${style.soft} ${style.border}`}
+                  >
+                    <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl text-xl ring-1 ${style.sticker}`}>
+                      {iconFor(category?.icon_key ?? 'star')}
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className={`block font-semibold ${style.text}`}>{event.title}</span>
+                      <span className="mt-0.5 block text-xs text-slate-500">
+                        {displayTime(event.start_time, event.all_day)}
+                        {category?.label ? ` · ${category.label}` : ''}
+                      </span>
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CalendarEventSummaryModal({
+  event,
+  category,
+  onClose,
+  onEdit,
+  onDelete,
+}: {
+  event: CalendarEvent;
+  category?: CalendarEventCategory;
+  onClose: () => void;
+  onEdit: () => void;
+  onDelete: () => void;
+}) {
+  const style = styleFor(category?.color_key ?? 'slate');
+
+  return (
+    <div className="fixed inset-0 z-[95] flex items-center justify-center bg-black/55 p-3 sm:p-4">
+      <div className="w-full max-w-xl rounded-3xl bg-white shadow-2xl">
+        <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
+          <div className="flex min-w-0 items-center gap-3">
+            <span className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl text-2xl ring-1 ${style.sticker}`}>
+              {iconFor(category?.icon_key ?? 'star')}
+            </span>
+            <div className="min-w-0">
+              <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-red-500">RIEPILOGO EVENTO</div>
+              <h2 className="mt-1 truncate text-lg font-bold text-blue-950">{event.title}</h2>
+            </div>
+          </div>
+          <button type="button" onClick={onClose} className="rounded-lg p-2 text-slate-400 hover:bg-slate-100" aria-label="Chiudi">
+            <X size={20} />
+          </button>
+        </div>
+
+        <div className="space-y-4 p-5">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="rounded-2xl bg-slate-50 p-3">
+              <div className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Data</div>
+              <div className="mt-1 text-sm font-semibold text-slate-900">{displayDate(event.event_date)}</div>
+            </div>
+            <div className="rounded-2xl bg-slate-50 p-3">
+              <div className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Orario</div>
+              <div className="mt-1 text-sm font-semibold text-slate-900">{displayTime(event.start_time, event.all_day)}</div>
+            </div>
+            <div className="rounded-2xl bg-slate-50 p-3">
+              <div className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Categoria</div>
+              <div className={`mt-1 text-sm font-semibold ${style.text}`}>{category?.label ?? 'Categoria'}</div>
+            </div>
+            <div className="rounded-2xl bg-slate-50 p-3">
+              <div className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Promemoria</div>
+              <div className="mt-1 text-sm font-semibold text-slate-900">
+                {event.reminder_minutes == null ? 'Nessuno' : event.reminder_minutes === 0 ? "All'ora dell'evento" : `${event.reminder_minutes} min prima`}
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-slate-200 p-4">
+            <div className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Note</div>
+            <p className="mt-2 whitespace-pre-wrap text-sm text-slate-700">{event.notes || 'Nessuna nota.'}</p>
+          </div>
+
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-between">
+            <button
+              type="button"
+              onClick={onDelete}
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-red-50 px-4 py-3 text-sm font-semibold text-red-700 hover:bg-red-100"
+            >
+              <Trash2 size={16} /> Elimina
+            </button>
+            <div className="flex gap-2">
+              <button type="button" onClick={onClose} className="rounded-xl bg-slate-100 px-4 py-3 text-sm font-semibold text-slate-700">
+                Chiudi
+              </button>
+              <button
+                type="button"
+                onClick={onEdit}
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-900 px-4 py-3 text-sm font-semibold text-white hover:bg-blue-800"
+              >
+                <Pencil size={16} /> Modifica
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
