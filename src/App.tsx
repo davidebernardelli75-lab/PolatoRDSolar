@@ -158,6 +158,24 @@ export default function App() {
     setView({ name: 'launcher' });
   };
 
+  const handleSignOut = async () => {
+    setSidebarOpen(false);
+    setError(null);
+
+    const { error: signOutError } = await supabase.auth.signOut({ scope: 'local' });
+    if (signOutError) {
+      setError('Impossibile disconnettersi. Riprova.');
+      return;
+    }
+
+    setAccess(null);
+    setSession(null);
+    setArea('home');
+    setView({ name: 'launcher' });
+    setPlants([]);
+    setRoadmapProgress({});
+  };
+
   return (
     <div className="flex h-screen bg-slate-50">
       <Sidebar
@@ -167,7 +185,7 @@ export default function App() {
         currentView={currentView}
         isAdmin={adminArea}
         onChangeArea={handleChangeArea}
-        onSignOut={() => supabase.auth.signOut()}
+        onSignOut={() => { void handleSignOut(); }}
       />
 
       <div className="flex-1 flex flex-col min-w-0">
