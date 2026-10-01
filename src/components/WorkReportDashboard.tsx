@@ -33,6 +33,7 @@ import type {
 import {
   createWorkReport,
   deleteWorkReport,
+  deleteWorkReportJob,
   fetchPlants,
   fetchPlantQuoteLinks,
   fetchQuoteRequests,
@@ -226,7 +227,7 @@ export function WorkReportDashboard({ isAdmin }: WorkReportDashboardProps) {
   };
 
   const remove = async (report: WorkReport) => {
-    if (!window.confirm(`Eliminare il rapportino del ${displayDate(report.report_date)}?`)) return;
+    if (!window.confirm(`Eliminare definitivamente il rapportino del ${displayDate(report.report_date)}? L'operazione è irreversibile.`)) return;
     setBusyId(report.id);
     try {
       await deleteWorkReport(report.id);
@@ -238,14 +239,40 @@ export function WorkReportDashboard({ isAdmin }: WorkReportDashboardProps) {
     }
   };
 
+  const removeJob = async (plantId: string, reportCount: number) => {
+    const plant = plantById.get(plantId);
+    const linkedQuoteId = quoteLinkByPlant.get(plantId);
+    const quote = linkedQuoteId ? quoteById.get(linkedQuoteId) : null;
+    const label = quote
+      ? `${quote.progressive_number}/${quote.series} - ${quote.client}`
+      : (plant?.owner_name ?? 'cantiere selezionato');
+
+    if (!window.confirm(
+      `Eliminare definitivamente il cantiere ${label}?\n\nVerranno eliminati anche ${reportCount} rapportino/i e i relativi dati di ore, materiali e costi. L'operazione è irreversibile.`,
+    )) return;
+
+    setAssociationBusyPlantId(plantId);
+    setError(null);
+    try {
+      await deleteWorkReportJob(plantId);
+      setExpandedGroupKey(null);
+      setAssociationEditingPlantId(null);
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Eliminazione del cantiere non riuscita.');
+    } finally {
+      setAssociationBusyPlantId(null);
+    }
+  };
+
   const renderReportCard = (report: WorkReport, nested = false) => {
     const plant = plantById.get(report.plant_id);
     const reportWorkers = workers.filter((worker) => worker.report_id === report.id);
     const reportMaterials = materials.filter((material) => material.report_id === report.id);
     const hours = reportWorkers.reduce((sum, worker) => sum + Number(worker.hours || 0), 0);
     const expanded = expandedId === report.id;
-    const editable = isAdmin || report.status === 'BOZZA' || report.status === 'DA_CORREGGERE';
-    const deletable = report.status === 'BOZZA' || report.status === 'DA_CORREGGERE';
+    const editable = true;
+    const deletable = true;
 
     return (
       <article
@@ -526,6 +553,14 @@ export function WorkReportDashboard({ isAdmin }: WorkReportDashboardProps) {
                           Scollega preventivo
                         </button>
                       )}
+                      <button
+                        type="button"
+                        onClick={() => void removeJob(group.plantId, group.reports.length)}
+                        disabled={associationBusy}
+                        className="rounded-lg border border-red-300 bg-white px-3 py-2 text-xs font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50"
+                      >
+                        Elimina cantiere
+                      </button>
                       <button
                         type="button"
                         onClick={() => setExpandedGroupKey(groupExpanded ? null : group.key)}
