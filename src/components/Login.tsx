@@ -83,11 +83,26 @@ export function Login({ signedIn = false, canAdmin = true, onSignedIn, onSelectA
               {portal === 'admin' ? <Building2 size={27} /> : <HardHat size={27} />}
               <h2 className="text-xl font-bold">{portal === 'admin' ? 'Accesso amministrazione' : 'Accesso impianti FV'}</h2>
             </div>
-            <form onSubmit={(e) => { void signIn(e); }} className="space-y-4">
+            <form
+              key={portal}
+              id={portal === 'fv' ? 'fv-portal-login' : 'admin-portal-login'}
+              name={portal === 'fv' ? 'fv-portal-login' : 'admin-portal-login'}
+              autoComplete={portal === 'fv' ? 'off' : 'on'}
+              onSubmit={(e) => { void signIn(e); }}
+              className="space-y-4"
+            >
               <label className="block text-sm font-semibold text-slate-700">Email
-                <input type="email" required autoComplete="username" value={email}
+                <input
+                  id={portal === 'fv' ? 'fv-portal-email' : 'admin-portal-email'}
+                  name={portal === 'fv' ? 'fv-portal-username' : 'admin-portal-username'}
+                  type="email"
+                  required
+                  autoComplete={portal === 'fv' ? 'off' : 'username'}
+                  value={email}
+                  readOnly={portal === 'fv'}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-3 focus:border-blue-900 focus:outline-none" />
+                  className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-3 focus:border-blue-900 focus:outline-none"
+                />
               </label>
               <label className="block text-sm font-semibold text-slate-700">Password
                 <div className="relative mt-1">
@@ -100,7 +115,7 @@ export function Login({ signedIn = false, canAdmin = true, onSignedIn, onSelectA
                     autoCapitalize="none"
                     spellCheck={false}
                     required
-                    autoComplete="current-password"
+                    autoComplete={portal === 'fv' ? 'new-password' : 'current-password'}
                     defaultValue=""
                     className="w-full rounded-lg border border-slate-300 px-3 py-3 pr-12 focus:border-blue-900 focus:outline-none"
                   />
