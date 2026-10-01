@@ -314,3 +314,33 @@ export interface PlantQuoteLink {
   plant_id: string;
   quote_request_id: string;
 }
+
+
+export interface CalendarEventCategory {
+  id: string;
+  label: string;
+  normalized_label: string;
+  color_key: string;
+  icon_key: string;
+  sort_order: number;
+  is_custom: boolean;
+  active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CalendarEvent {
+  id: string;
+  category_id: string;
+  title: string;
+  event_date: string;
+  start_time: string | null;
+  all_day: boolean;
+  notes: string | null;
+  reminder_minutes: number | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type CalendarEventInsert = Omit<CalendarEvent, 'id' | 'created_by' | 'created_at' | 'updated_at'>;
