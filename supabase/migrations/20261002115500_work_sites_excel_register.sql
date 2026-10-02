@@ -152,6 +152,8 @@ BEGIN
     SELECT s.quote_request_id INTO NEW.quote_request_id
     FROM public.work_sites s
     WHERE s.id = NEW.site_id;
+  ELSE
+    NEW.quote_request_id := NULL;
   END IF;
   RETURN NEW;
 END;
