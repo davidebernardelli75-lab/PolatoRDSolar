@@ -591,8 +591,6 @@ export function WorkReportDashboard({ isAdmin }: WorkReportDashboardProps) {
               workers={workers}
               materials={materials}
               quotes={quotes}
-              workerCatalog={workerCatalog}
-              materialCatalog={materialCatalog}
               workerCostByRow={workerCostByRow}
               materialCostByRow={materialCostByRow}
               laborDefaultByKey={laborDefaultByKey}
