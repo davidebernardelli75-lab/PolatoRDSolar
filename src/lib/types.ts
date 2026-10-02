@@ -227,6 +227,7 @@ export type WorkReportStatus = 'BOZZA' | 'DA_VERIFICARE' | 'APPROVATO' | 'DA_COR
 export interface WorkReport {
   id: string;
   plant_id: string | null;
+  site_id: string | null;
   client_reference: string;
   quote_request_id: string | null;
   report_date: string;
@@ -310,14 +311,73 @@ export interface WorkReportAdminSummary {
   material_markup_percent: number;
 }
 
+export type WorkSiteOptionField =
+  | 'CATEGORY'
+  | 'SITE_STATUS'
+  | 'PHASE_PROGRESS_STATUS'
+  | 'PHASE_BILLING_STATUS';
+
+export interface WorkSiteOption {
+  id: string;
+  field_key: WorkSiteOptionField;
+  label: string;
+  normalized_label: string;
+  sort_order: number;
+  is_custom: boolean;
+  active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface WorkSite {
+  id: string;
+  name: string;
+  location: string | null;
+  category: string;
+  site_status: string;
+  start_date: string | null;
+  start_date_note: string | null;
+  planned_end_date: string | null;
+  quote_request_id: string | null;
+  plant_id: string | null;
+  notes: string | null;
+  active: boolean;
+  source_name: string | null;
+  source_group: string | null;
+  source_excel_id: string | null;
+  source_row_number: number | null;
+  import_key: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type WorkSiteInsert = Pick<
+  WorkSite,
+  'name' | 'location' | 'category' | 'site_status' | 'start_date' | 'start_date_note' |
+  'planned_end_date' | 'quote_request_id' | 'plant_id' | 'notes' | 'active'
+>;
+
+export interface WorkSitePhase {
+  id: string;
+  site_id: string;
+  phase_key: string;
+  phase_label: string;
+  weight_percent: number;
+  sort_order: number;
+  progress_status: string;
+  billing_status: string;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface WorkReportSiteOption {
-  quote_request_id: string;
-  progressive_number: number;
-  series: string;
-  quote_year: number;
-  client: string;
-  site_reference: string;
-  quote_status: QuoteStatus;
+  site_id: string;
+  name: string;
+  location: string | null;
+  category: string;
+  site_status: string;
   report_count: number;
 }
 
