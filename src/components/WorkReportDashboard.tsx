@@ -1118,7 +1118,7 @@ function WorkReportFormModal({
 }) {
   const [plantId, setPlantId] = useState(report?.plant_id ?? '');
   const [clientReference, setClientReference] = useState(report?.client_reference ?? '');
-  const [quoteRequestId, setQuoteRequestId] = useState(report?.quote_request_id ?? '');
+  const [siteId, setSiteId] = useState(report?.site_id ?? '');
   const [reportDate, setReportDate] = useState(report?.report_date ?? new Date().toISOString().slice(0, 10));
   const [teamName, setTeamName] = useState(report?.team_name ?? '');
   const [workDescription, setWorkDescription] = useState(report?.work_description ?? '');
@@ -1209,8 +1209,9 @@ function WorkReportFormModal({
       if (report) {
         saved = await updateWorkReport(report.id, {
           plant_id: plantId || null,
+          site_id: siteId || null,
           client_reference: clientReference.trim().toUpperCase(),
-          quote_request_id: quoteRequestId || null,
+          quote_request_id: null,
           report_date: reportDate,
           team_name: teamName.trim().toUpperCase(),
           work_description: workDescription.trim().toUpperCase() || null,
@@ -1223,8 +1224,9 @@ function WorkReportFormModal({
       } else {
         saved = await createWorkReport({
           plant_id: plantId || null,
+          site_id: siteId || null,
           client_reference: clientReference.trim().toUpperCase(),
-          quote_request_id: quoteRequestId || null,
+          quote_request_id: null,
           report_date: reportDate,
           team_name: teamName.trim().toUpperCase(),
           work_description: workDescription.trim().toUpperCase() || null,
@@ -1302,35 +1304,30 @@ function WorkReportFormModal({
           </label>
           <label className="text-xs font-semibold text-slate-600 sm:col-span-2">Cantiere collegato (facoltativo)
             <select
-              value={quoteRequestId}
+              value={siteId}
               onChange={(e) => {
                 const nextId = e.target.value;
-                setQuoteRequestId(nextId);
+                setSiteId(nextId);
                 if (!clientReference.trim() && nextId) {
-                  const selectedReference = isAdmin
-                    ? quoteOptions.find((quote) => quote.id === nextId)?.client
-                    : siteOptions.find((site) => site.quote_request_id === nextId)?.site_reference;
-                  if (selectedReference) setClientReference(selectedReference.toUpperCase());
+                  const selectedSite = siteOptions.find((site) => site.site_id === nextId);
+                  if (selectedSite) {
+                    const reference = [selectedSite.name, selectedSite.location].filter(Boolean).join(' - ');
+                    setClientReference(reference.toUpperCase());
+                  }
                 }
               }}
               className={inputClass + ' mt-1'}
             >
               <option value="">Nessun cantiere / da associare</option>
-              {isAdmin
-                ? quoteOptions.map((quote) => (
-                    <option key={quote.id} value={quote.id}>
-                      {quote.progressive_number}/{quote.series} · {quote.client} · {quote.status}
-                    </option>
-                  ))
-                : siteOptions.map((site) => (
-                    <option key={site.quote_request_id} value={site.quote_request_id}>
-                      {site.progressive_number}/{site.series} · {site.site_reference} · {site.report_count} rapp.
-                    </option>
-                  ))}
+              {siteOptions.map((site) => (
+                <option key={site.site_id} value={site.site_id}>
+                  {site.name}{site.location ? ` · ${site.location}` : ''} · {site.site_status}
+                </option>
+              ))}
             </select>
-            {!isAdmin && siteOptions.length === 0 && (
+            {siteOptions.length === 0 && (
               <span className="mt-1 block text-[10px] font-normal text-slate-400">
-                Nessun cantiere già aperto disponibile: lascia il rapportino da associare.
+                Nessun cantiere disponibile: lascia il rapportino da associare.
               </span>
             )}
           </label>
