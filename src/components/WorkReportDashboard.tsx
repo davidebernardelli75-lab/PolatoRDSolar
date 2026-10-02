@@ -32,6 +32,8 @@ import type {
   WorkSite,
   WorkSiteOption,
   WorkSitePhase,
+  WorkSiteScope,
+  WorkSitePlant,
   WorkReportWorker,
   WorkReportWorkerCatalogEntry,
   WorkReportWorkerCost,
@@ -55,12 +57,16 @@ import {
   fetchWorkReportSiteOptions,
   fetchWorkSiteOptions,
   fetchWorkSitePhases,
+  fetchWorkSitePlants,
+  fetchWorkSiteScopes,
   fetchWorkSites,
   fetchWorkReportWorkerCatalog,
   fetchWorkReportWorkerCosts,
   fetchWorkReportWorkers,
   replaceWorkReportMaterials,
   replaceWorkReportWorkers,
+  replaceWorkSitePlants,
+  replaceWorkSiteScopes,
   setWorkReportQuoteLink,
   setWorkReportSiteLink,
   setWorkReportMaterialCost,
@@ -108,6 +114,8 @@ export function WorkReportDashboard({ isAdmin }: WorkReportDashboardProps) {
   const [siteOptions, setSiteOptions] = useState<WorkReportSiteOption[]>([]);
   const [sites, setSites] = useState<WorkSite[]>([]);
   const [sitePhases, setSitePhases] = useState<WorkSitePhase[]>([]);
+  const [siteScopes, setSiteScopes] = useState<WorkSiteScope[]>([]);
+  const [sitePlantLinks, setSitePlantLinks] = useState<WorkSitePlant[]>([]);
   const [siteFieldOptions, setSiteFieldOptions] = useState<WorkSiteOption[]>([]);
   const [editingSite, setEditingSite] = useState<WorkSite | 'new' | null>(null);
   const [editing, setEditing] = useState<WorkReport | 'new' | null>(null);
@@ -137,6 +145,8 @@ export function WorkReportDashboard({ isAdmin }: WorkReportDashboardProps) {
       let quoteRows: QuoteRequest[] = [];
       let siteRows: WorkSite[] = [];
       let sitePhaseRows: WorkSitePhase[] = [];
+      let siteScopeRows: WorkSiteScope[] = [];
+      let sitePlantRows: WorkSitePlant[] = [];
       let siteFieldOptionRows: WorkSiteOption[] = [];
       let materialCostDefaultRows: WorkReportMaterialCostDefault[] = [];
       let laborRateDefaultRows: WorkReportLaborRateDefault[] = [];
@@ -147,6 +157,8 @@ export function WorkReportDashboard({ isAdmin }: WorkReportDashboardProps) {
           quoteRows,
           siteRows,
           sitePhaseRows,
+          siteScopeRows,
+          sitePlantRows,
           siteFieldOptionRows,
           materialCostDefaultRows,
           laborRateDefaultRows,
@@ -156,6 +168,8 @@ export function WorkReportDashboard({ isAdmin }: WorkReportDashboardProps) {
           fetchQuoteRequests(),
           fetchWorkSites(),
           fetchWorkSitePhases(),
+          fetchWorkSiteScopes(),
+          fetchWorkSitePlants(),
           fetchWorkSiteOptions(),
           fetchWorkReportMaterialCostDefaults(),
           fetchWorkReportLaborRateDefaults(),
@@ -174,6 +188,8 @@ export function WorkReportDashboard({ isAdmin }: WorkReportDashboardProps) {
       setSiteOptions(siteOptionRows);
       setSites(siteRows);
       setSitePhases(sitePhaseRows);
+      setSiteScopes(siteScopeRows);
+      setSitePlantLinks(sitePlantRows);
       setSiteFieldOptions(siteFieldOptionRows);
       setMaterialCostDefaults(materialCostDefaultRows);
       setLaborRateDefaults(laborRateDefaultRows);
@@ -586,6 +602,9 @@ export function WorkReportDashboard({ isAdmin }: WorkReportDashboardProps) {
               sites={sites}
               phases={sitePhases}
               siteOptions={siteFieldOptions}
+              siteScopes={siteScopes}
+              sitePlantLinks={sitePlantLinks}
+              plants={plants}
               reports={reports}
               visibleReports={filtered}
               workers={workers}
@@ -610,6 +629,8 @@ export function WorkReportDashboard({ isAdmin }: WorkReportDashboardProps) {
         <WorkSiteFormModal
           site={editingSite === 'new' ? null : editingSite}
           phases={editingSite === 'new' ? [] : sitePhases.filter((phase) => phase.site_id === editingSite.id)}
+          scopes={editingSite === 'new' ? [] : siteScopes.filter((scope) => scope.site_id === editingSite.id)}
+          plantLinks={editingSite === 'new' ? [] : sitePlantLinks.filter((link) => link.site_id === editingSite.id)}
           options={siteFieldOptions}
           quotes={quotes}
           plants={plants}
@@ -678,6 +699,9 @@ function WorkSiteRegister({
   sites,
   phases,
   siteOptions,
+  siteScopes,
+  sitePlantLinks,
+  plants,
   reports,
   visibleReports,
   workers,
@@ -697,6 +721,9 @@ function WorkSiteRegister({
   sites: WorkSite[];
   phases: WorkSitePhase[];
   siteOptions: WorkSiteOption[];
+  siteScopes: WorkSiteScope[];
+  sitePlantLinks: WorkSitePlant[];
+  plants: Plant[];
   reports: WorkReport[];
   visibleReports: WorkReport[];
   workers: WorkReportWorker[];
@@ -715,29 +742,40 @@ function WorkSiteRegister({
 }) {
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('TUTTI');
+  const [scopeFilter, setScopeFilter] = useState('TUTTI');
   const [siteStatusFilter, setSiteStatusFilter] = useState('TUTTI');
   const [expandedSiteId, setExpandedSiteId] = useState<string | null>(null);
   const [deletingSiteId, setDeletingSiteId] = useState<string | null>(null);
 
   const quoteById = useMemo(() => new Map(quotes.map((quote) => [quote.id, quote])), [quotes]);
   const categories = siteOptions.filter((option) => option.field_key === 'CATEGORY');
+  const workScopes = siteOptions.filter((option) => option.field_key === 'WORK_SCOPE');
   const siteStatuses = siteOptions.filter((option) => option.field_key === 'SITE_STATUS');
+  const scopeOptionById = useMemo(() => new Map(siteOptions.map((option) => [option.id, option])), [siteOptions]);
+  const plantById = useMemo(() => new Map(plants.map((plant) => [plant.id, plant])), [plants]);
 
   const filteredSites = useMemo(() => {
     const needle = normalizeCatalogValue(search);
     return sites.filter((site) => {
+      const siteScopeOptions = siteScopes
+        .filter((scope) => scope.site_id === site.id)
+        .map((scope) => scopeOptionById.get(scope.option_id))
+        .filter((option): option is WorkSiteOption => Boolean(option));
+      const scopeLabels = siteScopeOptions.map((option) => option.label);
       const searchHit = !needle || [
         site.name,
         site.location ?? '',
         site.category,
         site.site_status,
         site.source_group ?? '',
+        ...scopeLabels,
       ].some((value) => normalizeCatalogValue(value).includes(needle));
       return searchHit
         && (categoryFilter === 'TUTTI' || site.category === categoryFilter)
+        && (scopeFilter === 'TUTTI' || siteScopeOptions.some((option) => option.id === scopeFilter))
         && (siteStatusFilter === 'TUTTI' || site.site_status === siteStatusFilter);
     });
-  }, [sites, search, categoryFilter, siteStatusFilter]);
+  }, [sites, siteScopes, scopeOptionById, search, categoryFilter, scopeFilter, siteStatusFilter]);
 
   const unlinkedReports = visibleReports.filter((report) => !report.site_id);
 
@@ -762,7 +800,7 @@ function WorkSiteRegister({
 
   return (
     <div className="space-y-5">
-      <div className="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 md:grid-cols-[1fr_190px_190px]">
+      <div className="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 md:grid-cols-[1fr_180px_190px_180px]">
         <input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
@@ -772,6 +810,10 @@ function WorkSiteRegister({
         <select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)} className={inputClass}>
           <option value="TUTTI">Tutte le categorie</option>
           {categories.map((option) => <option key={option.id} value={option.label}>{option.label}</option>)}
+        </select>
+        <select value={scopeFilter} onChange={(e) => setScopeFilter(e.target.value)} className={inputClass}>
+          <option value="TUTTI">Tutti gli ambiti</option>
+          {workScopes.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}
         </select>
         <select value={siteStatusFilter} onChange={(e) => setSiteStatusFilter(e.target.value)} className={inputClass}>
           <option value="TUTTI">Tutti gli stati cantiere</option>
@@ -789,6 +831,14 @@ function WorkSiteRegister({
             const sitePhases = phases.filter((phase) => phase.site_id === site.id);
             const siteReports = reports.filter((report) => report.site_id === site.id);
             const visibleSiteReports = visibleReports.filter((report) => report.site_id === site.id);
+            const currentScopes = siteScopes
+              .filter((scope) => scope.site_id === site.id)
+              .map((scope) => scopeOptionById.get(scope.option_id))
+              .filter((option): option is WorkSiteOption => Boolean(option));
+            const linkedPlants = sitePlantLinks
+              .filter((link) => link.site_id === site.id)
+              .map((link) => plantById.get(link.plant_id))
+              .filter((plant): plant is Plant => Boolean(plant));
             const reportIds = new Set(siteReports.map((report) => report.id));
             const siteWorkers = workers.filter((worker) => reportIds.has(worker.report_id));
             const siteMaterials = materials.filter((material) => reportIds.has(material.report_id));
@@ -866,6 +916,20 @@ function WorkSiteRegister({
                         {site.start_date ? ` · Inizio ${displayDate(site.start_date)}` : site.start_date_note ? ` · Inizio: ${site.start_date_note}` : ''}
                         {site.planned_end_date ? ` · Fine prevista ${displayDate(site.planned_end_date)}` : ''}
                       </p>
+                      {currentScopes.length > 0 && (
+                        <div className="mt-2 flex flex-wrap gap-1.5">
+                          {currentScopes.map((scope) => (
+                            <span key={scope.id} className="rounded-full bg-sky-50 px-2 py-1 text-[10px] font-semibold text-sky-800 ring-1 ring-sky-100">
+                              {scope.label}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                      {linkedPlants.length > 0 && (
+                        <p className="mt-2 text-[10px] font-medium text-emerald-800">
+                          FV collegati: {linkedPlants.map((plant) => plant.owner_name).join(' · ')}
+                        </p>
+                      )}
                       <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-600">
                         <span><strong>{siteReports.length}</strong> rapportini</span>
                         <span>Avanzamento <strong>{progressPercent.toLocaleString('it-IT', { maximumFractionDigits: 1 })}%</strong></span>
@@ -1019,6 +1083,8 @@ const DEFAULT_WORK_SITE_PHASES: WorkSitePhaseDraft[] = [
 function WorkSiteFormModal({
   site,
   phases,
+  scopes,
+  plantLinks,
   options,
   quotes,
   plants,
@@ -1028,6 +1094,8 @@ function WorkSiteFormModal({
 }: {
   site: WorkSite | null;
   phases: WorkSitePhase[];
+  scopes: WorkSiteScope[];
+  plantLinks: WorkSitePlant[];
   options: WorkSiteOption[];
   quotes: QuoteRequest[];
   plants: Plant[];
@@ -1043,7 +1111,8 @@ function WorkSiteFormModal({
   const [startDateNote, setStartDateNote] = useState(site?.start_date_note ?? '');
   const [plannedEndDate, setPlannedEndDate] = useState(site?.planned_end_date ?? '');
   const [quoteId, setQuoteId] = useState(site?.quote_request_id ?? '');
-  const [plantId, setPlantId] = useState(site?.plant_id ?? '');
+  const [selectedScopeIds, setSelectedScopeIds] = useState<string[]>(scopes.map((scope) => scope.option_id));
+  const [selectedPlantIds, setSelectedPlantIds] = useState<string[]>(plantLinks.map((link) => link.plant_id));
   const [notes, setNotes] = useState(site?.notes ?? '');
   const [active, setActive] = useState(site?.active ?? true);
   const [phaseRows, setPhaseRows] = useState<WorkSitePhaseDraft[]>(
@@ -1064,6 +1133,13 @@ function WorkSiteFormModal({
 
   const fieldOptions = (fieldKey: WorkSiteOption['field_key']) =>
     options.filter((option) => option.field_key === fieldKey && option.active);
+
+  const workScopeOptions = fieldOptions('WORK_SCOPE');
+  const photovoltaicScope = workScopeOptions.find((option) => normalizeCatalogValue(option.label) === 'FOTOVOLTAICO');
+  const hasPhotovoltaicScope = photovoltaicScope ? selectedScopeIds.includes(photovoltaicScope.id) : false;
+  const selectedScopeLabels = selectedScopeIds
+    .map((id) => workScopeOptions.find((option) => option.id === id)?.label)
+    .filter((label): label is string => Boolean(label));
 
   const chooseOption = async (
     fieldKey: WorkSiteOption['field_key'],
@@ -1090,6 +1166,39 @@ function WorkSiteFormModal({
     }
   };
 
+  const addCustomScope = async () => {
+    const raw = window.prompt('Inserisci il nuovo ambito/lavorazione. Verrà memorizzato nel menu per i prossimi cantieri.');
+    if (!raw?.trim()) return;
+    const normalized = normalizeCatalogValue(raw);
+    setBusy(true);
+    setError(null);
+    try {
+      const optionId = await rememberWorkSiteOption('WORK_SCOPE', normalized);
+      setSelectedScopeIds((current) => [...new Set([...current, optionId])]);
+      await onSaved();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Impossibile memorizzare il nuovo ambito.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const toggleScope = (optionId: string) => {
+    setSelectedScopeIds((current) =>
+      current.includes(optionId)
+        ? current.filter((id) => id !== optionId)
+        : [...current, optionId],
+    );
+  };
+
+  const togglePlant = (plantId: string) => {
+    setSelectedPlantIds((current) =>
+      current.includes(plantId)
+        ? current.filter((id) => id !== plantId)
+        : [...current, plantId],
+    );
+  };
+
   const weightTotal = phaseRows.reduce((sum, phase) => sum + (Number(phase.weight_percent) || 0), 0);
 
   const save = async () => {
@@ -1114,7 +1223,6 @@ function WorkSiteFormModal({
         start_date_note: startDateNote.trim().toUpperCase() || null,
         planned_end_date: plannedEndDate || null,
         quote_request_id: quoteId || null,
-        plant_id: plantId || null,
         notes: notes.trim().toUpperCase() || null,
         active,
       };
@@ -1127,16 +1235,20 @@ function WorkSiteFormModal({
         ? phases
         : (await fetchWorkSitePhases()).filter((phase) => phase.site_id === savedSite.id);
 
-      await Promise.all(phaseRows.map(async (draft) => {
-        const persisted = persistedPhases.find((phase) => phase.phase_key === draft.phase_key);
-        if (!persisted) return;
-        await updateWorkSitePhase(persisted.id, {
-          weight_percent: Math.max(0, Number(draft.weight_percent) || 0),
-          progress_status: draft.progress_status.trim().toUpperCase(),
-          billing_status: draft.billing_status.trim().toUpperCase(),
-          notes: draft.notes.trim().toUpperCase() || null,
-        });
-      }));
+      await Promise.all([
+        replaceWorkSiteScopes(savedSite.id, selectedScopeIds),
+        replaceWorkSitePlants(savedSite.id, hasPhotovoltaicScope ? selectedPlantIds : []),
+        ...phaseRows.map(async (draft) => {
+          const persisted = persistedPhases.find((phase) => phase.phase_key === draft.phase_key);
+          if (!persisted) return;
+          await updateWorkSitePhase(persisted.id, {
+            weight_percent: Math.max(0, Number(draft.weight_percent) || 0),
+            progress_status: draft.progress_status.trim().toUpperCase(),
+            billing_status: draft.billing_status.trim().toUpperCase(),
+            notes: draft.notes.trim().toUpperCase() || null,
+          });
+        }),
+      ]);
 
       await onSaved();
       onClose();
@@ -1156,7 +1268,9 @@ function WorkSiteFormModal({
         <div className="mb-5 flex items-start justify-between gap-4">
           <div>
             <h2 className="text-lg font-bold text-slate-900">{site ? 'Modifica cantiere' : 'Nuovo cantiere'}</h2>
-            <p className="mt-1 text-xs text-slate-500">Struttura derivata dal registro Cantieri 2026: anagrafica, cronoprogramma pesato, fatturazione per fase e collegamento economico al preventivo.</p>
+            <p className="mt-1 text-xs text-slate-500">
+              La categoria descrive il tipo generale di cantiere; gli ambiti indicano tutte le lavorazioni presenti. Fotovoltaico può essere l'unico ambito oppure convivere con impianto elettrico e altre lavorazioni.
+            </p>
           </div>
           <button onClick={onClose} className="rounded-lg p-2 text-slate-400 hover:bg-slate-100"><X size={20} /></button>
         </div>
@@ -1195,6 +1309,72 @@ function WorkSiteFormModal({
             </select>
           </label>
 
+          <div className="sm:col-span-2 lg:col-span-3">
+            <div className="text-xs font-semibold text-slate-600">Ambiti / lavorazioni</div>
+            <details className="relative mt-1">
+              <summary className="flex min-h-[42px] cursor-pointer list-none items-center justify-between rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700">
+                <span className="min-w-0 truncate">
+                  {selectedScopeLabels.length > 0 ? selectedScopeLabels.join(' + ') : 'Seleziona uno o più ambiti'}
+                </span>
+                <ChevronDown size={16} className="shrink-0 text-slate-400" />
+              </summary>
+              <div className="mt-2 rounded-xl border border-slate-200 bg-white p-3 shadow-lg">
+                <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                  {workScopeOptions.map((option) => (
+                    <label key={option.id} className="flex cursor-pointer items-center gap-2 rounded-lg border border-slate-100 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50">
+                      <input
+                        type="checkbox"
+                        checked={selectedScopeIds.includes(option.id)}
+                        onChange={() => toggleScope(option.id)}
+                        className="h-4 w-4 rounded border-slate-300"
+                      />
+                      {option.label}
+                    </label>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() => void addCustomScope()}
+                    className="rounded-lg border border-dashed border-blue-300 bg-blue-50 px-3 py-2 text-left text-xs font-semibold text-blue-900 hover:bg-blue-100"
+                  >
+                    + Altro…
+                  </button>
+                </div>
+              </div>
+            </details>
+            <p className="mt-1 text-[10px] text-slate-500">
+              Esempio: un cantiere CIVILE può avere insieme IMPIANTO ELETTRICO + FOTOVOLTAICO + DOMOTICA. Un aggiornamento solo FV può avere soltanto FOTOVOLTAICO.
+            </p>
+          </div>
+
+          {hasPhotovoltaicScope && (
+            <div className="sm:col-span-2 lg:col-span-3 rounded-xl border border-emerald-200 bg-emerald-50/50 p-3">
+              <div className="text-xs font-semibold text-emerald-950">Impianti FV collegati (facoltativo, 0 / 1 / più)</div>
+              <p className="mt-1 text-[10px] text-emerald-800">
+                Collega gli impianti FV già censiti che fanno parte di questo cantiere. Il cantiere resta valido anche senza alcun impianto associato.
+              </p>
+              {plants.length > 0 ? (
+                <div className="mt-3 grid max-h-52 gap-2 overflow-y-auto sm:grid-cols-2">
+                  {plants.map((plant) => (
+                    <label key={plant.id} className="flex cursor-pointer items-start gap-2 rounded-lg bg-white p-2.5 ring-1 ring-emerald-100">
+                      <input
+                        type="checkbox"
+                        checked={selectedPlantIds.includes(plant.id)}
+                        onChange={() => togglePlant(plant.id)}
+                        className="mt-0.5 h-4 w-4 rounded border-slate-300"
+                      />
+                      <span className="min-w-0">
+                        <span className="block text-xs font-semibold text-slate-800">{plant.owner_name}</span>
+                        <span className="block text-[10px] text-slate-500">{plant.address}{plant.city ? ` · ${plant.city}` : ''}</span>
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              ) : (
+                <p className="mt-3 rounded-lg bg-white p-3 text-xs text-slate-500">Nessun impianto FV censito disponibile.</p>
+              )}
+            </div>
+          )}
+
           <label className="text-xs font-semibold text-slate-600">
             Data inizio
             <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className={inputClass + ' mt-1'} />
@@ -1208,7 +1388,7 @@ function WorkSiteFormModal({
             <input type="date" value={plannedEndDate} onChange={(e) => setPlannedEndDate(e.target.value)} className={inputClass + ' mt-1'} />
           </label>
 
-          <label className="text-xs font-semibold text-slate-600 sm:col-span-2">
+          <label className="text-xs font-semibold text-slate-600 sm:col-span-2 lg:col-span-3">
             Preventivo di riferimento economico
             <select value={quoteId} onChange={(e) => setQuoteId(e.target.value)} className={inputClass + ' mt-1'}>
               <option value="">Nessun preventivo collegato</option>
@@ -1220,13 +1400,6 @@ function WorkSiteFormModal({
                   </option>
                 );
               })}
-            </select>
-          </label>
-          <label className="text-xs font-semibold text-slate-600">
-            Impianto FV collegato (facoltativo)
-            <select value={plantId} onChange={(e) => setPlantId(e.target.value)} className={inputClass + ' mt-1'}>
-              <option value="">Nessun impianto FV</option>
-              {plants.map((plant) => <option key={plant.id} value={plant.id}>{plant.owner_name} · {plant.address}</option>)}
             </select>
           </label>
 

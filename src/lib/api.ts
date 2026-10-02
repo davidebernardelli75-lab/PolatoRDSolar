@@ -1,5 +1,5 @@
 import { supabase, STORAGE_BUCKET, QUOTE_FILES_BUCKET } from './supabase';
-import type { Plant, Panel, PanelPhoto, PlantInsert, PlantUpdate, PanelInsert, RoadmapTask, PlantInverter, PlantStorage, PlantCharger, PlantInverterInsert, PlantStorageInsert, PlantChargerInsert, PlantPowerMeter, PlantPowerMeterInsert, Vehicle, VehicleInsert, Insurance, InsuranceInsert, EquipmentCatalogEntry, EquipmentCategory, QuoteRequest, QuoteRequestInsert, QuoteRequestFile, WorkReport, WorkReportInsert, WorkReportMaterial, WorkReportMaterialInput, WorkReportWorker, WorkReportWorkerInput, WorkReportStatus, WorkReportMaterialCatalogEntry, WorkReportWorkerCatalogEntry, WorkReportMaterialCostDefault, WorkReportLaborRateDefault, WorkReportMaterialCost, WorkReportWorkerCost, WorkReportAdminSummary, WorkReportSiteOption, WorkSite, WorkSiteInsert, WorkSiteOption, WorkSiteOptionField, WorkSitePhase, PlantQuoteLink, CalendarEvent, CalendarEventInsert, CalendarEventCategory } from './types';
+import type { Plant, Panel, PanelPhoto, PlantInsert, PlantUpdate, PanelInsert, RoadmapTask, PlantInverter, PlantStorage, PlantCharger, PlantInverterInsert, PlantStorageInsert, PlantChargerInsert, PlantPowerMeter, PlantPowerMeterInsert, Vehicle, VehicleInsert, Insurance, InsuranceInsert, EquipmentCatalogEntry, EquipmentCategory, QuoteRequest, QuoteRequestInsert, QuoteRequestFile, WorkReport, WorkReportInsert, WorkReportMaterial, WorkReportMaterialInput, WorkReportWorker, WorkReportWorkerInput, WorkReportStatus, WorkReportMaterialCatalogEntry, WorkReportWorkerCatalogEntry, WorkReportMaterialCostDefault, WorkReportLaborRateDefault, WorkReportMaterialCost, WorkReportWorkerCost, WorkReportAdminSummary, WorkReportSiteOption, WorkSite, WorkSiteInsert, WorkSiteOption, WorkSiteOptionField, WorkSitePhase, WorkSiteScope, WorkSitePlant, PlantQuoteLink, CalendarEvent, CalendarEventInsert, CalendarEventCategory } from './types';
 
 export async function fetchPlants(): Promise<Plant[]> {
   const { data, error } = await supabase
@@ -773,6 +773,58 @@ export async function fetchWorkSiteOptions(): Promise<WorkSiteOption[]> {
   return (data ?? []) as WorkSiteOption[];
 }
 
+export async function fetchWorkSiteScopes(): Promise<WorkSiteScope[]> {
+  const { data, error } = await supabase
+    .from('work_site_scopes')
+    .select('*')
+    .order('created_at', { ascending: true });
+  if (error) throw error;
+  return (data ?? []) as WorkSiteScope[];
+}
+
+export async function fetchWorkSitePlants(): Promise<WorkSitePlant[]> {
+  const { data, error } = await supabase
+    .from('work_site_plants')
+    .select('*')
+    .order('created_at', { ascending: true });
+  if (error) throw error;
+  return (data ?? []) as WorkSitePlant[];
+}
+
+export async function replaceWorkSiteScopes(siteId: string, optionIds: string[]): Promise<void> {
+  const { error: deleteError } = await supabase
+    .from('work_site_scopes')
+    .delete()
+    .eq('site_id', siteId);
+  if (deleteError) throw deleteError;
+  if (optionIds.length === 0) return;
+
+  const { error } = await supabase
+    .from('work_site_scopes')
+    .insert([...new Set(optionIds)].map((optionId) => ({
+      site_id: siteId,
+      option_id: optionId,
+    })));
+  if (error) throw error;
+}
+
+export async function replaceWorkSitePlants(siteId: string, plantIds: string[]): Promise<void> {
+  const { error: deleteError } = await supabase
+    .from('work_site_plants')
+    .delete()
+    .eq('site_id', siteId);
+  if (deleteError) throw deleteError;
+  if (plantIds.length === 0) return;
+
+  const { error } = await supabase
+    .from('work_site_plants')
+    .insert([...new Set(plantIds)].map((plantId) => ({
+      site_id: siteId,
+      plant_id: plantId,
+    })));
+  if (error) throw error;
+}
+
 export async function createWorkSite(input: WorkSiteInsert): Promise<WorkSite> {
   const { data, error } = await supabase
     .from('work_sites')
@@ -808,12 +860,13 @@ export async function updateWorkSitePhase(
   return data as WorkSitePhase;
 }
 
-export async function rememberWorkSiteOption(fieldKey: WorkSiteOptionField, label: string): Promise<void> {
-  const { error } = await supabase.rpc('remember_work_site_option', {
+export async function rememberWorkSiteOption(fieldKey: WorkSiteOptionField, label: string): Promise<string> {
+  const { data, error } = await supabase.rpc('remember_work_site_option', {
     p_field_key: fieldKey,
     p_label: label,
   });
   if (error) throw error;
+  return String(data);
 }
 
 export async function deleteWorkSiteGroup(siteId: string): Promise<number> {
