@@ -699,6 +699,9 @@ function WorkSiteRegister({
   sites,
   phases,
   siteOptions,
+  siteScopes,
+  sitePlantLinks,
+  plants,
   reports,
   visibleReports,
   workers,
@@ -718,6 +721,9 @@ function WorkSiteRegister({
   sites: WorkSite[];
   phases: WorkSitePhase[];
   siteOptions: WorkSiteOption[];
+  siteScopes: WorkSiteScope[];
+  sitePlantLinks: WorkSitePlant[];
+  plants: Plant[];
   reports: WorkReport[];
   visibleReports: WorkReport[];
   workers: WorkReportWorker[];
@@ -736,29 +742,40 @@ function WorkSiteRegister({
 }) {
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('TUTTI');
+  const [scopeFilter, setScopeFilter] = useState('TUTTI');
   const [siteStatusFilter, setSiteStatusFilter] = useState('TUTTI');
   const [expandedSiteId, setExpandedSiteId] = useState<string | null>(null);
   const [deletingSiteId, setDeletingSiteId] = useState<string | null>(null);
 
   const quoteById = useMemo(() => new Map(quotes.map((quote) => [quote.id, quote])), [quotes]);
   const categories = siteOptions.filter((option) => option.field_key === 'CATEGORY');
+  const workScopes = siteOptions.filter((option) => option.field_key === 'WORK_SCOPE');
   const siteStatuses = siteOptions.filter((option) => option.field_key === 'SITE_STATUS');
+  const scopeOptionById = useMemo(() => new Map(siteOptions.map((option) => [option.id, option])), [siteOptions]);
+  const plantById = useMemo(() => new Map(plants.map((plant) => [plant.id, plant])), [plants]);
 
   const filteredSites = useMemo(() => {
     const needle = normalizeCatalogValue(search);
     return sites.filter((site) => {
+      const siteScopeOptions = siteScopes
+        .filter((scope) => scope.site_id === site.id)
+        .map((scope) => scopeOptionById.get(scope.option_id))
+        .filter((option): option is WorkSiteOption => Boolean(option));
+      const scopeLabels = siteScopeOptions.map((option) => option.label);
       const searchHit = !needle || [
         site.name,
         site.location ?? '',
         site.category,
         site.site_status,
         site.source_group ?? '',
+        ...scopeLabels,
       ].some((value) => normalizeCatalogValue(value).includes(needle));
       return searchHit
         && (categoryFilter === 'TUTTI' || site.category === categoryFilter)
+        && (scopeFilter === 'TUTTI' || siteScopeOptions.some((option) => option.id === scopeFilter))
         && (siteStatusFilter === 'TUTTI' || site.site_status === siteStatusFilter);
     });
-  }, [sites, search, categoryFilter, siteStatusFilter]);
+  }, [sites, siteScopes, scopeOptionById, search, categoryFilter, scopeFilter, siteStatusFilter]);
 
   const unlinkedReports = visibleReports.filter((report) => !report.site_id);
 
@@ -783,7 +800,7 @@ function WorkSiteRegister({
 
   return (
     <div className="space-y-5">
-      <div className="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 md:grid-cols-[1fr_190px_190px]">
+      <div className="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 md:grid-cols-[1fr_180px_190px_180px]">
         <input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
@@ -793,6 +810,10 @@ function WorkSiteRegister({
         <select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)} className={inputClass}>
           <option value="TUTTI">Tutte le categorie</option>
           {categories.map((option) => <option key={option.id} value={option.label}>{option.label}</option>)}
+        </select>
+        <select value={scopeFilter} onChange={(e) => setScopeFilter(e.target.value)} className={inputClass}>
+          <option value="TUTTI">Tutti gli ambiti</option>
+          {workScopes.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}
         </select>
         <select value={siteStatusFilter} onChange={(e) => setSiteStatusFilter(e.target.value)} className={inputClass}>
           <option value="TUTTI">Tutti gli stati cantiere</option>
@@ -810,6 +831,14 @@ function WorkSiteRegister({
             const sitePhases = phases.filter((phase) => phase.site_id === site.id);
             const siteReports = reports.filter((report) => report.site_id === site.id);
             const visibleSiteReports = visibleReports.filter((report) => report.site_id === site.id);
+            const currentScopes = siteScopes
+              .filter((scope) => scope.site_id === site.id)
+              .map((scope) => scopeOptionById.get(scope.option_id))
+              .filter((option): option is WorkSiteOption => Boolean(option));
+            const linkedPlants = sitePlantLinks
+              .filter((link) => link.site_id === site.id)
+              .map((link) => plantById.get(link.plant_id))
+              .filter((plant): plant is Plant => Boolean(plant));
             const reportIds = new Set(siteReports.map((report) => report.id));
             const siteWorkers = workers.filter((worker) => reportIds.has(worker.report_id));
             const siteMaterials = materials.filter((material) => reportIds.has(material.report_id));
@@ -887,6 +916,20 @@ function WorkSiteRegister({
                         {site.start_date ? ` · Inizio ${displayDate(site.start_date)}` : site.start_date_note ? ` · Inizio: ${site.start_date_note}` : ''}
                         {site.planned_end_date ? ` · Fine prevista ${displayDate(site.planned_end_date)}` : ''}
                       </p>
+                      {currentScopes.length > 0 && (
+                        <div className="mt-2 flex flex-wrap gap-1.5">
+                          {currentScopes.map((scope) => (
+                            <span key={scope.id} className="rounded-full bg-sky-50 px-2 py-1 text-[10px] font-semibold text-sky-800 ring-1 ring-sky-100">
+                              {scope.label}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                      {linkedPlants.length > 0 && (
+                        <p className="mt-2 text-[10px] font-medium text-emerald-800">
+                          FV collegati: {linkedPlants.map((plant) => plant.owner_name).join(' · ')}
+                        </p>
+                      )}
                       <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-600">
                         <span><strong>{siteReports.length}</strong> rapportini</span>
                         <span>Avanzamento <strong>{progressPercent.toLocaleString('it-IT', { maximumFractionDigits: 1 })}%</strong></span>
