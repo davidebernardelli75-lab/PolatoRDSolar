@@ -602,6 +602,9 @@ export function WorkReportDashboard({ isAdmin }: WorkReportDashboardProps) {
               sites={sites}
               phases={sitePhases}
               siteOptions={siteFieldOptions}
+              siteScopes={siteScopes}
+              sitePlantLinks={sitePlantLinks}
+              plants={plants}
               reports={reports}
               visibleReports={filtered}
               workers={workers}
@@ -626,6 +629,8 @@ export function WorkReportDashboard({ isAdmin }: WorkReportDashboardProps) {
         <WorkSiteFormModal
           site={editingSite === 'new' ? null : editingSite}
           phases={editingSite === 'new' ? [] : sitePhases.filter((phase) => phase.site_id === editingSite.id)}
+          scopes={editingSite === 'new' ? [] : siteScopes.filter((scope) => scope.site_id === editingSite.id)}
+          plantLinks={editingSite === 'new' ? [] : sitePlantLinks.filter((link) => link.site_id === editingSite.id)}
           options={siteFieldOptions}
           quotes={quotes}
           plants={plants}
