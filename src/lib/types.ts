@@ -310,6 +310,17 @@ export interface WorkReportAdminSummary {
   material_markup_percent: number;
 }
 
+export interface WorkReportSiteOption {
+  quote_request_id: string;
+  progressive_number: number;
+  series: string;
+  quote_year: number;
+  client: string;
+  site_reference: string;
+  quote_status: QuoteStatus;
+  report_count: number;
+}
+
 export interface PlantQuoteLink {
   plant_id: string;
   quote_request_id: string;
