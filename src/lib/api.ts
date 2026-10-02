@@ -1,5 +1,5 @@
 import { supabase, STORAGE_BUCKET, QUOTE_FILES_BUCKET } from './supabase';
-import type { Plant, Panel, PanelPhoto, PlantInsert, PlantUpdate, PanelInsert, RoadmapTask, PlantInverter, PlantStorage, PlantCharger, PlantInverterInsert, PlantStorageInsert, PlantChargerInsert, PlantPowerMeter, PlantPowerMeterInsert, Vehicle, VehicleInsert, Insurance, InsuranceInsert, EquipmentCatalogEntry, EquipmentCategory, QuoteRequest, QuoteRequestInsert, QuoteRequestFile, WorkReport, WorkReportInsert, WorkReportMaterial, WorkReportMaterialInput, WorkReportWorker, WorkReportWorkerInput, WorkReportStatus, WorkReportMaterialCatalogEntry, WorkReportWorkerCatalogEntry, WorkReportMaterialCostDefault, WorkReportLaborRateDefault, WorkReportMaterialCost, WorkReportWorkerCost, WorkReportAdminSummary, WorkReportSiteOption, PlantQuoteLink, CalendarEvent, CalendarEventInsert, CalendarEventCategory } from './types';
+import type { Plant, Panel, PanelPhoto, PlantInsert, PlantUpdate, PanelInsert, RoadmapTask, PlantInverter, PlantStorage, PlantCharger, PlantInverterInsert, PlantStorageInsert, PlantChargerInsert, PlantPowerMeter, PlantPowerMeterInsert, Vehicle, VehicleInsert, Insurance, InsuranceInsert, EquipmentCatalogEntry, EquipmentCategory, QuoteRequest, QuoteRequestInsert, QuoteRequestFile, WorkReport, WorkReportInsert, WorkReportMaterial, WorkReportMaterialInput, WorkReportWorker, WorkReportWorkerInput, WorkReportStatus, WorkReportMaterialCatalogEntry, WorkReportWorkerCatalogEntry, WorkReportMaterialCostDefault, WorkReportLaborRateDefault, WorkReportMaterialCost, WorkReportWorkerCost, WorkReportAdminSummary, WorkReportSiteOption, WorkSite, WorkSiteInsert, WorkSiteOption, WorkSiteOptionField, WorkSitePhase, PlantQuoteLink, CalendarEvent, CalendarEventInsert, CalendarEventCategory } from './types';
 
 export async function fetchPlants(): Promise<Plant[]> {
   const { data, error } = await supabase
@@ -146,6 +146,17 @@ export async function setWorkReportQuoteLink(reportId: string, quoteRequestId: s
     .from('work_reports')
     .update({
       quote_request_id: quoteRequestId,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', reportId);
+  if (error) throw error;
+}
+
+export async function setWorkReportSiteLink(reportId: string, siteId: string | null): Promise<void> {
+  const { error } = await supabase
+    .from('work_reports')
+    .update({
+      site_id: siteId,
       updated_at: new Date().toISOString(),
     })
     .eq('id', reportId);
@@ -729,6 +740,86 @@ export async function fetchWorkReportSiteOptions(): Promise<WorkReportSiteOption
   const { data, error } = await supabase.rpc('list_work_report_sites');
   if (error) throw error;
   return (data ?? []) as WorkReportSiteOption[];
+}
+
+export async function fetchWorkSites(): Promise<WorkSite[]> {
+  const { data, error } = await supabase
+    .from('work_sites')
+    .select('*')
+    .order('site_status', { ascending: true })
+    .order('name', { ascending: true });
+  if (error) throw error;
+  return (data ?? []) as WorkSite[];
+}
+
+export async function fetchWorkSitePhases(): Promise<WorkSitePhase[]> {
+  const { data, error } = await supabase
+    .from('work_site_phases')
+    .select('*')
+    .order('sort_order', { ascending: true });
+  if (error) throw error;
+  return (data ?? []) as WorkSitePhase[];
+}
+
+export async function fetchWorkSiteOptions(): Promise<WorkSiteOption[]> {
+  const { data, error } = await supabase
+    .from('work_site_options')
+    .select('*')
+    .eq('active', true)
+    .order('field_key', { ascending: true })
+    .order('sort_order', { ascending: true })
+    .order('label', { ascending: true });
+  if (error) throw error;
+  return (data ?? []) as WorkSiteOption[];
+}
+
+export async function createWorkSite(input: WorkSiteInsert): Promise<WorkSite> {
+  const { data, error } = await supabase
+    .from('work_sites')
+    .insert(input)
+    .select()
+    .single();
+  if (error) throw error;
+  return data as WorkSite;
+}
+
+export async function updateWorkSite(id: string, input: Partial<WorkSiteInsert>): Promise<WorkSite> {
+  const { data, error } = await supabase
+    .from('work_sites')
+    .update({ ...input, updated_at: new Date().toISOString() })
+    .eq('id', id)
+    .select()
+    .single();
+  if (error) throw error;
+  return data as WorkSite;
+}
+
+export async function updateWorkSitePhase(
+  id: string,
+  input: Partial<Pick<WorkSitePhase, 'weight_percent' | 'progress_status' | 'billing_status' | 'notes'>>,
+): Promise<WorkSitePhase> {
+  const { data, error } = await supabase
+    .from('work_site_phases')
+    .update({ ...input, updated_at: new Date().toISOString() })
+    .eq('id', id)
+    .select()
+    .single();
+  if (error) throw error;
+  return data as WorkSitePhase;
+}
+
+export async function rememberWorkSiteOption(fieldKey: WorkSiteOptionField, label: string): Promise<void> {
+  const { error } = await supabase.rpc('remember_work_site_option', {
+    p_field_key: fieldKey,
+    p_label: label,
+  });
+  if (error) throw error;
+}
+
+export async function deleteWorkSiteGroup(siteId: string): Promise<number> {
+  const { data, error } = await supabase.rpc('delete_work_site_group', { p_site_id: siteId });
+  if (error) throw error;
+  return Number(data ?? 0);
 }
 
 export async function fetchWorkReportWorkers(): Promise<WorkReportWorker[]> {
