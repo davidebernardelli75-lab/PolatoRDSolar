@@ -1083,6 +1083,8 @@ const DEFAULT_WORK_SITE_PHASES: WorkSitePhaseDraft[] = [
 function WorkSiteFormModal({
   site,
   phases,
+  scopes,
+  plantLinks,
   options,
   quotes,
   plants,
@@ -1092,6 +1094,8 @@ function WorkSiteFormModal({
 }: {
   site: WorkSite | null;
   phases: WorkSitePhase[];
+  scopes: WorkSiteScope[];
+  plantLinks: WorkSitePlant[];
   options: WorkSiteOption[];
   quotes: QuoteRequest[];
   plants: Plant[];
@@ -1107,7 +1111,8 @@ function WorkSiteFormModal({
   const [startDateNote, setStartDateNote] = useState(site?.start_date_note ?? '');
   const [plannedEndDate, setPlannedEndDate] = useState(site?.planned_end_date ?? '');
   const [quoteId, setQuoteId] = useState(site?.quote_request_id ?? '');
-  const [plantId, setPlantId] = useState(site?.plant_id ?? '');
+  const [selectedScopeIds, setSelectedScopeIds] = useState<string[]>(scopes.map((scope) => scope.option_id));
+  const [selectedPlantIds, setSelectedPlantIds] = useState<string[]>(plantLinks.map((link) => link.plant_id));
   const [notes, setNotes] = useState(site?.notes ?? '');
   const [active, setActive] = useState(site?.active ?? true);
   const [phaseRows, setPhaseRows] = useState<WorkSitePhaseDraft[]>(
@@ -1128,6 +1133,13 @@ function WorkSiteFormModal({
 
   const fieldOptions = (fieldKey: WorkSiteOption['field_key']) =>
     options.filter((option) => option.field_key === fieldKey && option.active);
+
+  const workScopeOptions = fieldOptions('WORK_SCOPE');
+  const photovoltaicScope = workScopeOptions.find((option) => normalizeCatalogValue(option.label) === 'FOTOVOLTAICO');
+  const hasPhotovoltaicScope = photovoltaicScope ? selectedScopeIds.includes(photovoltaicScope.id) : false;
+  const selectedScopeLabels = selectedScopeIds
+    .map((id) => workScopeOptions.find((option) => option.id === id)?.label)
+    .filter((label): label is string => Boolean(label));
 
   const chooseOption = async (
     fieldKey: WorkSiteOption['field_key'],
@@ -1154,6 +1166,39 @@ function WorkSiteFormModal({
     }
   };
 
+  const addCustomScope = async () => {
+    const raw = window.prompt('Inserisci il nuovo ambito/lavorazione. Verrà memorizzato nel menu per i prossimi cantieri.');
+    if (!raw?.trim()) return;
+    const normalized = normalizeCatalogValue(raw);
+    setBusy(true);
+    setError(null);
+    try {
+      const optionId = await rememberWorkSiteOption('WORK_SCOPE', normalized);
+      setSelectedScopeIds((current) => [...new Set([...current, optionId])]);
+      await onSaved();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Impossibile memorizzare il nuovo ambito.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const toggleScope = (optionId: string) => {
+    setSelectedScopeIds((current) =>
+      current.includes(optionId)
+        ? current.filter((id) => id !== optionId)
+        : [...current, optionId],
+    );
+  };
+
+  const togglePlant = (plantId: string) => {
+    setSelectedPlantIds((current) =>
+      current.includes(plantId)
+        ? current.filter((id) => id !== plantId)
+        : [...current, plantId],
+    );
+  };
+
   const weightTotal = phaseRows.reduce((sum, phase) => sum + (Number(phase.weight_percent) || 0), 0);
 
   const save = async () => {
@@ -1178,7 +1223,6 @@ function WorkSiteFormModal({
         start_date_note: startDateNote.trim().toUpperCase() || null,
         planned_end_date: plannedEndDate || null,
         quote_request_id: quoteId || null,
-        plant_id: plantId || null,
         notes: notes.trim().toUpperCase() || null,
         active,
       };
@@ -1191,16 +1235,20 @@ function WorkSiteFormModal({
         ? phases
         : (await fetchWorkSitePhases()).filter((phase) => phase.site_id === savedSite.id);
 
-      await Promise.all(phaseRows.map(async (draft) => {
-        const persisted = persistedPhases.find((phase) => phase.phase_key === draft.phase_key);
-        if (!persisted) return;
-        await updateWorkSitePhase(persisted.id, {
-          weight_percent: Math.max(0, Number(draft.weight_percent) || 0),
-          progress_status: draft.progress_status.trim().toUpperCase(),
-          billing_status: draft.billing_status.trim().toUpperCase(),
-          notes: draft.notes.trim().toUpperCase() || null,
-        });
-      }));
+      await Promise.all([
+        replaceWorkSiteScopes(savedSite.id, selectedScopeIds),
+        replaceWorkSitePlants(savedSite.id, hasPhotovoltaicScope ? selectedPlantIds : []),
+        ...phaseRows.map(async (draft) => {
+          const persisted = persistedPhases.find((phase) => phase.phase_key === draft.phase_key);
+          if (!persisted) return;
+          await updateWorkSitePhase(persisted.id, {
+            weight_percent: Math.max(0, Number(draft.weight_percent) || 0),
+            progress_status: draft.progress_status.trim().toUpperCase(),
+            billing_status: draft.billing_status.trim().toUpperCase(),
+            notes: draft.notes.trim().toUpperCase() || null,
+          });
+        }),
+      ]);
 
       await onSaved();
       onClose();
@@ -1220,7 +1268,9 @@ function WorkSiteFormModal({
         <div className="mb-5 flex items-start justify-between gap-4">
           <div>
             <h2 className="text-lg font-bold text-slate-900">{site ? 'Modifica cantiere' : 'Nuovo cantiere'}</h2>
-            <p className="mt-1 text-xs text-slate-500">Struttura derivata dal registro Cantieri 2026: anagrafica, cronoprogramma pesato, fatturazione per fase e collegamento economico al preventivo.</p>
+            <p className="mt-1 text-xs text-slate-500">
+              La categoria descrive il tipo generale di cantiere; gli ambiti indicano tutte le lavorazioni presenti. Fotovoltaico può essere l'unico ambito oppure convivere con impianto elettrico e altre lavorazioni.
+            </p>
           </div>
           <button onClick={onClose} className="rounded-lg p-2 text-slate-400 hover:bg-slate-100"><X size={20} /></button>
         </div>
@@ -1259,6 +1309,72 @@ function WorkSiteFormModal({
             </select>
           </label>
 
+          <div className="sm:col-span-2 lg:col-span-3">
+            <div className="text-xs font-semibold text-slate-600">Ambiti / lavorazioni</div>
+            <details className="relative mt-1">
+              <summary className="flex min-h-[42px] cursor-pointer list-none items-center justify-between rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700">
+                <span className="min-w-0 truncate">
+                  {selectedScopeLabels.length > 0 ? selectedScopeLabels.join(' + ') : 'Seleziona uno o più ambiti'}
+                </span>
+                <ChevronDown size={16} className="shrink-0 text-slate-400" />
+              </summary>
+              <div className="mt-2 rounded-xl border border-slate-200 bg-white p-3 shadow-lg">
+                <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                  {workScopeOptions.map((option) => (
+                    <label key={option.id} className="flex cursor-pointer items-center gap-2 rounded-lg border border-slate-100 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50">
+                      <input
+                        type="checkbox"
+                        checked={selectedScopeIds.includes(option.id)}
+                        onChange={() => toggleScope(option.id)}
+                        className="h-4 w-4 rounded border-slate-300"
+                      />
+                      {option.label}
+                    </label>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() => void addCustomScope()}
+                    className="rounded-lg border border-dashed border-blue-300 bg-blue-50 px-3 py-2 text-left text-xs font-semibold text-blue-900 hover:bg-blue-100"
+                  >
+                    + Altro…
+                  </button>
+                </div>
+              </div>
+            </details>
+            <p className="mt-1 text-[10px] text-slate-500">
+              Esempio: un cantiere CIVILE può avere insieme IMPIANTO ELETTRICO + FOTOVOLTAICO + DOMOTICA. Un aggiornamento solo FV può avere soltanto FOTOVOLTAICO.
+            </p>
+          </div>
+
+          {hasPhotovoltaicScope && (
+            <div className="sm:col-span-2 lg:col-span-3 rounded-xl border border-emerald-200 bg-emerald-50/50 p-3">
+              <div className="text-xs font-semibold text-emerald-950">Impianti FV collegati (facoltativo, 0 / 1 / più)</div>
+              <p className="mt-1 text-[10px] text-emerald-800">
+                Collega gli impianti FV già censiti che fanno parte di questo cantiere. Il cantiere resta valido anche senza alcun impianto associato.
+              </p>
+              {plants.length > 0 ? (
+                <div className="mt-3 grid max-h-52 gap-2 overflow-y-auto sm:grid-cols-2">
+                  {plants.map((plant) => (
+                    <label key={plant.id} className="flex cursor-pointer items-start gap-2 rounded-lg bg-white p-2.5 ring-1 ring-emerald-100">
+                      <input
+                        type="checkbox"
+                        checked={selectedPlantIds.includes(plant.id)}
+                        onChange={() => togglePlant(plant.id)}
+                        className="mt-0.5 h-4 w-4 rounded border-slate-300"
+                      />
+                      <span className="min-w-0">
+                        <span className="block text-xs font-semibold text-slate-800">{plant.owner_name}</span>
+                        <span className="block text-[10px] text-slate-500">{plant.address}{plant.city ? ` · ${plant.city}` : ''}</span>
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              ) : (
+                <p className="mt-3 rounded-lg bg-white p-3 text-xs text-slate-500">Nessun impianto FV censito disponibile.</p>
+              )}
+            </div>
+          )}
+
           <label className="text-xs font-semibold text-slate-600">
             Data inizio
             <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className={inputClass + ' mt-1'} />
@@ -1272,7 +1388,7 @@ function WorkSiteFormModal({
             <input type="date" value={plannedEndDate} onChange={(e) => setPlannedEndDate(e.target.value)} className={inputClass + ' mt-1'} />
           </label>
 
-          <label className="text-xs font-semibold text-slate-600 sm:col-span-2">
+          <label className="text-xs font-semibold text-slate-600 sm:col-span-2 lg:col-span-3">
             Preventivo di riferimento economico
             <select value={quoteId} onChange={(e) => setQuoteId(e.target.value)} className={inputClass + ' mt-1'}>
               <option value="">Nessun preventivo collegato</option>
@@ -1284,13 +1400,6 @@ function WorkSiteFormModal({
                   </option>
                 );
               })}
-            </select>
-          </label>
-          <label className="text-xs font-semibold text-slate-600">
-            Impianto FV collegato (facoltativo)
-            <select value={plantId} onChange={(e) => setPlantId(e.target.value)} className={inputClass + ' mt-1'}>
-              <option value="">Nessun impianto FV</option>
-              {plants.map((plant) => <option key={plant.id} value={plant.id}>{plant.owner_name} · {plant.address}</option>)}
             </select>
           </label>
 
