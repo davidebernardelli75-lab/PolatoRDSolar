@@ -29,6 +29,9 @@ import type {
   WorkReportMaterialInput,
   WorkReportStatus,
   WorkReportSiteOption,
+  WorkSite,
+  WorkSiteOption,
+  WorkSitePhase,
   WorkReportWorker,
   WorkReportWorkerCatalogEntry,
   WorkReportWorkerCost,
@@ -36,8 +39,10 @@ import type {
 } from '@/lib/types';
 import {
   createWorkReport,
+  createWorkSite,
   deleteWorkReport,
   deleteWorkReportGroup,
+  deleteWorkSiteGroup,
   fetchPlants,
   fetchQuoteRequests,
   fetchWorkReportAdminSummary,
@@ -48,16 +53,23 @@ import {
   fetchWorkReportMaterials,
   fetchWorkReports,
   fetchWorkReportSiteOptions,
+  fetchWorkSiteOptions,
+  fetchWorkSitePhases,
+  fetchWorkSites,
   fetchWorkReportWorkerCatalog,
   fetchWorkReportWorkerCosts,
   fetchWorkReportWorkers,
   replaceWorkReportMaterials,
   replaceWorkReportWorkers,
   setWorkReportQuoteLink,
+  setWorkReportSiteLink,
   setWorkReportMaterialCost,
   setWorkReportMaterialMarkup,
   setWorkReportWorkerCost,
   updateWorkReport,
+  updateWorkSite,
+  updateWorkSitePhase,
+  rememberWorkSiteOption,
 } from '@/lib/api';
 
 interface WorkReportDashboardProps {
@@ -94,6 +106,10 @@ export function WorkReportDashboard({ isAdmin }: WorkReportDashboardProps) {
   const [plants, setPlants] = useState<Plant[]>([]);
   const [quotes, setQuotes] = useState<QuoteRequest[]>([]);
   const [siteOptions, setSiteOptions] = useState<WorkReportSiteOption[]>([]);
+  const [sites, setSites] = useState<WorkSite[]>([]);
+  const [sitePhases, setSitePhases] = useState<WorkSitePhase[]>([]);
+  const [siteFieldOptions, setSiteFieldOptions] = useState<WorkSiteOption[]>([]);
+  const [editingSite, setEditingSite] = useState<WorkSite | 'new' | null>(null);
   const [editing, setEditing] = useState<WorkReport | 'new' | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [expandedGroupKey, setExpandedGroupKey] = useState<string | null>(null);
@@ -119,6 +135,9 @@ export function WorkReportDashboard({ isAdmin }: WorkReportDashboardProps) {
       ]);
 
       let quoteRows: QuoteRequest[] = [];
+      let siteRows: WorkSite[] = [];
+      let sitePhaseRows: WorkSitePhase[] = [];
+      let siteFieldOptionRows: WorkSiteOption[] = [];
       let materialCostDefaultRows: WorkReportMaterialCostDefault[] = [];
       let laborRateDefaultRows: WorkReportLaborRateDefault[] = [];
       let materialCostRows: WorkReportMaterialCost[] = [];
@@ -126,12 +145,18 @@ export function WorkReportDashboard({ isAdmin }: WorkReportDashboardProps) {
       if (isAdmin) {
         [
           quoteRows,
+          siteRows,
+          sitePhaseRows,
+          siteFieldOptionRows,
           materialCostDefaultRows,
           laborRateDefaultRows,
           materialCostRows,
           workerCostRows,
         ] = await Promise.all([
           fetchQuoteRequests(),
+          fetchWorkSites(),
+          fetchWorkSitePhases(),
+          fetchWorkSiteOptions(),
           fetchWorkReportMaterialCostDefaults(),
           fetchWorkReportLaborRateDefaults(),
           fetchWorkReportMaterialCosts(),
@@ -147,6 +172,9 @@ export function WorkReportDashboard({ isAdmin }: WorkReportDashboardProps) {
       setWorkerCatalog(workerOptions);
       setQuotes(quoteRows);
       setSiteOptions(siteRows);
+      setSites(siteRows);
+      setSitePhases(sitePhaseRows);
+      setSiteFieldOptions(siteFieldOptionRows);
       setMaterialCostDefaults(materialCostDefaultRows);
       setLaborRateDefaults(laborRateDefaultRows);
       setMaterialCostSnapshots(materialCostRows);
