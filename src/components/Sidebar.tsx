@@ -58,7 +58,7 @@ export function Sidebar({ open, onClose, onNavigate, currentView, isAdmin, onSig
 
   const items = [
     { id: 'dashboard' as const, label: 'Impianti FV', icon: LayoutGrid },
-    { id: 'reports' as const, label: 'Rapportini', icon: ClipboardList },
+    { id: 'reports' as const, label: isAdmin ? 'Cantieri' : 'Rapportini', icon: ClipboardList },
     ...(isAdmin ? [
       { id: 'vehicles' as const, label: 'Parco Automezzi', icon: Car, badge: vehicleAlerts },
       { id: 'insurances' as const, label: 'Assicurazioni', icon: ShieldCheck },
