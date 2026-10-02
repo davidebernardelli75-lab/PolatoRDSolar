@@ -124,7 +124,7 @@ export function WorkReportDashboard({ isAdmin }: WorkReportDashboardProps) {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [reportRows, workerRows, materialRows, plantRows, materialOptions, workerOptions, siteRows] = await Promise.all([
+      const [reportRows, workerRows, materialRows, plantRows, materialOptions, workerOptions, siteOptionRows] = await Promise.all([
         fetchWorkReports(),
         fetchWorkReportWorkers(),
         fetchWorkReportMaterials(),
@@ -171,7 +171,7 @@ export function WorkReportDashboard({ isAdmin }: WorkReportDashboardProps) {
       setMaterialCatalog(materialOptions);
       setWorkerCatalog(workerOptions);
       setQuotes(quoteRows);
-      setSiteOptions(siteRows);
+      setSiteOptions(siteOptionRows);
       setSites(siteRows);
       setSitePhases(sitePhaseRows);
       setSiteFieldOptions(siteFieldOptionRows);
