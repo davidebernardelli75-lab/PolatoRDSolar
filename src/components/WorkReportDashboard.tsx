@@ -32,6 +32,8 @@ import type {
   WorkSite,
   WorkSiteOption,
   WorkSitePhase,
+  WorkSiteScope,
+  WorkSitePlant,
   WorkReportWorker,
   WorkReportWorkerCatalogEntry,
   WorkReportWorkerCost,
@@ -55,12 +57,16 @@ import {
   fetchWorkReportSiteOptions,
   fetchWorkSiteOptions,
   fetchWorkSitePhases,
+  fetchWorkSitePlants,
+  fetchWorkSiteScopes,
   fetchWorkSites,
   fetchWorkReportWorkerCatalog,
   fetchWorkReportWorkerCosts,
   fetchWorkReportWorkers,
   replaceWorkReportMaterials,
   replaceWorkReportWorkers,
+  replaceWorkSitePlants,
+  replaceWorkSiteScopes,
   setWorkReportQuoteLink,
   setWorkReportSiteLink,
   setWorkReportMaterialCost,
@@ -108,6 +114,8 @@ export function WorkReportDashboard({ isAdmin }: WorkReportDashboardProps) {
   const [siteOptions, setSiteOptions] = useState<WorkReportSiteOption[]>([]);
   const [sites, setSites] = useState<WorkSite[]>([]);
   const [sitePhases, setSitePhases] = useState<WorkSitePhase[]>([]);
+  const [siteScopes, setSiteScopes] = useState<WorkSiteScope[]>([]);
+  const [sitePlantLinks, setSitePlantLinks] = useState<WorkSitePlant[]>([]);
   const [siteFieldOptions, setSiteFieldOptions] = useState<WorkSiteOption[]>([]);
   const [editingSite, setEditingSite] = useState<WorkSite | 'new' | null>(null);
   const [editing, setEditing] = useState<WorkReport | 'new' | null>(null);
@@ -137,6 +145,8 @@ export function WorkReportDashboard({ isAdmin }: WorkReportDashboardProps) {
       let quoteRows: QuoteRequest[] = [];
       let siteRows: WorkSite[] = [];
       let sitePhaseRows: WorkSitePhase[] = [];
+      let siteScopeRows: WorkSiteScope[] = [];
+      let sitePlantRows: WorkSitePlant[] = [];
       let siteFieldOptionRows: WorkSiteOption[] = [];
       let materialCostDefaultRows: WorkReportMaterialCostDefault[] = [];
       let laborRateDefaultRows: WorkReportLaborRateDefault[] = [];
@@ -147,6 +157,8 @@ export function WorkReportDashboard({ isAdmin }: WorkReportDashboardProps) {
           quoteRows,
           siteRows,
           sitePhaseRows,
+          siteScopeRows,
+          sitePlantRows,
           siteFieldOptionRows,
           materialCostDefaultRows,
           laborRateDefaultRows,
@@ -156,6 +168,8 @@ export function WorkReportDashboard({ isAdmin }: WorkReportDashboardProps) {
           fetchQuoteRequests(),
           fetchWorkSites(),
           fetchWorkSitePhases(),
+          fetchWorkSiteScopes(),
+          fetchWorkSitePlants(),
           fetchWorkSiteOptions(),
           fetchWorkReportMaterialCostDefaults(),
           fetchWorkReportLaborRateDefaults(),
@@ -174,6 +188,8 @@ export function WorkReportDashboard({ isAdmin }: WorkReportDashboardProps) {
       setSiteOptions(siteOptionRows);
       setSites(siteRows);
       setSitePhases(sitePhaseRows);
+      setSiteScopes(siteScopeRows);
+      setSitePlantLinks(sitePlantRows);
       setSiteFieldOptions(siteFieldOptionRows);
       setMaterialCostDefaults(materialCostDefaultRows);
       setLaborRateDefaults(laborRateDefaultRows);
