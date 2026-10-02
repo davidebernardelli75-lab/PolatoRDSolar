@@ -28,6 +28,7 @@ import type {
   WorkReportMaterialCostDefault,
   WorkReportMaterialInput,
   WorkReportStatus,
+  WorkReportSiteOption,
   WorkReportWorker,
   WorkReportWorkerCatalogEntry,
   WorkReportWorkerCost,
@@ -46,6 +47,7 @@ import {
   fetchWorkReportMaterialCosts,
   fetchWorkReportMaterials,
   fetchWorkReports,
+  fetchWorkReportSiteOptions,
   fetchWorkReportWorkerCatalog,
   fetchWorkReportWorkerCosts,
   fetchWorkReportWorkers,
@@ -91,6 +93,7 @@ export function WorkReportDashboard({ isAdmin }: WorkReportDashboardProps) {
   const [workerCostSnapshots, setWorkerCostSnapshots] = useState<WorkReportWorkerCost[]>([]);
   const [plants, setPlants] = useState<Plant[]>([]);
   const [quotes, setQuotes] = useState<QuoteRequest[]>([]);
+  const [siteOptions, setSiteOptions] = useState<WorkReportSiteOption[]>([]);
   const [editing, setEditing] = useState<WorkReport | 'new' | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [expandedGroupKey, setExpandedGroupKey] = useState<string | null>(null);
@@ -105,13 +108,14 @@ export function WorkReportDashboard({ isAdmin }: WorkReportDashboardProps) {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [reportRows, workerRows, materialRows, plantRows, materialOptions, workerOptions] = await Promise.all([
+      const [reportRows, workerRows, materialRows, plantRows, materialOptions, workerOptions, siteRows] = await Promise.all([
         fetchWorkReports(),
         fetchWorkReportWorkers(),
         fetchWorkReportMaterials(),
         fetchPlants(),
         fetchWorkReportMaterialCatalog(),
         fetchWorkReportWorkerCatalog(),
+        fetchWorkReportSiteOptions(),
       ]);
 
       let quoteRows: QuoteRequest[] = [];
@@ -142,6 +146,7 @@ export function WorkReportDashboard({ isAdmin }: WorkReportDashboardProps) {
       setMaterialCatalog(materialOptions);
       setWorkerCatalog(workerOptions);
       setQuotes(quoteRows);
+      setSiteOptions(siteRows);
       setMaterialCostDefaults(materialCostDefaultRows);
       setLaborRateDefaults(laborRateDefaultRows);
       setMaterialCostSnapshots(materialCostRows);
@@ -252,8 +257,8 @@ export function WorkReportDashboard({ isAdmin }: WorkReportDashboardProps) {
     const currentQuote = currentQuoteId ? quoteById.get(currentQuoteId) : null;
     const nextQuote = quoteRequestId ? quoteById.get(quoteRequestId) : null;
     const message = quoteRequestId
-      ? `Associare ${reportIds.length === 1 ? 'questo rapportino' : `questi ${reportIds.length} rapportini`} al preventivo ${nextQuote?.progressive_number ?? ''}/${nextQuote?.series ?? ''} - ${nextQuote?.client ?? ''}?\n\nL'associazione attuale${currentQuote ? ` con ${currentQuote.progressive_number}/${currentQuote.series} - ${currentQuote.client}` : ''} verrà sostituita.`
-      : `Scollegare ${reportIds.length === 1 ? 'questo rapportino' : `questi ${reportIds.length} rapportini`} dal preventivo? I rapportini resteranno disponibili nella sezione da associare.`;
+      ? `Collegare ${reportIds.length === 1 ? 'questo rapportino' : `questi ${reportIds.length} rapportini`} al cantiere ${nextQuote?.progressive_number ?? ''}/${nextQuote?.series ?? ''} - ${nextQuote?.client ?? ''}?\n\nL'associazione attuale${currentQuote ? ` con il cantiere ${currentQuote.progressive_number}/${currentQuote.series} - ${currentQuote.client}` : ''} verrà sostituita.`
+      : `Scollegare ${reportIds.length === 1 ? 'questo rapportino' : `questi ${reportIds.length} rapportini`} dal cantiere? I rapportini resteranno disponibili nella sezione da associare.`;
 
     if (!window.confirm(message)) return;
 
@@ -265,7 +270,7 @@ export function WorkReportDashboard({ isAdmin }: WorkReportDashboardProps) {
       setExpandedGroupKey(null);
       await load();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Correzione dell’associazione non riuscita.');
+      setError(err instanceof Error ? err.message : 'Correzione dell’associazione al cantiere non riuscita.');
     } finally {
       setAssociationBusyGroupKey(null);
     }
@@ -471,9 +476,11 @@ export function WorkReportDashboard({ isAdmin }: WorkReportDashboardProps) {
             <div className="mb-2 text-[10px] font-semibold tracking-widest text-red-300">
               {isAdmin ? 'AMMINISTRAZIONE' : 'SQUADRA FV'}
             </div>
-            <h1 className="text-2xl font-bold">Rapportini di lavoro</h1>
+            <h1 className="text-2xl font-bold">{isAdmin ? 'Cantieri' : 'Rapportini di lavoro'}</h1>
             <p className="mt-1 text-sm text-slate-300">
-              Ore di manodopera, attività svolte e materiali utilizzati per ogni cantiere o intervento.
+              {isAdmin
+                ? 'Cantieri, rapportini collegati e analisi economica progressiva di manodopera e materiali.'
+                : 'Ore di manodopera, attività svolte e materiali utilizzati per ogni cantiere o intervento.'}
             </p>
           </div>
           <button
@@ -501,7 +508,7 @@ export function WorkReportDashboard({ isAdmin }: WorkReportDashboardProps) {
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <ClipboardList size={18} className="text-blue-900" />
-          <h2 className="font-semibold text-slate-900">{isAdmin ? 'Commesse e cantieri' : 'I miei rapportini'}</h2>
+          <h2 className="font-semibold text-slate-900">{isAdmin ? 'Cantieri e rapportini da associare' : 'I miei rapportini'}</h2>
         </div>
         <select
           value={statusFilter}
@@ -628,7 +635,7 @@ export function WorkReportDashboard({ isAdmin }: WorkReportDashboardProps) {
                 <div className="p-4 sm:p-5">
                   <div className="flex flex-wrap items-start gap-4">
                     <div className={`rounded-xl px-3 py-2 text-center ${quote ? 'bg-blue-900 text-white' : 'bg-amber-50 text-amber-900'}`}>
-                      <div className="text-[9px] font-bold uppercase tracking-wide">{quote ? 'Commessa' : 'Da associare'}</div>
+                      <div className="text-[9px] font-bold uppercase tracking-wide">{quote ? 'Cantiere' : 'Da associare'}</div>
                       <div className="mt-0.5 text-sm font-bold">
                         {quote ? `${quote.progressive_number}/${quote.series}` : `${group.reports.length} RAPP.`}
                       </div>
@@ -646,7 +653,7 @@ export function WorkReportDashboard({ isAdmin }: WorkReportDashboardProps) {
                         )}
                         {!quote && (
                           <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-800">
-                            NESSUN PREVENTIVO COLLEGATO
+                            DA ASSOCIARE A UN CANTIERE
                           </span>
                         )}
                       </div>
@@ -675,7 +682,7 @@ export function WorkReportDashboard({ isAdmin }: WorkReportDashboardProps) {
                         disabled={associationBusy}
                         className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-900 hover:bg-blue-100 disabled:opacity-50"
                       >
-                        Correggi abbinamento
+                        Cambia cantiere
                       </button>
                       {quote && (
                         <button
@@ -689,7 +696,7 @@ export function WorkReportDashboard({ isAdmin }: WorkReportDashboardProps) {
                           disabled={associationBusy || deletingGroup}
                           className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-700 hover:bg-red-100 disabled:opacity-50"
                         >
-                          Scollega preventivo
+                          Scollega cantiere
                         </button>
                       )}
                       <button
@@ -710,7 +717,7 @@ export function WorkReportDashboard({ isAdmin }: WorkReportDashboardProps) {
                         type="button"
                         onClick={() => setExpandedGroupKey(groupExpanded ? null : group.key)}
                         className="rounded-lg p-2 text-blue-900 hover:bg-blue-50"
-                        aria-label={groupExpanded ? 'Chiudi commessa' : 'Apri commessa'}
+                        aria-label={groupExpanded ? 'Chiudi cantiere' : 'Apri cantiere'}
                       >
                         {groupExpanded ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
                       </button>
@@ -723,7 +730,7 @@ export function WorkReportDashboard({ isAdmin }: WorkReportDashboardProps) {
                         <div>
                           <h4 className="text-xs font-bold uppercase tracking-wide text-slate-700">Andamento economico cantiere</h4>
                           <p className="mt-0.5 text-[11px] text-slate-500">
-                            Percentuali calcolate sul consuntivo di tutti i rapportini collegati alla commessa.
+                            Percentuali calcolate sul consuntivo di tutti i rapportini collegati al cantiere.
                           </p>
                         </div>
                         <span className={`rounded-full px-3 py-1.5 text-xs font-bold ${
@@ -828,7 +835,7 @@ export function WorkReportDashboard({ isAdmin }: WorkReportDashboardProps) {
                           disabled={associationBusy}
                           className="w-full rounded-xl border border-blue-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-blue-500 disabled:opacity-50"
                         >
-                          <option value="">Nessun preventivo collegato</option>
+                          <option value="">Nessun cantiere collegato</option>
                           {quotes.map((option) => (
                             <option key={option.id} value={option.id}>
                               {option.progressive_number}/{option.series} · {option.client} · {option.status}
@@ -845,7 +852,7 @@ export function WorkReportDashboard({ isAdmin }: WorkReportDashboardProps) {
                         </button>
                       </div>
                       <p className="mt-2 text-[11px] text-blue-800">
-                        Il collegamento al preventivo è amministrativo e non richiede che il rapportino appartenga a un impianto FV. Per correggere un solo rapportino di una commessa già raggruppata, aprilo con la matita e modifica il preventivo associato.
+                        Il collegamento al cantiere usa il preventivo come riferimento economico e non richiede che il rapportino appartenga a un impianto FV. Per correggere un solo rapportino già raggruppato, aprilo con la matita e modifica il cantiere associato.
                       </p>
                     </div>
                   )}
@@ -855,7 +862,7 @@ export function WorkReportDashboard({ isAdmin }: WorkReportDashboardProps) {
                   <div className="border-t border-slate-200 bg-slate-50/60 p-3 sm:p-4">
                     <div className="mb-3 flex items-center justify-between gap-3">
                       <div>
-                        <h4 className="text-xs font-bold uppercase tracking-wide text-slate-600">Rapportini della commessa</h4>
+                        <h4 className="text-xs font-bold uppercase tracking-wide text-slate-600">Rapportini del cantiere</h4>
                         <p className="mt-0.5 text-[11px] text-slate-500">Apri il singolo rapportino per costi, materiali, ore, approvazione o correzioni.</p>
                       </div>
                     </div>
@@ -879,6 +886,7 @@ export function WorkReportDashboard({ isAdmin }: WorkReportDashboardProps) {
           materialCatalog={materialCatalog}
           workerCatalog={workerCatalog}
           quoteOptions={quotes}
+          siteOptions={siteOptions}
           isAdmin={isAdmin}
           onClose={() => setEditing(null)}
           onSaved={async () => {
@@ -1139,9 +1147,9 @@ function AdminReportCostEditor({
           <section className="rounded-2xl border border-blue-200 bg-blue-50/50 p-3 sm:p-4">
             <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
               <div>
-                <h5 className="text-sm font-bold uppercase tracking-wide text-blue-950">Andamento commessa vs preventivo</h5>
+                <h5 className="text-sm font-bold uppercase tracking-wide text-blue-950">Andamento cantiere vs preventivo</h5>
                 <p className="mt-0.5 text-[11px] text-blue-800">
-                  Il confronto usa tutti i rapportini registrati nella stessa commessa. L'abbinamento si corregge dalla maschera principale del cantiere.
+                  Il confronto usa tutti i rapportini registrati nello stesso cantiere. L'abbinamento si corregge dalla maschera principale del cantiere.
                 </p>
               </div>
               <div className={`rounded-full px-3 py-2 text-xs font-bold ${economicClass}`}>
@@ -1360,6 +1368,7 @@ function WorkReportFormModal({
   materialCatalog,
   workerCatalog,
   quoteOptions,
+  siteOptions,
   isAdmin,
   onClose,
   onSaved,
@@ -1371,6 +1380,7 @@ function WorkReportFormModal({
   materialCatalog: WorkReportMaterialCatalogEntry[];
   workerCatalog: WorkReportWorkerCatalogEntry[];
   quoteOptions: QuoteRequest[];
+  siteOptions: WorkReportSiteOption[];
   isAdmin: boolean;
   onClose: () => void;
   onSaved: () => Promise<void>;
@@ -1469,7 +1479,7 @@ function WorkReportFormModal({
         saved = await updateWorkReport(report.id, {
           plant_id: plantId || null,
           client_reference: clientReference.trim().toUpperCase(),
-          quote_request_id: isAdmin ? (quoteRequestId || null) : report.quote_request_id,
+          quote_request_id: quoteRequestId || null,
           report_date: reportDate,
           team_name: teamName.trim().toUpperCase(),
           work_description: workDescription.trim().toUpperCase() || null,
@@ -1483,7 +1493,7 @@ function WorkReportFormModal({
         saved = await createWorkReport({
           plant_id: plantId || null,
           client_reference: clientReference.trim().toUpperCase(),
-          quote_request_id: isAdmin ? (quoteRequestId || null) : null,
+          quote_request_id: quoteRequestId || null,
           report_date: reportDate,
           team_name: teamName.trim().toUpperCase(),
           work_description: workDescription.trim().toUpperCase() || null,
@@ -1524,7 +1534,9 @@ function WorkReportFormModal({
         <div className="mb-5 flex items-center justify-between">
           <div>
             <h2 className="text-lg font-bold text-slate-900">{report ? 'Modifica rapportino' : 'Nuovo rapportino'}</h2>
-            <p className="text-xs text-slate-500">Compila i dati della giornata. Il riferimento cliente/cantiere è obbligatorio; l'impianto FV è facoltativo. Il preventivo viene gestito dall'amministrazione.</p>
+            <p className="text-xs text-slate-500">
+              Compila i dati della giornata. Puoi collegare il rapportino a un cantiere già esistente; se non è ancora presente, lascialo da associare e l'amministrazione potrà abbinarlo successivamente.
+            </p>
           </div>
           <button onClick={onClose} className="rounded-lg p-2 text-slate-400 hover:bg-slate-100"><X size={20} /></button>
         </div>
@@ -1557,18 +1569,40 @@ function WorkReportFormModal({
               {plants.map((plant) => <option key={plant.id} value={plant.id}>{plant.owner_name} — {plant.address}</option>)}
             </select>
           </label>
-          {isAdmin && (
-            <label className="text-xs font-semibold text-slate-600 sm:col-span-2">Preventivo / commessa associata
-              <select value={quoteRequestId} onChange={(e) => setQuoteRequestId(e.target.value)} className={inputClass + ' mt-1'}>
-                <option value="">Da associare</option>
-                {quoteOptions.map((quote) => (
-                  <option key={quote.id} value={quote.id}>
-                    {quote.progressive_number}/{quote.series} · {quote.client} · {quote.status}
-                  </option>
-                ))}
-              </select>
-            </label>
-          )}
+          <label className="text-xs font-semibold text-slate-600 sm:col-span-2">Cantiere collegato (facoltativo)
+            <select
+              value={quoteRequestId}
+              onChange={(e) => {
+                const nextId = e.target.value;
+                setQuoteRequestId(nextId);
+                if (!clientReference.trim() && nextId) {
+                  const selectedReference = isAdmin
+                    ? quoteOptions.find((quote) => quote.id === nextId)?.client
+                    : siteOptions.find((site) => site.quote_request_id === nextId)?.site_reference;
+                  if (selectedReference) setClientReference(selectedReference.toUpperCase());
+                }
+              }}
+              className={inputClass + ' mt-1'}
+            >
+              <option value="">Nessun cantiere / da associare</option>
+              {isAdmin
+                ? quoteOptions.map((quote) => (
+                    <option key={quote.id} value={quote.id}>
+                      {quote.progressive_number}/{quote.series} · {quote.client} · {quote.status}
+                    </option>
+                  ))
+                : siteOptions.map((site) => (
+                    <option key={site.quote_request_id} value={site.quote_request_id}>
+                      {site.progressive_number}/{site.series} · {site.site_reference} · {site.report_count} rapp.
+                    </option>
+                  ))}
+            </select>
+            {!isAdmin && siteOptions.length === 0 && (
+              <span className="mt-1 block text-[10px] font-normal text-slate-400">
+                Nessun cantiere già aperto disponibile: lascia il rapportino da associare.
+              </span>
+            )}
+          </label>
           <label className="text-xs font-semibold text-slate-600">Data *
             <input type="date" value={reportDate} onChange={(e) => setReportDate(e.target.value)} className={inputClass + ' mt-1'} />
           </label>
