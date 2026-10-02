@@ -315,7 +315,8 @@ export type WorkSiteOptionField =
   | 'CATEGORY'
   | 'SITE_STATUS'
   | 'PHASE_PROGRESS_STATUS'
-  | 'PHASE_BILLING_STATUS';
+  | 'PHASE_BILLING_STATUS'
+  | 'WORK_SCOPE';
 
 export interface WorkSiteOption {
   id: string;
@@ -339,7 +340,6 @@ export interface WorkSite {
   start_date_note: string | null;
   planned_end_date: string | null;
   quote_request_id: string | null;
-  plant_id: string | null;
   notes: string | null;
   active: boolean;
   source_name: string | null;
@@ -355,8 +355,20 @@ export interface WorkSite {
 export type WorkSiteInsert = Pick<
   WorkSite,
   'name' | 'location' | 'category' | 'site_status' | 'start_date' | 'start_date_note' |
-  'planned_end_date' | 'quote_request_id' | 'plant_id' | 'notes' | 'active'
+  'planned_end_date' | 'quote_request_id' | 'notes' | 'active'
 >;
+
+export interface WorkSiteScope {
+  site_id: string;
+  option_id: string;
+  created_at: string;
+}
+
+export interface WorkSitePlant {
+  site_id: string;
+  plant_id: string;
+  created_at: string;
+}
 
 export interface WorkSitePhase {
   id: string;
