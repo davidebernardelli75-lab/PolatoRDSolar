@@ -66,7 +66,7 @@ export function Dashboard({ plants, loading, roadmapProgress, onOpenPlant, onNew
             className="h-12 w-12 object-contain"
           />
           <div>
-            <h1 className="text-2xl font-bold text-blue-900">Impianti Solari</h1>
+            <h1 className="text-2xl font-bold text-blue-900">Impianti FV</h1>
             <p className="text-slate-500 text-sm mt-1">
               {plants.length} impiant{plants.length === 1 ? 'o' : 'i'} archiviat{plants.length === 1 ? 'o' : 'i'}
             </p>
