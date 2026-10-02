@@ -24,8 +24,10 @@ export function ModuleLauncher({ isAdmin, onNavigate }: ModuleLauncherProps) {
     },
     {
       id: 'reports' as const,
-      label: 'Rapportini',
-      description: 'Rapportini di lavoro, squadre, materiali e andamento delle commesse.',
+      label: isAdmin ? 'Cantieri' : 'Rapportini',
+      description: isAdmin
+        ? 'Cantieri, rapportini collegati, costi di manodopera/materiali e analisi economica progressiva.'
+        : 'Rapportini di lavoro, squadre, materiali e collegamento ai cantieri esistenti.',
       icon: ClipboardList,
     },
     ...(isAdmin ? [
