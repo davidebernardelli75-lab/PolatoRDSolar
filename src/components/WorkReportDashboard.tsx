@@ -608,6 +608,19 @@ export function WorkReportDashboard({ isAdmin }: WorkReportDashboardProps) {
         </div>
       )}
 
+      {editingSite && (
+        <WorkSiteFormModal
+          site={editingSite === 'new' ? null : editingSite}
+          phases={editingSite === 'new' ? [] : sitePhases.filter((phase) => phase.site_id === editingSite.id)}
+          options={siteFieldOptions}
+          quotes={quotes}
+          plants={plants}
+          sites={sites}
+          onClose={() => setEditingSite(null)}
+          onSaved={load}
+        />
+      )}
+
       {editing && (
         <WorkReportFormModal
           report={editing === 'new' ? null : editing}
