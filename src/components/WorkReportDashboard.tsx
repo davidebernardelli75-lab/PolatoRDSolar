@@ -511,12 +511,22 @@ export function WorkReportDashboard({ isAdmin }: WorkReportDashboardProps) {
                 : 'Ore di manodopera, attività svolte e materiali utilizzati per ogni cantiere o intervento.'}
             </p>
           </div>
-          <button
-            onClick={() => setEditing('new')}
-            className="inline-flex items-center gap-2 rounded-xl bg-red-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-red-600"
-          >
-            <Plus size={18} /> Nuovo rapportino
-          </button>
+          <div className="flex flex-wrap gap-2">
+            {isAdmin && (
+              <button
+                onClick={() => setEditingSite('new')}
+                className="inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-blue-950 hover:bg-blue-50"
+              >
+                <Plus size={18} /> Nuovo cantiere
+              </button>
+            )}
+            <button
+              onClick={() => setEditing('new')}
+              className="inline-flex items-center gap-2 rounded-xl bg-red-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-red-600"
+            >
+              <Plus size={18} /> Nuovo rapportino
+            </button>
+          </div>
         </div>
       </header>
 
@@ -527,16 +537,27 @@ export function WorkReportDashboard({ isAdmin }: WorkReportDashboardProps) {
       )}
 
       <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Kpi label="Rapportini" value={String(reports.length)} />
-        <Kpi label="Da verificare" value={String(pendingCount)} />
-        <Kpi label="Approvati" value={String(approvedCount)} />
-        <Kpi label="Ore registrate" value={totalHours.toLocaleString('it-IT', { maximumFractionDigits: 2 })} />
+        {isAdmin ? (
+          <>
+            <Kpi label="Cantieri" value={String(sites.length)} />
+            <Kpi label="Da iniziare" value={String(sites.filter((site) => normalizeCatalogValue(site.site_status) === 'DA INIZIARE').length)} />
+            <Kpi label="In corso" value={String(sites.filter((site) => normalizeCatalogValue(site.site_status) === 'IN CORSO').length)} />
+            <Kpi label="Rapportini" value={String(reports.length)} />
+          </>
+        ) : (
+          <>
+            <Kpi label="Rapportini" value={String(reports.length)} />
+            <Kpi label="Da verificare" value={String(pendingCount)} />
+            <Kpi label="Approvati" value={String(approvedCount)} />
+            <Kpi label="Ore registrate" value={totalHours.toLocaleString('it-IT', { maximumFractionDigits: 2 })} />
+          </>
+        )}
       </div>
 
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <ClipboardList size={18} className="text-blue-900" />
-          <h2 className="font-semibold text-slate-900">{isAdmin ? 'Cantieri e rapportini da associare' : 'I miei rapportini'}</h2>
+          <h2 className="font-semibold text-slate-900">{isAdmin ? 'Registro cantieri e rapportini da associare' : 'I miei rapportini'}</h2>
         </div>
         <select
           value={statusFilter}
@@ -553,355 +574,37 @@ export function WorkReportDashboard({ isAdmin }: WorkReportDashboardProps) {
 
       {loading ? (
         <div className="py-16 text-center"><Loader2 className="mx-auto animate-spin text-slate-400" /></div>
-      ) : filtered.length === 0 ? (
+      ) : !isAdmin && filtered.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-slate-300 bg-white py-16 text-center">
           <ClipboardList size={34} className="mx-auto mb-3 text-slate-300" />
           <p className="text-sm text-slate-500">Nessun rapportino disponibile.</p>
         </div>
       ) : (
         <div className="space-y-3">
-          {isAdmin ? adminGroups.map((group) => {
-            const quote = group.quoteRequestId ? quoteById.get(group.quoteRequestId) : null;
-            const primaryReport = group.reports[0];
-            const groupExpanded = expandedGroupKey === group.key;
-            const reportIds = new Set(group.reports.map((report) => report.id));
-            const groupWorkers = workers.filter((worker) => reportIds.has(worker.report_id));
-            const groupMaterials = materials.filter((material) => reportIds.has(material.report_id));
-            const groupHours = groupWorkers.reduce((sum, worker) => sum + Number(worker.hours || 0), 0);
-            const economicReportIds = new Set(
-              reports
-                .filter((report) => group.quoteRequestId
-                  ? report.quote_request_id === group.quoteRequestId
-                  : group.reports.some((groupReport) => groupReport.id === report.id))
-                .map((report) => report.id),
-            );
-            const economicWorkers = workers.filter((worker) => economicReportIds.has(worker.report_id));
-            const economicMaterials = materials.filter((material) => economicReportIds.has(material.report_id));
-
-            let groupLaborCost = 0;
-            let groupMaterialCost = 0;
-            let groupMissingCosts = 0;
-
-            economicWorkers.forEach((worker) => {
-              let rate = workerCostByRow.get(worker.id);
-              if (rate == null) {
-                const workerCatalogEntry = workerCatalogByName.get(normalizeCatalogValue(worker.worker_name));
-                const fallbackKey = workerCatalogEntry
-                  ? `${workerCatalogEntry.id}::${normalizeCatalogValue(worker.rate_type || 'ORDINARIA')}`
-                  : '';
-                rate = fallbackKey ? laborDefaultByKey.get(fallbackKey) : undefined;
-              }
-
-              if (rate == null || !Number.isFinite(rate)) {
-                groupMissingCosts += 1;
-                return;
-              }
-
-              groupLaborCost += Number(worker.hours) * rate;
-            });
-
-            economicMaterials.forEach((material) => {
-              let unitPrice = materialCostByRow.get(material.id);
-              if (unitPrice == null) {
-                const materialCatalogEntry = materialCatalogByDescription.get(normalizeCatalogValue(material.description));
-                unitPrice = materialCatalogEntry
-                  ? materialDefaultByCatalog.get(materialCatalogEntry.id)
-                  : undefined;
-              }
-
-              if (unitPrice == null || !Number.isFinite(unitPrice)) {
-                groupMissingCosts += 1;
-                return;
-              }
-
-              groupMaterialCost += Number(material.quantity) * unitPrice;
-            });
-
-            const groupCostToDate = groupLaborCost + groupMaterialCost;
-            const quoteValue = quote?.value_ex_vat == null ? null : Number(quote.value_ex_vat);
-            const groupBudgetUsedPercent = quoteValue != null && quoteValue > 0
-              ? (groupCostToDate / quoteValue) * 100
-              : null;
-            const groupMargin = quoteValue == null ? null : quoteValue - groupCostToDate;
-            const groupMarginPercent = quoteValue != null && quoteValue > 0 && groupMargin != null
-              ? (groupMargin / quoteValue) * 100
-              : null;
-            const groupLaborPercent = quoteValue != null && quoteValue > 0
-              ? (groupLaborCost / quoteValue) * 100
-              : null;
-            const groupMaterialPercent = quoteValue != null && quoteValue > 0
-              ? (groupMaterialCost / quoteValue) * 100
-              : null;
-            const budgetProgressWidth = groupBudgetUsedPercent == null
-              ? 0
-              : Math.min(Math.max(groupBudgetUsedPercent, 0), 100);
-            const budgetProgressClass = groupBudgetUsedPercent == null
-              ? 'bg-slate-300'
-              : groupBudgetUsedPercent > 100
-                ? 'bg-red-600'
-                : groupBudgetUsedPercent >= 75
-                  ? 'bg-amber-500'
-                  : 'bg-green-600';
-
-            const newestDate = group.reports[0]?.report_date ?? '';
-            const oldestDate = group.reports[group.reports.length - 1]?.report_date ?? '';
-            const dateLabel = newestDate === oldestDate
-              ? displayDate(newestDate)
-              : `${displayDate(oldestDate)} → ${displayDate(newestDate)}`;
-            const correctingAssociation = associationEditingGroupKey === group.key;
-            const associationBusy = associationBusyGroupKey === group.key;
-            const deletingGroup = deletingGroupKey === group.key;
-            const totalGroupReports = group.quoteRequestId
-              ? reports.filter((report) => report.quote_request_id === group.quoteRequestId).length
-              : group.reports.length;
-            const groupLabel = quote
-              ? `${quote.progressive_number}/${quote.series} - ${quote.client}`
-              : primaryReport.client_reference;
-
-            return (
-              <section key={group.key} className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-                <div className="p-4 sm:p-5">
-                  <div className="flex flex-wrap items-start gap-4">
-                    <div className={`rounded-xl px-3 py-2 text-center ${quote ? 'bg-blue-900 text-white' : 'bg-amber-50 text-amber-900'}`}>
-                      <div className="text-[9px] font-bold uppercase tracking-wide">{quote ? 'Cantiere' : 'Da associare'}</div>
-                      <div className="mt-0.5 text-sm font-bold">
-                        {quote ? `${quote.progressive_number}/${quote.series}` : `${group.reports.length} RAPP.`}
-                      </div>
-                    </div>
-
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <h3 className="text-base font-bold text-slate-900">
-                          {quote ? quote.client : primaryReport.client_reference}
-                        </h3>
-                        {quote && (
-                          <span className="rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-semibold text-green-800">
-                            {quote.status}
-                          </span>
-                        )}
-                        {!quote && (
-                          <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-800">
-                            DA ASSOCIARE A UN CANTIERE
-                          </span>
-                        )}
-                      </div>
-                      <p className="mt-0.5 text-xs text-slate-500">
-                        {quote
-                          ? `Rif. operativo: ${primaryReport.client_reference}${group.reports.length > 1 ? ' · storico rapportini aggregato' : ''}`
-                          : primaryReport.plant_id
-                            ? `Rapportino da associare · impianto FV facoltativo presente`
-                            : 'Rapportino da associare · nessun impianto FV richiesto'}
-                      </p>
-                      <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-600">
-                        <span><strong>{group.reports.length}</strong> rapportini</span>
-                        <span>{dateLabel}</span>
-                        <span><strong>{groupHours.toLocaleString('it-IT', { maximumFractionDigits: 2 })}</strong> ore</span>
-                        <span><strong>{groupMaterials.length}</strong> righe materiale</span>
-                        {quote?.value_ex_vat != null && (
-                          <span>Preventivo <strong>{Number(quote.value_ex_vat).toLocaleString('it-IT', { style: 'currency', currency: 'EUR' })}</strong></span>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="flex flex-wrap items-center justify-end gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setAssociationEditingGroupKey(correctingAssociation ? null : group.key)}
-                        disabled={associationBusy}
-                        className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-900 hover:bg-blue-100 disabled:opacity-50"
-                      >
-                        Cambia cantiere
-                      </button>
-                      {quote && (
-                        <button
-                          type="button"
-                          onClick={() => void updateGroupQuoteAssociation(
-                            group.key,
-                            group.reports.map((report) => report.id),
-                            group.quoteRequestId,
-                            null,
-                          )}
-                          disabled={associationBusy || deletingGroup}
-                          className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-700 hover:bg-red-100 disabled:opacity-50"
-                        >
-                          Scollega cantiere
-                        </button>
-                      )}
-                      <button
-                        type="button"
-                        onClick={() => void removeGroup(
-                          group.key,
-                          group.quoteRequestId,
-                          group.reports.map((report) => report.id),
-                          groupLabel,
-                          totalGroupReports,
-                        )}
-                        disabled={associationBusy || deletingGroup}
-                        className="rounded-lg border border-red-300 bg-white px-3 py-2 text-xs font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50"
-                      >
-                        {deletingGroup ? 'Eliminazione…' : 'Elimina cantiere'}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setExpandedGroupKey(groupExpanded ? null : group.key)}
-                        className="rounded-lg p-2 text-blue-900 hover:bg-blue-50"
-                        aria-label={groupExpanded ? 'Chiudi cantiere' : 'Apri cantiere'}
-                      >
-                        {groupExpanded ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
-                      </button>
-                    </div>
-                  </div>
-
-                  {quote && quoteValue != null && quoteValue > 0 && (
-                    <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50/70 p-3 sm:p-4">
-                      <div className="flex flex-wrap items-start justify-between gap-2">
-                        <div>
-                          <h4 className="text-xs font-bold uppercase tracking-wide text-slate-700">Andamento economico cantiere</h4>
-                          <p className="mt-0.5 text-[11px] text-slate-500">
-                            Percentuali calcolate sul consuntivo di tutti i rapportini collegati al cantiere.
-                          </p>
-                        </div>
-                        <span className={`rounded-full px-3 py-1.5 text-xs font-bold ${
-                          groupBudgetUsedPercent != null && groupBudgetUsedPercent > 100
-                            ? 'bg-red-100 text-red-800'
-                            : groupBudgetUsedPercent != null && groupBudgetUsedPercent >= 75
-                              ? 'bg-amber-100 text-amber-800'
-                              : 'bg-green-100 text-green-800'
-                        }`}>
-                          {groupBudgetUsedPercent?.toLocaleString('it-IT', { maximumFractionDigits: 1 })}% utilizzato
-                        </span>
-                      </div>
-
-                      <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-                        <div className="rounded-xl bg-white p-3 ring-1 ring-slate-100">
-                          <div className="text-[9px] font-bold uppercase tracking-wide text-slate-400">Costi / preventivo</div>
-                          <div className="mt-1 text-lg font-bold text-slate-900">
-                            {groupBudgetUsedPercent?.toLocaleString('it-IT', { maximumFractionDigits: 1 })}%
-                          </div>
-                          <div className="mt-0.5 text-[10px] text-slate-500">
-                            {groupCostToDate.toLocaleString('it-IT', { style: 'currency', currency: 'EUR' })}
-                          </div>
-                        </div>
-
-                        <div className="rounded-xl bg-white p-3 ring-1 ring-slate-100">
-                          <div className="text-[9px] font-bold uppercase tracking-wide text-slate-400">Margine residuo</div>
-                          <div className={`mt-1 text-lg font-bold ${
-                            groupMarginPercent == null
-                              ? 'text-slate-500'
-                              : groupMarginPercent >= 0
-                                ? 'text-green-700'
-                                : 'text-red-700'
-                          }`}>
-                            {groupMarginPercent == null ? '—' : `${groupMarginPercent.toLocaleString('it-IT', { maximumFractionDigits: 1 })}%`}
-                          </div>
-                          <div className="mt-0.5 text-[10px] text-slate-500">
-                            {groupMargin == null ? '—' : groupMargin.toLocaleString('it-IT', { style: 'currency', currency: 'EUR' })}
-                          </div>
-                        </div>
-
-                        <div className="rounded-xl bg-white p-3 ring-1 ring-slate-100">
-                          <div className="text-[9px] font-bold uppercase tracking-wide text-slate-400">Incidenza manodopera</div>
-                          <div className="mt-1 text-lg font-bold text-slate-900">
-                            {groupLaborPercent == null ? '—' : `${groupLaborPercent.toLocaleString('it-IT', { maximumFractionDigits: 1 })}%`}
-                          </div>
-                          <div className="mt-0.5 text-[10px] text-slate-500">
-                            {groupLaborCost.toLocaleString('it-IT', { style: 'currency', currency: 'EUR' })}
-                          </div>
-                        </div>
-
-                        <div className="rounded-xl bg-white p-3 ring-1 ring-slate-100">
-                          <div className="text-[9px] font-bold uppercase tracking-wide text-slate-400">Incidenza materiali</div>
-                          <div className="mt-1 text-lg font-bold text-slate-900">
-                            {groupMaterialPercent == null ? '—' : `${groupMaterialPercent.toLocaleString('it-IT', { maximumFractionDigits: 1 })}%`}
-                          </div>
-                          <div className="mt-0.5 text-[10px] text-slate-500">
-                            {groupMaterialCost.toLocaleString('it-IT', { style: 'currency', currency: 'EUR' })}
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="mt-3">
-                        <div className="h-2.5 overflow-hidden rounded-full bg-slate-200">
-                          <div
-                            className={`h-full rounded-full transition-all ${budgetProgressClass}`}
-                            style={{ width: `${budgetProgressWidth}%` }}
-                          />
-                        </div>
-                        <div className="mt-1 flex justify-between text-[9px] font-semibold text-slate-400">
-                          <span>0%</span>
-                          <span>50%</span>
-                          <span>75%</span>
-                          <span>100%</span>
-                        </div>
-                      </div>
-
-                      {groupBudgetUsedPercent != null && groupBudgetUsedPercent > 100 && (
-                        <p className="mt-2 rounded-lg bg-red-50 px-3 py-2 text-[11px] font-semibold text-red-800">
-                          Costi oltre il valore del preventivo di {(groupBudgetUsedPercent - 100).toLocaleString('it-IT', { maximumFractionDigits: 1 })}%.
-                        </p>
-                      )}
-
-                      {groupMissingCosts > 0 && (
-                        <p className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-[11px] text-amber-900">
-                          Andamento parziale: {groupMissingCosts} voce/i di costo non sono ancora valorizzate.
-                        </p>
-                      )}
-                    </div>
-                  )}
-
-                  {correctingAssociation && (
-                    <div className="mt-4 rounded-xl border border-blue-200 bg-blue-50/60 p-3">
-                      <div className="grid gap-2 lg:grid-cols-[1fr_auto] lg:items-center">
-                        <select
-                          value={group.quoteRequestId ?? ''}
-                          onChange={(e) => void updateGroupQuoteAssociation(
-                            group.key,
-                            group.reports.map((report) => report.id),
-                            group.quoteRequestId,
-                            e.target.value || null,
-                          )}
-                          disabled={associationBusy}
-                          className="w-full rounded-xl border border-blue-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-blue-500 disabled:opacity-50"
-                        >
-                          <option value="">Nessun cantiere collegato</option>
-                          {quotes.map((option) => (
-                            <option key={option.id} value={option.id}>
-                              {option.progressive_number}/{option.series} · {option.client} · {option.status}
-                              {option.value_ex_vat != null ? ` · ${Number(option.value_ex_vat).toLocaleString('it-IT', { style: 'currency', currency: 'EUR' })}` : ''}
-                            </option>
-                          ))}
-                        </select>
-                        <button
-                          type="button"
-                          onClick={() => setAssociationEditingGroupKey(null)}
-                          className="rounded-lg bg-white px-3 py-2.5 text-xs font-semibold text-slate-600 ring-1 ring-slate-200"
-                        >
-                          Annulla
-                        </button>
-                      </div>
-                      <p className="mt-2 text-[11px] text-blue-800">
-                        Il collegamento al cantiere usa il preventivo come riferimento economico e non richiede che il rapportino appartenga a un impianto FV. Per correggere un solo rapportino già raggruppato, aprilo con la matita e modifica il cantiere associato.
-                      </p>
-                    </div>
-                  )}
-                </div>
-
-                {groupExpanded && (
-                  <div className="border-t border-slate-200 bg-slate-50/60 p-3 sm:p-4">
-                    <div className="mb-3 flex items-center justify-between gap-3">
-                      <div>
-                        <h4 className="text-xs font-bold uppercase tracking-wide text-slate-600">Rapportini del cantiere</h4>
-                        <p className="mt-0.5 text-[11px] text-slate-500">Apri il singolo rapportino per costi, materiali, ore, approvazione o correzioni.</p>
-                      </div>
-                    </div>
-                    <div className="space-y-3">
-                      {group.reports.map((report) => renderReportCard(report, true))}
-                    </div>
-                  </div>
-                )}
-              </section>
-            );
-          }) : filtered.map((report) => renderReportCard(report))}
+          {isAdmin ? (
+            <WorkSiteRegister
+              sites={sites}
+              phases={sitePhases}
+              siteOptions={siteFieldOptions}
+              reports={reports}
+              visibleReports={filtered}
+              workers={workers}
+              materials={materials}
+              quotes={quotes}
+              workerCatalog={workerCatalog}
+              materialCatalog={materialCatalog}
+              workerCostByRow={workerCostByRow}
+              materialCostByRow={materialCostByRow}
+              laborDefaultByKey={laborDefaultByKey}
+              materialDefaultByCatalog={materialDefaultByCatalog}
+              workerCatalogByName={workerCatalogByName}
+              materialCatalogByDescription={materialCatalogByDescription}
+              renderReportCard={(report) => renderReportCard(report, true)}
+              onEditSite={(site) => setEditingSite(site)}
+              onReload={load}
+              onError={setError}
+            />
+          ) : filtered.map((report) => renderReportCard(report))}
         </div>
       )}
 
