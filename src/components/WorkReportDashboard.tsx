@@ -639,6 +639,686 @@ function Kpi({ label, value }: { label: string; value: string }) {
   );
 }
 
+
+function workSiteProgressFactor(status: string): number {
+  const normalized = normalizeCatalogValue(status);
+  if (normalized === 'COMPLETATO') return 1;
+  if (normalized === 'IN CORSO') return 0.5;
+  return 0;
+}
+
+function workSiteBillingFactor(status: string): number {
+  const normalized = normalizeCatalogValue(status);
+  if (normalized === 'FATTURATO') return 1;
+  if (normalized === 'PARZIALMENTE FATTURATO') return 0.5;
+  return 0;
+}
+
+function workSiteStatusClass(status: string): string {
+  const normalized = normalizeCatalogValue(status);
+  if (normalized === 'COMPLETATO') return 'bg-green-100 text-green-800';
+  if (normalized === 'IN CORSO') return 'bg-blue-100 text-blue-800';
+  if (normalized === 'SOSPESO') return 'bg-amber-100 text-amber-900';
+  if (normalized === 'DA INIZIARE') return 'bg-slate-100 text-slate-700';
+  return 'bg-violet-100 text-violet-800';
+}
+
+function WorkSiteRegister({
+  sites,
+  phases,
+  siteOptions,
+  reports,
+  visibleReports,
+  workers,
+  materials,
+  quotes,
+  workerCostByRow,
+  materialCostByRow,
+  laborDefaultByKey,
+  materialDefaultByCatalog,
+  workerCatalogByName,
+  materialCatalogByDescription,
+  renderReportCard,
+  onEditSite,
+  onReload,
+  onError,
+}: {
+  sites: WorkSite[];
+  phases: WorkSitePhase[];
+  siteOptions: WorkSiteOption[];
+  reports: WorkReport[];
+  visibleReports: WorkReport[];
+  workers: WorkReportWorker[];
+  materials: WorkReportMaterial[];
+  quotes: QuoteRequest[];
+  workerCostByRow: Map<string, number>;
+  materialCostByRow: Map<string, number>;
+  laborDefaultByKey: Map<string, number>;
+  materialDefaultByCatalog: Map<string, number>;
+  workerCatalogByName: Map<string, WorkReportWorkerCatalogEntry>;
+  materialCatalogByDescription: Map<string, WorkReportMaterialCatalogEntry>;
+  renderReportCard: (report: WorkReport) => ReactNode;
+  onEditSite: (site: WorkSite) => void;
+  onReload: () => Promise<void>;
+  onError: (message: string | null) => void;
+}) {
+  const [search, setSearch] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState('TUTTI');
+  const [siteStatusFilter, setSiteStatusFilter] = useState('TUTTI');
+  const [expandedSiteId, setExpandedSiteId] = useState<string | null>(null);
+  const [deletingSiteId, setDeletingSiteId] = useState<string | null>(null);
+
+  const quoteById = useMemo(() => new Map(quotes.map((quote) => [quote.id, quote])), [quotes]);
+  const categories = siteOptions.filter((option) => option.field_key === 'CATEGORY');
+  const siteStatuses = siteOptions.filter((option) => option.field_key === 'SITE_STATUS');
+
+  const filteredSites = useMemo(() => {
+    const needle = normalizeCatalogValue(search);
+    return sites.filter((site) => {
+      const searchHit = !needle || [
+        site.name,
+        site.location ?? '',
+        site.category,
+        site.site_status,
+        site.source_group ?? '',
+      ].some((value) => normalizeCatalogValue(value).includes(needle));
+      return searchHit
+        && (categoryFilter === 'TUTTI' || site.category === categoryFilter)
+        && (siteStatusFilter === 'TUTTI' || site.site_status === siteStatusFilter);
+    });
+  }, [sites, search, categoryFilter, siteStatusFilter]);
+
+  const unlinkedReports = visibleReports.filter((report) => !report.site_id);
+
+  const removeSite = async (site: WorkSite) => {
+    const linkedCount = reports.filter((report) => report.site_id === site.id).length;
+    if (!window.confirm(
+      `Eliminare definitivamente il cantiere "${site.name}"?\n\nVerranno eliminati anche i ${linkedCount} rapportini collegati, con ore, materiali e costi. Il preventivo e l'impianto FV non verranno eliminati. Questa operazione non è annullabile.`,
+    )) return;
+
+    setDeletingSiteId(site.id);
+    onError(null);
+    try {
+      await deleteWorkSiteGroup(site.id);
+      setExpandedSiteId(null);
+      await onReload();
+    } catch (err) {
+      onError(err instanceof Error ? err.message : 'Eliminazione cantiere non riuscita.');
+    } finally {
+      setDeletingSiteId(null);
+    }
+  };
+
+  return (
+    <div className="space-y-5">
+      <div className="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 md:grid-cols-[1fr_190px_190px]">
+        <input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Cerca cantiere, località, categoria..."
+          className={inputClass}
+        />
+        <select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)} className={inputClass}>
+          <option value="TUTTI">Tutte le categorie</option>
+          {categories.map((option) => <option key={option.id} value={option.label}>{option.label}</option>)}
+        </select>
+        <select value={siteStatusFilter} onChange={(e) => setSiteStatusFilter(e.target.value)} className={inputClass}>
+          <option value="TUTTI">Tutti gli stati cantiere</option>
+          {siteStatuses.map((option) => <option key={option.id} value={option.label}>{option.label}</option>)}
+        </select>
+      </div>
+
+      {filteredSites.length === 0 ? (
+        <div className="rounded-2xl border border-dashed border-slate-300 bg-white py-12 text-center text-sm text-slate-500">
+          Nessun cantiere corrisponde ai filtri selezionati.
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {filteredSites.map((site) => {
+            const sitePhases = phases.filter((phase) => phase.site_id === site.id);
+            const siteReports = reports.filter((report) => report.site_id === site.id);
+            const visibleSiteReports = visibleReports.filter((report) => report.site_id === site.id);
+            const reportIds = new Set(siteReports.map((report) => report.id));
+            const siteWorkers = workers.filter((worker) => reportIds.has(worker.report_id));
+            const siteMaterials = materials.filter((material) => reportIds.has(material.report_id));
+            const totalWeight = sitePhases.reduce((sum, phase) => sum + Number(phase.weight_percent || 0), 0);
+            const progressPercent = totalWeight > 0
+              ? sitePhases.reduce((sum, phase) => sum + Number(phase.weight_percent || 0) * workSiteProgressFactor(phase.progress_status), 0) / totalWeight * 100
+              : 0;
+            const billingPercent = totalWeight > 0
+              ? sitePhases.reduce((sum, phase) => sum + Number(phase.weight_percent || 0) * workSiteBillingFactor(phase.billing_status), 0) / totalWeight * 100
+              : 0;
+            const quote = site.quote_request_id ? quoteById.get(site.quote_request_id) : null;
+
+            let laborCost = 0;
+            let materialCost = 0;
+            let missingCosts = 0;
+
+            siteWorkers.forEach((worker) => {
+              let rate = workerCostByRow.get(worker.id);
+              if (rate == null) {
+                const catalog = workerCatalogByName.get(normalizeCatalogValue(worker.worker_name));
+                const key = catalog ? `${catalog.id}::${normalizeCatalogValue(worker.rate_type || 'ORDINARIA')}` : '';
+                rate = key ? laborDefaultByKey.get(key) : undefined;
+              }
+              if (rate == null || !Number.isFinite(rate)) {
+                missingCosts += 1;
+                return;
+              }
+              laborCost += Number(worker.hours) * rate;
+            });
+
+            siteMaterials.forEach((material) => {
+              let unitPrice = materialCostByRow.get(material.id);
+              if (unitPrice == null) {
+                const catalog = materialCatalogByDescription.get(normalizeCatalogValue(material.description));
+                unitPrice = catalog ? materialDefaultByCatalog.get(catalog.id) : undefined;
+              }
+              if (unitPrice == null || !Number.isFinite(unitPrice)) {
+                missingCosts += 1;
+                return;
+              }
+              materialCost += Number(material.quantity) * unitPrice;
+            });
+
+            const totalCost = laborCost + materialCost;
+            const quoteValue = quote?.value_ex_vat == null ? null : Number(quote.value_ex_vat);
+            const usedPercent = quoteValue != null && quoteValue > 0 ? totalCost / quoteValue * 100 : null;
+            const margin = quoteValue == null ? null : quoteValue - totalCost;
+            const marginPercent = quoteValue != null && quoteValue > 0 && margin != null ? margin / quoteValue * 100 : null;
+            const expanded = expandedSiteId === site.id;
+            const deleting = deletingSiteId === site.id;
+
+            return (
+              <section key={site.id} className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                <div className="p-4 sm:p-5">
+                  <div className="flex flex-wrap items-start gap-4">
+                    <div className="rounded-xl bg-blue-900 px-3 py-2 text-center text-white">
+                      <div className="text-[9px] font-bold uppercase tracking-wide">{site.category}</div>
+                      <div className="mt-0.5 text-sm font-bold">{Math.round(progressPercent)}%</div>
+                    </div>
+
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h3 className="text-base font-bold text-slate-900">{site.name}</h3>
+                        <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${workSiteStatusClass(site.site_status)}`}>
+                          {site.site_status}
+                        </span>
+                        {quote && (
+                          <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-800">
+                            Prev. {quote.progressive_number}/{quote.series}
+                          </span>
+                        )}
+                      </div>
+                      <p className="mt-0.5 text-xs text-slate-500">
+                        {site.location || 'Località da definire'}
+                        {site.start_date ? ` · Inizio ${displayDate(site.start_date)}` : site.start_date_note ? ` · Inizio: ${site.start_date_note}` : ''}
+                        {site.planned_end_date ? ` · Fine prevista ${displayDate(site.planned_end_date)}` : ''}
+                      </p>
+                      <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-600">
+                        <span><strong>{siteReports.length}</strong> rapportini</span>
+                        <span>Avanzamento <strong>{progressPercent.toLocaleString('it-IT', { maximumFractionDigits: 1 })}%</strong></span>
+                        <span>Fatturazione fasi <strong>{billingPercent.toLocaleString('it-IT', { maximumFractionDigits: 1 })}%</strong></span>
+                        {site.source_name && <span className="text-slate-400">{site.source_name}</span>}
+                      </div>
+                    </div>
+
+                    <div className="flex flex-wrap items-center justify-end gap-2">
+                      <button
+                        type="button"
+                        onClick={() => onEditSite(site)}
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-900 hover:bg-blue-100"
+                      >
+                        <Pencil size={14} /> Modifica
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void removeSite(site)}
+                        disabled={deleting}
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-700 hover:bg-red-100 disabled:opacity-50"
+                      >
+                        <Trash2 size={14} /> {deleting ? 'Eliminazione…' : 'Elimina'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setExpandedSiteId(expanded ? null : site.id)}
+                        className="rounded-lg p-2 text-blue-900 hover:bg-blue-50"
+                        aria-label={expanded ? 'Chiudi cantiere' : 'Apri cantiere'}
+                      >
+                        {expanded ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 grid gap-3 lg:grid-cols-2">
+                    <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-3">
+                      <div className="mb-2 flex items-center justify-between gap-3">
+                        <h4 className="text-[10px] font-bold uppercase tracking-wide text-slate-600">Cronoprogramma</h4>
+                        <span className="text-xs font-bold text-blue-900">{progressPercent.toLocaleString('it-IT', { maximumFractionDigits: 1 })}%</span>
+                      </div>
+                      <div className="h-2.5 overflow-hidden rounded-full bg-slate-200">
+                        <div className="h-full rounded-full bg-blue-700" style={{ width: `${Math.min(Math.max(progressPercent, 0), 100)}%` }} />
+                      </div>
+                      <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                        {sitePhases.map((phase) => (
+                          <div key={phase.id} className="rounded-lg bg-white p-2 ring-1 ring-slate-100">
+                            <div className="text-[9px] font-bold uppercase leading-tight text-slate-500">{phase.phase_label} · {Number(phase.weight_percent)}%</div>
+                            <div className="mt-1 text-[10px] font-semibold text-slate-800">{phase.progress_status}</div>
+                            <div className="mt-0.5 text-[9px] text-slate-400">{phase.billing_status}</div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-3">
+                      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                        <h4 className="text-[10px] font-bold uppercase tracking-wide text-slate-600">Analisi economica cantiere</h4>
+                        {usedPercent != null && (
+                          <span className={`rounded-full px-2 py-1 text-[10px] font-bold ${usedPercent > 100 ? 'bg-red-100 text-red-800' : usedPercent >= 75 ? 'bg-amber-100 text-amber-800' : 'bg-green-100 text-green-800'}`}>
+                            {usedPercent.toLocaleString('it-IT', { maximumFractionDigits: 1 })}% utilizzato
+                          </span>
+                        )}
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="rounded-lg bg-white p-2 ring-1 ring-slate-100">
+                          <div className="text-[9px] uppercase text-slate-400">Preventivo</div>
+                          <div className="mt-1 text-sm font-bold text-slate-900">{quoteValue == null ? '—' : quoteValue.toLocaleString('it-IT', { style: 'currency', currency: 'EUR' })}</div>
+                        </div>
+                        <div className="rounded-lg bg-white p-2 ring-1 ring-slate-100">
+                          <div className="text-[9px] uppercase text-slate-400">Costo sostenuto</div>
+                          <div className="mt-1 text-sm font-bold text-slate-900">{totalCost.toLocaleString('it-IT', { style: 'currency', currency: 'EUR' })}</div>
+                        </div>
+                        <div className="rounded-lg bg-white p-2 ring-1 ring-slate-100">
+                          <div className="text-[9px] uppercase text-slate-400">Manodopera / materiali</div>
+                          <div className="mt-1 text-[11px] font-semibold text-slate-700">
+                            {laborCost.toLocaleString('it-IT', { style: 'currency', currency: 'EUR' })} / {materialCost.toLocaleString('it-IT', { style: 'currency', currency: 'EUR' })}
+                          </div>
+                        </div>
+                        <div className="rounded-lg bg-white p-2 ring-1 ring-slate-100">
+                          <div className="text-[9px] uppercase text-slate-400">Margine residuo</div>
+                          <div className={`mt-1 text-sm font-bold ${margin != null && margin < 0 ? 'text-red-700' : 'text-green-700'}`}>
+                            {margin == null ? '—' : margin.toLocaleString('it-IT', { style: 'currency', currency: 'EUR' })}
+                          </div>
+                          <div className="text-[9px] text-slate-400">{marginPercent == null ? '' : `${marginPercent.toLocaleString('it-IT', { maximumFractionDigits: 1 })}%`}</div>
+                        </div>
+                      </div>
+                      {!quote && <p className="mt-2 text-[10px] text-slate-500">Collega un preventivo al cantiere per attivare il confronto economico.</p>}
+                      {quote && quoteValue == null && <p className="mt-2 text-[10px] text-amber-800">Il preventivo è collegato ma il valore economico non è ancora valorizzato.</p>}
+                      {missingCosts > 0 && <p className="mt-2 text-[10px] text-amber-800">{missingCosts} voce/i di costo non ancora valorizzate.</p>}
+                      {usedPercent != null && usedPercent > 100 && <p className="mt-2 text-[10px] font-semibold text-red-700">Costi superiori al preventivo di {(usedPercent - 100).toLocaleString('it-IT', { maximumFractionDigits: 1 })}%.</p>}
+                    </div>
+                  </div>
+                </div>
+
+                {expanded && (
+                  <div className="border-t border-slate-200 bg-slate-50/60 p-3 sm:p-4">
+                    <div className="mb-3">
+                      <h4 className="text-xs font-bold uppercase tracking-wide text-slate-600">Rapportini del cantiere</h4>
+                      <p className="mt-0.5 text-[11px] text-slate-500">I nuovi rapportini collegati aggiornano automaticamente costi e analisi economica.</p>
+                    </div>
+                    {visibleSiteReports.length > 0 ? (
+                      <div className="space-y-3">{visibleSiteReports.map((report) => <div key={report.id}>{renderReportCard(report)}</div>)}</div>
+                    ) : (
+                      <div className="rounded-xl border border-dashed border-slate-300 bg-white p-5 text-center text-xs text-slate-500">
+                        Nessun rapportino del cantiere corrisponde allo stato rapportini selezionato.
+                      </div>
+                    )}
+                  </div>
+                )}
+              </section>
+            );
+          })}
+        </div>
+      )}
+
+      {unlinkedReports.length > 0 && (
+        <section className="rounded-2xl border border-amber-200 bg-amber-50/40 p-4">
+          <div className="mb-3">
+            <h3 className="font-bold text-amber-950">Rapportini da associare</h3>
+            <p className="text-xs text-amber-800">Questi rapportini non sono ancora collegati a un cantiere. Aprili con la matita per scegliere il cantiere corretto.</p>
+          </div>
+          <div className="space-y-3">{unlinkedReports.map((report) => <div key={report.id}>{renderReportCard(report)}</div>)}</div>
+        </section>
+      )}
+    </div>
+  );
+}
+
+type WorkSitePhaseDraft = {
+  id?: string;
+  phase_key: string;
+  phase_label: string;
+  weight_percent: string;
+  progress_status: string;
+  billing_status: string;
+  notes: string;
+};
+
+const DEFAULT_WORK_SITE_PHASES: WorkSitePhaseDraft[] = [
+  { phase_key: 'TRACCIATURA', phase_label: 'TRACCIATURA', weight_percent: '5', progress_status: 'NON INIZIATO', billing_status: 'DA FATTURARE', notes: '' },
+  { phase_key: 'POSA_TUBI', phase_label: 'POSA TUBI', weight_percent: '20', progress_status: 'NON INIZIATO', billing_status: 'DA FATTURARE', notes: '' },
+  { phase_key: 'POSA_FILI', phase_label: 'POSA FILI', weight_percent: '25', progress_status: 'NON INIZIATO', billing_status: 'DA FATTURARE', notes: '' },
+  { phase_key: 'POSA_FRUTTI', phase_label: 'POSA FRUTTI', weight_percent: '30', progress_status: 'NON INIZIATO', billing_status: 'DA FATTURARE', notes: '' },
+  { phase_key: 'CABLAGGIO_CENTRALINO', phase_label: 'CABLAGGIO CENTRALINO', weight_percent: '5', progress_status: 'NON INIZIATO', billing_status: 'DA FATTURARE', notes: '' },
+  { phase_key: 'GIUNZIONI', phase_label: 'GIUNZIONI', weight_percent: '5', progress_status: 'NON INIZIATO', billing_status: 'DA FATTURARE', notes: '' },
+  { phase_key: 'COLLAUDO_CANTIERE', phase_label: 'COLLAUDO CANTIERE', weight_percent: '5', progress_status: 'NON INIZIATO', billing_status: 'DA FATTURARE', notes: '' },
+  { phase_key: 'EXTRA_RICHIESTI', phase_label: 'EXTRA RICHIESTI', weight_percent: '5', progress_status: 'NON INIZIATO', billing_status: 'DA FATTURARE', notes: '' },
+];
+
+function WorkSiteFormModal({
+  site,
+  phases,
+  options,
+  quotes,
+  plants,
+  sites,
+  onClose,
+  onSaved,
+}: {
+  site: WorkSite | null;
+  phases: WorkSitePhase[];
+  options: WorkSiteOption[];
+  quotes: QuoteRequest[];
+  plants: Plant[];
+  sites: WorkSite[];
+  onClose: () => void;
+  onSaved: () => Promise<void>;
+}) {
+  const [name, setName] = useState(site?.name ?? '');
+  const [location, setLocation] = useState(site?.location ?? '');
+  const [category, setCategory] = useState(site?.category ?? 'DA DEFINIRE');
+  const [siteStatus, setSiteStatus] = useState(site?.site_status ?? 'DA INIZIARE');
+  const [startDate, setStartDate] = useState(site?.start_date ?? '');
+  const [startDateNote, setStartDateNote] = useState(site?.start_date_note ?? '');
+  const [plannedEndDate, setPlannedEndDate] = useState(site?.planned_end_date ?? '');
+  const [quoteId, setQuoteId] = useState(site?.quote_request_id ?? '');
+  const [plantId, setPlantId] = useState(site?.plant_id ?? '');
+  const [notes, setNotes] = useState(site?.notes ?? '');
+  const [active, setActive] = useState(site?.active ?? true);
+  const [phaseRows, setPhaseRows] = useState<WorkSitePhaseDraft[]>(
+    phases.length > 0
+      ? phases.map((phase) => ({
+          id: phase.id,
+          phase_key: phase.phase_key,
+          phase_label: phase.phase_label,
+          weight_percent: String(phase.weight_percent),
+          progress_status: phase.progress_status,
+          billing_status: phase.billing_status,
+          notes: phase.notes ?? '',
+        }))
+      : DEFAULT_WORK_SITE_PHASES.map((phase) => ({ ...phase })),
+  );
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const fieldOptions = (fieldKey: WorkSiteOption['field_key']) =>
+    options.filter((option) => option.field_key === fieldKey && option.active);
+
+  const chooseOption = async (
+    fieldKey: WorkSiteOption['field_key'],
+    value: string,
+    apply: (next: string) => void,
+  ) => {
+    if (value !== '__OTHER__') {
+      apply(value);
+      return;
+    }
+    const raw = window.prompt('Inserisci la nuova voce. Verrà memorizzata nel menu per i prossimi cantieri.');
+    if (!raw?.trim()) return;
+    const normalized = normalizeCatalogValue(raw);
+    setBusy(true);
+    setError(null);
+    try {
+      await rememberWorkSiteOption(fieldKey, normalized);
+      apply(normalized);
+      await onSaved();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Impossibile memorizzare la nuova voce.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const weightTotal = phaseRows.reduce((sum, phase) => sum + (Number(phase.weight_percent) || 0), 0);
+
+  const save = async () => {
+    if (!name.trim()) {
+      setError('Indica il nome del cantiere.');
+      return;
+    }
+    if (weightTotal <= 0) {
+      setError('Il peso complessivo delle fasi deve essere maggiore di zero.');
+      return;
+    }
+
+    setBusy(true);
+    setError(null);
+    try {
+      const payload = {
+        name: name.trim().toUpperCase(),
+        location: location.trim().toUpperCase() || null,
+        category: category.trim().toUpperCase(),
+        site_status: siteStatus.trim().toUpperCase(),
+        start_date: startDate || null,
+        start_date_note: startDateNote.trim().toUpperCase() || null,
+        planned_end_date: plannedEndDate || null,
+        quote_request_id: quoteId || null,
+        plant_id: plantId || null,
+        notes: notes.trim().toUpperCase() || null,
+        active,
+      };
+
+      const savedSite = site
+        ? await updateWorkSite(site.id, payload)
+        : await createWorkSite(payload);
+
+      const persistedPhases = site
+        ? phases
+        : (await fetchWorkSitePhases()).filter((phase) => phase.site_id === savedSite.id);
+
+      await Promise.all(phaseRows.map(async (draft) => {
+        const persisted = persistedPhases.find((phase) => phase.phase_key === draft.phase_key);
+        if (!persisted) return;
+        await updateWorkSitePhase(persisted.id, {
+          weight_percent: Math.max(0, Number(draft.weight_percent) || 0),
+          progress_status: draft.progress_status.trim().toUpperCase(),
+          billing_status: draft.billing_status.trim().toUpperCase(),
+          notes: draft.notes.trim().toUpperCase() || null,
+        });
+      }));
+
+      await onSaved();
+      onClose();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Salvataggio cantiere non riuscito.';
+      setError(message.includes('work_sites_quote_request_id_key')
+        ? 'Questo preventivo è già collegato a un altro cantiere.'
+        : message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[95] flex items-center justify-center bg-black/60 p-3 sm:p-4">
+      <div className="max-h-[96vh] w-full max-w-5xl overflow-y-auto rounded-2xl bg-white p-4 shadow-2xl sm:p-6">
+        <div className="mb-5 flex items-start justify-between gap-4">
+          <div>
+            <h2 className="text-lg font-bold text-slate-900">{site ? 'Modifica cantiere' : 'Nuovo cantiere'}</h2>
+            <p className="mt-1 text-xs text-slate-500">Struttura derivata dal registro Cantieri 2026: anagrafica, cronoprogramma pesato, fatturazione per fase e collegamento economico al preventivo.</p>
+          </div>
+          <button onClick={onClose} className="rounded-lg p-2 text-slate-400 hover:bg-slate-100"><X size={20} /></button>
+        </div>
+
+        {error && <div className="mb-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div>}
+
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <label className="text-xs font-semibold text-slate-600 sm:col-span-2">
+            Cantiere *
+            <input value={name} onChange={(e) => setName(e.target.value.toUpperCase())} className={inputClass + ' mt-1'} />
+          </label>
+          <label className="text-xs font-semibold text-slate-600">
+            Località
+            <input value={location} onChange={(e) => setLocation(e.target.value.toUpperCase())} className={inputClass + ' mt-1'} />
+          </label>
+
+          <label className="text-xs font-semibold text-slate-600">
+            Categoria
+            <select value={category} onChange={(e) => void chooseOption('CATEGORY', e.target.value, setCategory)} className={inputClass + ' mt-1'}>
+              {fieldOptions('CATEGORY').map((option) => <option key={option.id} value={option.label}>{option.label}</option>)}
+              <option value="__OTHER__">Altro…</option>
+            </select>
+          </label>
+          <label className="text-xs font-semibold text-slate-600">
+            Stato cantiere
+            <select value={siteStatus} onChange={(e) => void chooseOption('SITE_STATUS', e.target.value, setSiteStatus)} className={inputClass + ' mt-1'}>
+              {fieldOptions('SITE_STATUS').map((option) => <option key={option.id} value={option.label}>{option.label}</option>)}
+              <option value="__OTHER__">Altro…</option>
+            </select>
+          </label>
+          <label className="text-xs font-semibold text-slate-600">
+            Attivo
+            <select value={active ? 'SI' : 'NO'} onChange={(e) => setActive(e.target.value === 'SI')} className={inputClass + ' mt-1'}>
+              <option value="SI">Sì</option>
+              <option value="NO">No</option>
+            </select>
+          </label>
+
+          <label className="text-xs font-semibold text-slate-600">
+            Data inizio
+            <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className={inputClass + ' mt-1'} />
+          </label>
+          <label className="text-xs font-semibold text-slate-600">
+            Nota data inizio
+            <input value={startDateNote} onChange={(e) => setStartDateNote(e.target.value.toUpperCase())} className={inputClass + ' mt-1'} placeholder="ES. DA DEFINIRE / SOLO ANNO" />
+          </label>
+          <label className="text-xs font-semibold text-slate-600">
+            Fine prevista
+            <input type="date" value={plannedEndDate} onChange={(e) => setPlannedEndDate(e.target.value)} className={inputClass + ' mt-1'} />
+          </label>
+
+          <label className="text-xs font-semibold text-slate-600 sm:col-span-2">
+            Preventivo di riferimento economico
+            <select value={quoteId} onChange={(e) => setQuoteId(e.target.value)} className={inputClass + ' mt-1'}>
+              <option value="">Nessun preventivo collegato</option>
+              {quotes.map((quote) => {
+                const occupied = sites.some((other) => other.id !== site?.id && other.quote_request_id === quote.id);
+                return (
+                  <option key={quote.id} value={quote.id} disabled={occupied}>
+                    {quote.progressive_number}/{quote.series} · {quote.client} · {quote.status}{occupied ? ' · GIÀ COLLEGATO' : ''}
+                  </option>
+                );
+              })}
+            </select>
+          </label>
+          <label className="text-xs font-semibold text-slate-600">
+            Impianto FV collegato (facoltativo)
+            <select value={plantId} onChange={(e) => setPlantId(e.target.value)} className={inputClass + ' mt-1'}>
+              <option value="">Nessun impianto FV</option>
+              {plants.map((plant) => <option key={plant.id} value={plant.id}>{plant.owner_name} · {plant.address}</option>)}
+            </select>
+          </label>
+
+          <label className="text-xs font-semibold text-slate-600 sm:col-span-2 lg:col-span-3">
+            Note
+            <textarea rows={2} value={notes} onChange={(e) => setNotes(e.target.value.toUpperCase())} className={inputClass + ' mt-1 resize-none'} />
+          </label>
+        </div>
+
+        <section className="mt-5 rounded-2xl border border-slate-200 p-4">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h3 className="font-semibold text-slate-900">Cronoprogramma e fatturazione</h3>
+              <p className="text-[11px] text-slate-500">I pesi iniziali sono quelli del foglio Excel. “In corso” vale metà del peso, “Completato” vale il peso intero.</p>
+            </div>
+            <span className={`rounded-full px-3 py-1.5 text-xs font-bold ${Math.abs(weightTotal - 100) < 0.01 ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-900'}`}>
+              Pesi totali {weightTotal.toLocaleString('it-IT', { maximumFractionDigits: 2 })}%
+            </span>
+          </div>
+
+          <div className="space-y-2">
+            {phaseRows.map((phase, index) => (
+              <div key={phase.phase_key} className="grid gap-2 rounded-xl bg-slate-50 p-3 md:grid-cols-[1.2fr_90px_1fr_1fr]">
+                <div>
+                  <div className="text-xs font-bold text-slate-800">{phase.phase_label}</div>
+                  <div className="mt-1 text-[10px] text-slate-400">{phase.phase_key}</div>
+                </div>
+                <label className="text-[10px] font-semibold text-slate-500">
+                  Peso %
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="0.5"
+                    value={phase.weight_percent}
+                    onChange={(e) => setPhaseRows((rows) => rows.map((row, i) => i === index ? { ...row, weight_percent: e.target.value } : row))}
+                    className={inputClass + ' mt-1'}
+                  />
+                </label>
+                <label className="text-[10px] font-semibold text-slate-500">
+                  Avanzamento
+                  <select
+                    value={phase.progress_status}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      if (value === '__OTHER__') {
+                        void chooseOption('PHASE_PROGRESS_STATUS', value, (next) => {
+                          setPhaseRows((rows) => rows.map((row, i) => i === index ? { ...row, progress_status: next } : row));
+                        });
+                      } else {
+                        setPhaseRows((rows) => rows.map((row, i) => i === index ? { ...row, progress_status: value } : row));
+                      }
+                    }}
+                    className={inputClass + ' mt-1'}
+                  >
+                    {fieldOptions('PHASE_PROGRESS_STATUS').map((option) => <option key={option.id} value={option.label}>{option.label}</option>)}
+                    <option value="__OTHER__">Altro…</option>
+                  </select>
+                </label>
+                <label className="text-[10px] font-semibold text-slate-500">
+                  Fatturazione
+                  <select
+                    value={phase.billing_status}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      if (value === '__OTHER__') {
+                        void chooseOption('PHASE_BILLING_STATUS', value, (next) => {
+                          setPhaseRows((rows) => rows.map((row, i) => i === index ? { ...row, billing_status: next } : row));
+                        });
+                      } else {
+                        setPhaseRows((rows) => rows.map((row, i) => i === index ? { ...row, billing_status: value } : row));
+                      }
+                    }}
+                    className={inputClass + ' mt-1'}
+                  >
+                    {fieldOptions('PHASE_BILLING_STATUS').map((option) => <option key={option.id} value={option.label}>{option.label}</option>)}
+                    <option value="__OTHER__">Altro…</option>
+                  </select>
+                </label>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <div className="mt-5 flex justify-end gap-2">
+          <button type="button" onClick={onClose} className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700">
+            Annulla
+          </button>
+          <button
+            type="button"
+            onClick={() => void save()}
+            disabled={busy}
+            className="inline-flex items-center gap-2 rounded-xl bg-blue-900 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50"
+          >
+            {busy ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+            Salva cantiere
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function normalizeCatalogValue(value: string): string {
   return value.trim().toUpperCase().replace(/\s+/g, ' ');
 }
