@@ -129,8 +129,8 @@ export function WorkReportDashboard({ isAdmin }: WorkReportDashboardProps) {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  const load = useCallback(async (showInitialLoader = false) => {
+    if (showInitialLoader) setLoading(true);
     try {
       const [reportRows, workerRows, materialRows, plantRows, materialOptions, workerOptions, siteOptionRows] = await Promise.all([
         fetchWorkReports(),
@@ -203,7 +203,7 @@ export function WorkReportDashboard({ isAdmin }: WorkReportDashboardProps) {
     }
   }, [isAdmin]);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => { void load(true); }, [load]);
 
   const plantById = useMemo(() => new Map(plants.map((plant) => [plant.id, plant])), [plants]);
   const quoteById = useMemo(() => new Map(quotes.map((quote) => [quote.id, quote])), [quotes]);
