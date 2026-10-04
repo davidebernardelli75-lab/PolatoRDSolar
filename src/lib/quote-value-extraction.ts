@@ -274,8 +274,64 @@ function centsKey(value: number): number {
   return Math.round(value * 100);
 }
 
+function roundCurrency(value: number): number {
+  return Math.round((value + Number.EPSILON) * 100) / 100;
+}
+
+function findVatRates(pages: string[]): number[] {
+  const rates = new Set<number>();
+
+  pages.forEach((page) => {
+    const upper = normalizeText(page).toUpperCase();
+    const vatRegex = /\bIVA(?:TO|TA)?\b\s*(?:(?:AL|DEL|APPLICAT[AO])\s*)?(\d{1,2}(?:[.,]\d+)?)\s*%/g;
+
+    for (const match of upper.matchAll(vatRegex)) {
+      const rate = Number(match[1].replace(',', '.'));
+      if (Number.isFinite(rate) && rate > 0 && rate <= 30) rates.add(rate);
+    }
+  });
+
+  return [...rates].sort((a, b) => a - b);
+}
+
+function deriveNetFromOverallGross(
+  pages: string[],
+  perPage: AmountCandidate[][],
+): AmountCandidate | null {
+  const vatRates = findVatRates(pages);
+  if (vatRates.length !== 1) return null;
+
+  const overallGross = perPage
+    .flat()
+    .filter((candidate) =>
+      candidate.kind === 'gross' &&
+      candidate.overall &&
+      candidate.score >= 200
+    )
+    .sort((a, b) => b.score - a.score || b.value - a.value)[0];
+
+  if (!overallGross) return null;
+
+  const vatRate = vatRates[0];
+  const netValue = roundCurrency(overallGross.value / (1 + vatRate / 100));
+
+  return {
+    value: netValue,
+    score: 320,
+    label: `Totale senza IVA calcolato da totale IVATO (IVA ${vatRate.toLocaleString('it-IT')}%)`,
+    kind: 'net',
+    overall: true,
+  };
+}
+
 function bestValueFromPages(pages: string[]): AmountCandidate | null {
   const perPage = pages.map((page) => findCandidates(page));
+
+  // When the document exposes one unambiguous VAT rate and an overall
+  // VAT-included total, derive the net mathematically. This is more robust
+  // than summing table rows whose PDF text order may be imperfect.
+  const grossDerivedNet = deriveNetFromOverallGross(pages, perPage);
+  if (grossDerivedNet) return grossDerivedNet;
 
   const overallNet = perPage
     .flat()
@@ -317,7 +373,7 @@ function bestValueFromPages(pages: string[]): AmountCandidate | null {
     }
 
     return {
-      value: netSum,
+      value: roundCurrency(netSum),
       score: Math.min(...netParts.map((candidate) => candidate.score)) + 20,
       label: 'Somma imponibili del preventivo',
       kind: 'net',
