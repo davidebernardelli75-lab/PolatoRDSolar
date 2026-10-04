@@ -221,6 +221,17 @@ export interface QuoteRequestFile {
   created_at: string;
 }
 
+export interface QuoteTypeOption {
+  id: string;
+  label: string;
+  normalized_label: string;
+  sort_order: number;
+  is_custom: boolean;
+  active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
 
 export type WorkReportStatus = 'BOZZA' | 'DA_VERIFICARE' | 'APPROVATO' | 'DA_CORREGGERE';
 

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AlertCircle, CalendarClock, CalendarDays, CheckCircle2, Download, Euro, FileSpreadsheet, Loader2, Mail, Paperclip, Pencil, Phone, Plus, Search, StickyNote, Trash2, Upload, X } from 'lucide-react';
-import type { QuoteRequest, QuoteRequestFile, QuoteRequestInsert, QuoteStatus } from '@/lib/types';
-import { createQuoteRequest, deleteQuoteRequest, deleteQuoteRequestFile, downloadQuoteRequestFile, fetchQuoteRequestFiles, fetchQuoteRequests, updateQuoteRequest, uploadQuoteRequestFile } from '@/lib/api';
+import type { QuoteRequest, QuoteRequestFile, QuoteRequestInsert, QuoteStatus, QuoteTypeOption } from '@/lib/types';
+import { createQuoteRequest, deleteQuoteRequest, deleteQuoteRequestFile, downloadQuoteRequestFile, fetchQuoteRequestFiles, fetchQuoteRequests, fetchQuoteTypeOptions, rememberQuoteTypeOption, updateQuoteRequest, uploadQuoteRequestFile } from '@/lib/api';
 import { saveAs } from 'file-saver';
 
 const STATUSES: QuoteStatus[] = ['DA VERIFICARE','DA GESTIRE','IN PREPARAZIONE','INVIATO','ACCETTATO','RIFIUTATO','SOSPESO'];
@@ -49,6 +49,7 @@ function statusClass(status: QuoteStatus) {
 export function QuoteDashboard() {
   const [rows, setRows] = useState<QuoteRequest[]>([]);
   const [quoteFiles, setQuoteFiles] = useState<QuoteRequestFile[]>([]);
+  const [quoteTypeOptions, setQuoteTypeOptions] = useState<QuoteTypeOption[]>([]);
   const [uploadingQuoteId, setUploadingQuoteId] = useState<string | null>(null);
   const [clearingNoteId, setClearingNoteId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -62,9 +63,14 @@ export function QuoteDashboard() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [requests, files] = await Promise.all([fetchQuoteRequests(), fetchQuoteRequestFiles()]);
+      const [requests, files, typeOptions] = await Promise.all([
+        fetchQuoteRequests(),
+        fetchQuoteRequestFiles(),
+        fetchQuoteTypeOptions(),
+      ]);
       setRows(requests);
       setQuoteFiles(files);
+      setQuoteTypeOptions(typeOptions);
       setError(null);
     }
     catch (err) { setError(err instanceof Error ? err.message : 'Impossibile caricare i preventivi.'); }
@@ -326,7 +332,25 @@ export function QuoteDashboard() {
         </section>
       </div>
 
-      {editing && <QuoteFormModal person={editing === 'new' ? null : editing} rows={rows} onClose={() => setEditing(null)} onSave={save} />}
+      {editing && (
+        <QuoteFormModal
+          person={editing === 'new' ? null : editing}
+          rows={rows}
+          quoteTypeOptions={quoteTypeOptions}
+          onRememberQuoteType={async (label) => {
+            const option = await rememberQuoteTypeOption(label);
+            setQuoteTypeOptions((previous) => {
+              const withoutCurrent = previous.filter((item) => item.id !== option.id);
+              return [...withoutCurrent, option].sort((a, b) =>
+                a.sort_order - b.sort_order || a.label.localeCompare(b.label, 'it')
+              );
+            });
+            return option;
+          }}
+          onClose={() => setEditing(null)}
+          onSave={save}
+        />
+      )}
     </div>
   );
 }
@@ -389,9 +413,11 @@ function Kpi({ icon: Icon, label, value }: { icon: typeof FileSpreadsheet; label
   </div>;
 }
 
-function QuoteFormModal({ person, rows, onClose, onSave }: {
+function QuoteFormModal({ person, rows, quoteTypeOptions, onRememberQuoteType, onClose, onSave }: {
   person: QuoteRequest | null;
   rows: QuoteRequest[];
+  quoteTypeOptions: QuoteTypeOption[];
+  onRememberQuoteType: (label: string) => Promise<QuoteTypeOption>;
   onClose: () => void;
   onSave: (input: QuoteRequestInsert) => Promise<void>;
 }) {
@@ -428,8 +454,7 @@ function QuoteFormModal({ person, rows, onClose, onSave }: {
     }
   };
 
-  const submit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const submit = async () => {
     if (!client.trim()) return;
     setBusy(true); setError(null);
     try {
@@ -453,7 +478,10 @@ function QuoteFormModal({ person, rows, onClose, onSave }: {
   };
 
   return <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/60 p-4">
-    <form onSubmit={(e) => void submit(e)} className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-5 shadow-xl">
+    <form
+      onSubmit={(e) => e.preventDefault()}
+      className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-5 shadow-xl"
+    >
       <div className="mb-4 flex items-center justify-between">
         <h2 className="text-lg font-bold text-slate-900">{person ? 'Modifica richiesta preventivo' : 'Nuova richiesta preventivo'}</h2>
         <button type="button" onClick={onClose} className="rounded-lg p-1 text-slate-500"><X size={20}/></button>
@@ -487,8 +515,36 @@ function QuoteFormModal({ person, rows, onClose, onSave }: {
           />
           <span className="mt-1 block text-[10px] font-normal text-slate-400">Seleziona giorno e orario del sopralluogo. Lascia vuoto se non è ancora programmato.</span>
         </label>
-        <label className="text-xs font-semibold text-slate-600 sm:col-span-2">Tipo preventivo
-          <input value={quoteType} onChange={(e) => setQuoteType(e.target.value.toUpperCase())} className={inputClass + ' mt-1'} placeholder="FOTOVOLTAICO, ACCUMULO, WALLBOX..." />
+        <label className="text-xs font-semibold text-slate-600 sm:col-span-2">Tipo di impianto
+          <select
+            value={quoteType}
+            onChange={(e) => {
+              const next = e.target.value;
+              if (next !== '__OTHER__') {
+                setQuoteType(next);
+                return;
+              }
+              const raw = window.prompt('Inserisci il nuovo tipo di impianto. Verrà memorizzato nel menu per i prossimi preventivi.');
+              if (!raw?.trim()) return;
+              setBusy(true);
+              setError(null);
+              void onRememberQuoteType(raw.trim().toUpperCase())
+                .then((option) => setQuoteType(option.label))
+                .catch((err) => setError(err instanceof Error ? err.message : 'Impossibile memorizzare il nuovo tipo di impianto.'))
+                .finally(() => setBusy(false));
+            }}
+            className={inputClass + ' mt-1'}
+          >
+            <option value="">Seleziona tipo di impianto</option>
+            {quoteType && !quoteTypeOptions.some((option) => option.label === quoteType) && (
+              <option value={quoteType}>{quoteType}</option>
+            )}
+            {quoteTypeOptions.map((option) => (
+              <option key={option.id} value={option.label}>{option.label}</option>
+            ))}
+            <option value="__OTHER__">Altro…</option>
+          </select>
+          <span className="mt-1 block text-[10px] font-normal text-slate-400">Con “Altro…” la nuova voce viene aggiunta automaticamente al menu.</span>
         </label>
         <label className="text-xs font-semibold text-slate-600">Valore senza IVA
           <input type="number" step="0.01" min="0" value={value} onChange={(e) => setValue(e.target.value)} className={inputClass + ' mt-1'} />
@@ -504,7 +560,14 @@ function QuoteFormModal({ person, rows, onClose, onSave }: {
       </div>
       {error && <p className="mt-3 rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p>}
       <div className="mt-5 flex gap-3">
-        <button type="submit" disabled={busy || !client.trim()} className="flex-1 rounded-xl bg-blue-900 py-3 text-sm font-semibold text-white disabled:opacity-50">{busy ? 'Salvataggio...' : 'Salva'}</button>
+        <button
+          type="button"
+          onClick={() => { void submit(); }}
+          disabled={busy || !client.trim()}
+          className="flex-1 rounded-xl bg-blue-900 py-3 text-sm font-semibold text-white disabled:opacity-50"
+        >
+          {busy ? 'Salvataggio...' : 'Salva'}
+        </button>
         <button type="button" onClick={onClose} className="rounded-xl bg-slate-100 px-5 py-3 text-sm font-medium text-slate-700">Annulla</button>
       </div>
     </form>

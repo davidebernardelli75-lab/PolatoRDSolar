@@ -1,5 +1,5 @@
 import { supabase, STORAGE_BUCKET, QUOTE_FILES_BUCKET } from './supabase';
-import type { Plant, Panel, PanelPhoto, PlantInsert, PlantUpdate, PanelInsert, RoadmapTask, PlantInverter, PlantStorage, PlantCharger, PlantInverterInsert, PlantStorageInsert, PlantChargerInsert, PlantPowerMeter, PlantPowerMeterInsert, Vehicle, VehicleInsert, Insurance, InsuranceInsert, EquipmentCatalogEntry, EquipmentCategory, QuoteRequest, QuoteRequestInsert, QuoteRequestFile, WorkReport, WorkReportInsert, WorkReportMaterial, WorkReportMaterialInput, WorkReportWorker, WorkReportWorkerInput, WorkReportStatus, WorkReportMaterialCatalogEntry, WorkReportWorkerCatalogEntry, WorkReportMaterialCostDefault, WorkReportLaborRateDefault, WorkReportMaterialCost, WorkReportWorkerCost, WorkReportAdminSummary, WorkReportSiteOption, WorkSite, WorkSiteInsert, WorkSiteOption, WorkSiteOptionField, WorkSitePhase, WorkSiteScope, WorkSitePlant, PlantQuoteLink, CalendarEvent, CalendarEventInsert, CalendarEventCategory } from './types';
+import type { Plant, Panel, PanelPhoto, PlantInsert, PlantUpdate, PanelInsert, RoadmapTask, PlantInverter, PlantStorage, PlantCharger, PlantInverterInsert, PlantStorageInsert, PlantChargerInsert, PlantPowerMeter, PlantPowerMeterInsert, Vehicle, VehicleInsert, Insurance, InsuranceInsert, EquipmentCatalogEntry, EquipmentCategory, QuoteRequest, QuoteRequestInsert, QuoteRequestFile, QuoteTypeOption, WorkReport, WorkReportInsert, WorkReportMaterial, WorkReportMaterialInput, WorkReportWorker, WorkReportWorkerInput, WorkReportStatus, WorkReportMaterialCatalogEntry, WorkReportWorkerCatalogEntry, WorkReportMaterialCostDefault, WorkReportLaborRateDefault, WorkReportMaterialCost, WorkReportWorkerCost, WorkReportAdminSummary, WorkReportSiteOption, WorkSite, WorkSiteInsert, WorkSiteOption, WorkSiteOptionField, WorkSitePhase, WorkSiteScope, WorkSitePlant, PlantQuoteLink, CalendarEvent, CalendarEventInsert, CalendarEventCategory } from './types';
 
 export async function fetchPlants(): Promise<Plant[]> {
   const { data, error } = await supabase
@@ -605,6 +605,25 @@ export async function fetchQuoteRequests(): Promise<QuoteRequest[]> {
     .order('progressive_number', { ascending: false });
   if (error) throw error;
   return data ?? [];
+}
+
+export async function fetchQuoteTypeOptions(): Promise<QuoteTypeOption[]> {
+  const { data, error } = await supabase
+    .from('quote_type_options')
+    .select('*')
+    .eq('active', true)
+    .order('sort_order', { ascending: true })
+    .order('label', { ascending: true });
+  if (error) throw error;
+  return (data ?? []) as QuoteTypeOption[];
+}
+
+export async function rememberQuoteTypeOption(label: string): Promise<QuoteTypeOption> {
+  const { data, error } = await supabase.rpc('remember_quote_type_option', {
+    p_label: label,
+  });
+  if (error) throw error;
+  return data as QuoteTypeOption;
 }
 
 export async function createQuoteRequest(input: QuoteRequestInsert): Promise<QuoteRequest> {
