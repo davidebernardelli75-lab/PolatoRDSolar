@@ -108,7 +108,7 @@ function looksNonMonetary(
     return true;
   }
 
-  if (/\b(?:POTENZA|CAPACITA|CAPACITÀ|QUANTITA|QUANTITÀ|NR\.?|N\.)\s*$/.test(before)) {
+  if (/\b(?:POTENZA|CAPACITA|CAPACITÀ|QUANTITA|QUANTITÀ|QTA|QTÀ|PZ|PZ\.|NR\.?|N\.)\s*$/.test(before)) {
     return true;
   }
 
