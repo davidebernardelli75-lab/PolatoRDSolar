@@ -428,8 +428,7 @@ function QuoteFormModal({ person, rows, onClose, onSave }: {
     }
   };
 
-  const submit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const submit = async () => {
     if (!client.trim()) return;
     setBusy(true); setError(null);
     try {
@@ -453,7 +452,10 @@ function QuoteFormModal({ person, rows, onClose, onSave }: {
   };
 
   return <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/60 p-4">
-    <form onSubmit={(e) => void submit(e)} className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-5 shadow-xl">
+    <form
+      onSubmit={(e) => e.preventDefault()}
+      className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-5 shadow-xl"
+    >
       <div className="mb-4 flex items-center justify-between">
         <h2 className="text-lg font-bold text-slate-900">{person ? 'Modifica richiesta preventivo' : 'Nuova richiesta preventivo'}</h2>
         <button type="button" onClick={onClose} className="rounded-lg p-1 text-slate-500"><X size={20}/></button>
@@ -504,7 +506,14 @@ function QuoteFormModal({ person, rows, onClose, onSave }: {
       </div>
       {error && <p className="mt-3 rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p>}
       <div className="mt-5 flex gap-3">
-        <button type="submit" disabled={busy || !client.trim()} className="flex-1 rounded-xl bg-blue-900 py-3 text-sm font-semibold text-white disabled:opacity-50">{busy ? 'Salvataggio...' : 'Salva'}</button>
+        <button
+          type="button"
+          onClick={() => { void submit(); }}
+          disabled={busy || !client.trim()}
+          className="flex-1 rounded-xl bg-blue-900 py-3 text-sm font-semibold text-white disabled:opacity-50"
+        >
+          {busy ? 'Salvataggio...' : 'Salva'}
+        </button>
         <button type="button" onClick={onClose} className="rounded-xl bg-slate-100 px-5 py-3 text-sm font-medium text-slate-700">Annulla</button>
       </div>
     </form>
