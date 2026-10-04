@@ -3,6 +3,7 @@ on:
   pull_request:
     paths:
       - 'src/components/QuoteDashboard.tsx'
+      - 'src/lib/quote-value-extraction.ts'
       - 'src/lib/api.ts'
       - 'src/lib/types.ts'
       - 'supabase/migrations/*quote*.sql'
