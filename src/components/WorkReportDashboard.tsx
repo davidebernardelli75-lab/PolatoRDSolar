@@ -1116,7 +1116,12 @@ function WorkSiteFormModal({
   const [startDate, setStartDate] = useState(site?.start_date ?? '');
   const [startDateNote, setStartDateNote] = useState(site?.start_date_note ?? '');
   const [plannedEndDate, setPlannedEndDate] = useState(site?.planned_end_date ?? '');
+  const formatQuoteOption = (quote: QuoteRequest) =>
+    `${quote.progressive_number}/${quote.series} · ${quote.client} · ${quote.status}`;
+  const initialQuote = quotes.find((quote) => quote.id === site?.quote_request_id);
   const [quoteId, setQuoteId] = useState(site?.quote_request_id ?? '');
+  const [quoteSearch, setQuoteSearch] = useState(initialQuote ? formatQuoteOption(initialQuote) : '');
+  const [quotePickerOpen, setQuotePickerOpen] = useState(false);
   const [selectedScopeIds, setSelectedScopeIds] = useState<string[]>(scopes.map((scope) => scope.option_id));
   const [selectedPlantIds, setSelectedPlantIds] = useState<string[]>(plantLinks.map((link) => link.plant_id));
   const [notes, setNotes] = useState(site?.notes ?? '');
@@ -1146,6 +1151,21 @@ function WorkSiteFormModal({
   const selectedScopeLabels = selectedScopeIds
     .map((id) => workScopeOptions.find((option) => option.id === id)?.label)
     .filter((label): label is string => Boolean(label));
+
+  const selectedQuote = quotes.find((quote) => quote.id === quoteId);
+  const selectedQuoteLabel = selectedQuote ? formatQuoteOption(selectedQuote) : '';
+  const quoteSearchNeedle = normalizeCatalogValue(quoteSearch);
+  const showAllQuoteOptions = !quoteSearchNeedle || (Boolean(quoteId) && quoteSearch === selectedQuoteLabel);
+  const filteredQuoteOptions = quotes.filter((quote) => {
+    if (showAllQuoteOptions) return true;
+    return [
+      quote.client,
+      quote.progressive_number,
+      quote.series,
+      quote.status,
+      `${quote.progressive_number}/${quote.series}`,
+    ].some((value) => normalizeCatalogValue(String(value ?? '')).includes(quoteSearchNeedle));
+  });
 
   const chooseOption = async (
     fieldKey: WorkSiteOption['field_key'],
@@ -1214,6 +1234,10 @@ function WorkSiteFormModal({
     }
     if (weightTotal <= 0) {
       setError('Il peso complessivo delle fasi deve essere maggiore di zero.');
+      return;
+    }
+    if (quoteSearch.trim() && !quoteId) {
+      setError('Seleziona un preventivo dall’elenco dei risultati oppure svuota il campo.');
       return;
     }
 
@@ -1394,20 +1418,99 @@ function WorkSiteFormModal({
             <input type="date" value={plannedEndDate} onChange={(e) => setPlannedEndDate(e.target.value)} className={inputClass + ' mt-1'} />
           </label>
 
-          <label className="text-xs font-semibold text-slate-600 sm:col-span-2 lg:col-span-3">
-            Preventivo di riferimento economico
-            <select value={quoteId} onChange={(e) => setQuoteId(e.target.value)} className={inputClass + ' mt-1'}>
-              <option value="">Nessun preventivo collegato</option>
-              {quotes.map((quote) => {
-                const occupied = sites.some((other) => other.id !== site?.id && other.quote_request_id === quote.id);
-                return (
-                  <option key={quote.id} value={quote.id} disabled={occupied}>
-                    {quote.progressive_number}/{quote.series} · {quote.client} · {quote.status}{occupied ? ' · GIÀ COLLEGATO' : ''}
-                  </option>
-                );
-              })}
-            </select>
-          </label>
+          <div className="relative text-xs font-semibold text-slate-600 sm:col-span-2 lg:col-span-3">
+            <label htmlFor="work-site-quote-search">Preventivo di riferimento economico</label>
+            <input
+              id="work-site-quote-search"
+              type="text"
+              value={quoteSearch}
+              placeholder="Digita cliente o numero preventivo..."
+              autoComplete="off"
+              role="combobox"
+              aria-expanded={quotePickerOpen}
+              aria-controls="work-site-quote-options"
+              onFocus={(e) => {
+                setQuotePickerOpen(true);
+                e.currentTarget.select();
+              }}
+              onBlur={() => {
+                window.setTimeout(() => {
+                  setQuotePickerOpen(false);
+                  if (quoteId) {
+                    const current = quotes.find((quote) => quote.id === quoteId);
+                    if (current) setQuoteSearch(formatQuoteOption(current));
+                  }
+                }, 120);
+              }}
+              onChange={(e) => {
+                setQuoteSearch(e.target.value);
+                setQuoteId('');
+                setQuotePickerOpen(true);
+              }}
+              className={inputClass + ' mt-1'}
+            />
+
+            {quotePickerOpen && (
+              <div
+                id="work-site-quote-options"
+                role="listbox"
+                className="absolute z-30 mt-1 max-h-64 w-full overflow-y-auto rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl"
+              >
+                <button
+                  type="button"
+                  role="option"
+                  aria-selected={!quoteId}
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => {
+                    setQuoteId('');
+                    setQuoteSearch('');
+                    setQuotePickerOpen(false);
+                  }}
+                  className="w-full rounded-lg px-3 py-2 text-left text-xs font-medium text-slate-500 hover:bg-slate-50"
+                >
+                  Nessun preventivo collegato
+                </button>
+
+                {filteredQuoteOptions.length === 0 ? (
+                  <div className="px-3 py-3 text-xs font-normal text-slate-400">
+                    Nessun preventivo trovato per “{quoteSearch}”.
+                  </div>
+                ) : (
+                  filteredQuoteOptions.map((quote) => {
+                    const occupied = sites.some((other) => other.id !== site?.id && other.quote_request_id === quote.id);
+                    const selected = quote.id === quoteId;
+                    return (
+                      <button
+                        key={quote.id}
+                        type="button"
+                        role="option"
+                        aria-selected={selected}
+                        disabled={occupied}
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => {
+                          if (occupied) return;
+                          setQuoteId(quote.id);
+                          setQuoteSearch(formatQuoteOption(quote));
+                          setQuotePickerOpen(false);
+                        }}
+                        className={`w-full rounded-lg px-3 py-2 text-left text-xs transition ${occupied
+                          ? 'cursor-not-allowed bg-slate-50 text-slate-300'
+                          : selected
+                            ? 'bg-blue-50 font-semibold text-blue-900'
+                            : 'font-medium text-slate-700 hover:bg-blue-50'}`}
+                      >
+                        {formatQuoteOption(quote)}{occupied ? ' · GIÀ COLLEGATO' : ''}
+                      </button>
+                    );
+                  })
+                )}
+              </div>
+            )}
+
+            <p className="mt-1 text-[10px] font-normal text-slate-400">
+              Apri il campo per vedere l’elenco completo oppure digita il nome cliente o il numero del preventivo.
+            </p>
+          </div>
 
           <label className="text-xs font-semibold text-slate-600 sm:col-span-2 lg:col-span-3">
             Note
