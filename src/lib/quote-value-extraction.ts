@@ -208,6 +208,10 @@ function scoreCandidate(context: string): {
   };
 }
 
+function lineHasMoneyAmount(line: string): boolean {
+  return /(?:€\s*|\bEUR\s*|\bEURO\s*)?\d{1,3}(?:[.\s]\d{3})*(?:,\d{1,2})|(?:€\s*|\bEUR\s*|\bEURO\s*)?\d+(?:[.,]\d{1,2})?/i.test(line);
+}
+
 function findCandidates(text: string): AmountCandidate[] {
   const normalized = normalizeText(text);
   if (!normalized) return [];
@@ -219,7 +223,7 @@ function findCandidates(text: string): AmountCandidate[] {
   lines.forEach((line, index) => {
     const previous = lines[index - 1] ?? '';
     const next = lines[index + 1] ?? '';
-    const context = [previous, line, next].join(' | ');
+    const surroundingContext = [previous, line, next].join(' | ');
 
     for (const match of line.matchAll(amountRegex)) {
       const raw = match[0];
@@ -229,7 +233,18 @@ function findCandidates(text: string): AmountCandidate[] {
       const start = match.index ?? 0;
       if (looksNonMonetary(line, start, raw, value)) continue;
 
-      const scored = scoreCandidate(context);
+      // Classify the amount from its own row first. This prevents a gross total
+      // from inheriting "IVA ESCLUSA / IMPONIBILE" from the adjacent row.
+      let scored = scoreCandidate(line);
+
+      // Some PDF tables split the label and the amount onto two consecutive rows.
+      // Only inherit the previous row's label when that previous row contains no
+      // monetary amount of its own.
+      if (scored.score <= 0 && previous && !lineHasMoneyAmount(previous)) {
+        const previousScored = scoreCandidate(previous);
+        if (previousScored.kind === 'net') scored = previousScored;
+      }
+
       if (scored.score <= 0) continue;
 
       let score = scored.score;
@@ -237,8 +252,8 @@ function findCandidates(text: string): AmountCandidate[] {
       if (hasCurrencyMarker(line, start, raw)) score += 30;
       else if (looksMoneyFormatted(raw)) score += 15;
 
-      if (/(?:ACCONTO|ANTICIPO|RATA|SCONTO|RITENUTA)/i.test(context)) score -= 70;
-      if (/(?:PREZZO\s+UNITARIO|COSTO\s+AL\s+(?:KW|KWH)|€\s*\d+(?:[.,]\d+)?\s*\/\s*(?:KW|KWH))/i.test(context)) score -= 90;
+      if (/(?:ACCONTO|ANTICIPO|RATA|SCONTO|RITENUTA)/i.test(surroundingContext)) score -= 70;
+      if (/(?:PREZZO\s+UNITARIO|COSTO\s+AL\s+(?:KW|KWH)|€\s*\d+(?:[.,]\d+)?\s*\/\s*(?:KW|KWH))/i.test(line)) score -= 90;
 
       if (score < 70) continue;
 
@@ -310,12 +325,10 @@ function bestValueFromPages(pages: string[]): AmountCandidate | null {
     };
   }
 
-  const generic = perPage
-    .flat()
-    .filter((candidate) => candidate.kind === 'generic' && candidate.score >= 100)
-    .sort((a, b) => b.score - a.score || b.value - a.value);
-
-  return generic[0] ?? null;
+  // value_ex_vat must never be populated from a gross or ambiguous total.
+  // If a reliable net/imponibile amount is unavailable, leave the field empty
+  // and let the operator verify it manually.
+  return null;
 }
 
 async function readDocx(file: File): Promise<string[]> {
