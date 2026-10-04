@@ -930,6 +930,12 @@ function WorkSiteRegister({
                           FV collegati: {linkedPlants.map((plant) => plant.owner_name).join(' · ')}
                         </p>
                       )}
+                      {site.notes && (
+                        <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                          <span className="font-semibold">Note cantiere:</span>
+                          <span className="ml-1 whitespace-pre-wrap">{site.notes}</span>
+                        </div>
+                      )}
                       <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-600">
                         <span><strong>{siteReports.length}</strong> rapportini</span>
                         <span>Avanzamento <strong>{progressPercent.toLocaleString('it-IT', { maximumFractionDigits: 1 })}%</strong></span>
