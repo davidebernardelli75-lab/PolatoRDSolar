@@ -143,7 +143,7 @@ function scoreCandidate(context: string): {
     /TOTALE\s+(?:NETTO|NETTO\s+IVA)/.test(upper);
 
   const overall =
-    /TOTALE\s+(?:GENERALE|IMPIANTO|PREVENTIVO|OFFERTA)\b/.test(upper) &&
+    /TOTALE\s+(?:GENERALE|PREVENTIVO|OFFERTA)\b/.test(upper) &&
     /(?:IVA\s+ESCLUSA|IMPONIBILE|NETTO)/.test(upper);
 
   if (explicitNet) {
@@ -288,8 +288,21 @@ function bestValueFromPages(pages: string[]): AmountCandidate | null {
     const netParts = [...unique.values()];
     if (netParts.length === 1) return netParts[0];
 
+    const netSum = netParts.reduce((sum, candidate) => sum + candidate.value, 0);
+    const alreadySummed = netParts.find((candidate) =>
+      Math.abs(candidate.value - (netSum - candidate.value)) < 0.01
+    );
+
+    if (alreadySummed) {
+      return {
+        ...alreadySummed,
+        label: 'Totale preventivo senza IVA',
+        overall: true,
+      };
+    }
+
     return {
-      value: netParts.reduce((sum, candidate) => sum + candidate.value, 0),
+      value: netSum,
       score: Math.min(...netParts.map((candidate) => candidate.score)) + 20,
       label: 'Somma imponibili del preventivo',
       kind: 'net',
