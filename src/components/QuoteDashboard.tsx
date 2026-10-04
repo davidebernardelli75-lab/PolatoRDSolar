@@ -478,9 +478,13 @@ function QuoteFormModal({ person, rows, quoteTypeOptions, onRememberQuoteType, o
   };
 
   return <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/60 p-4">
-    <form
-      onSubmit={(e) => e.preventDefault()}
+    <div
       className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-5 shadow-xl"
+      onKeyDownCapture={(event) => {
+        if (event.key === 'Enter' && event.target instanceof HTMLInputElement) {
+          event.preventDefault();
+        }
+      }}
     >
       <div className="mb-4 flex items-center justify-between">
         <h2 className="text-lg font-bold text-slate-900">{person ? 'Modifica richiesta preventivo' : 'Nuova richiesta preventivo'}</h2>
@@ -570,6 +574,6 @@ function QuoteFormModal({ person, rows, quoteTypeOptions, onRememberQuoteType, o
         </button>
         <button type="button" onClick={onClose} className="rounded-xl bg-slate-100 px-5 py-3 text-sm font-medium text-slate-700">Annulla</button>
       </div>
-    </form>
+    </div>
   </div>;
 }
