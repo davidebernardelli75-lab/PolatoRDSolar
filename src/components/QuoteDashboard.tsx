@@ -3,6 +3,7 @@ import { AlertCircle, CalendarClock, CalendarDays, CheckCircle2, Download, Euro,
 import type { QuoteRequest, QuoteRequestFile, QuoteRequestInsert, QuoteStatus, QuoteTypeOption } from '@/lib/types';
 import { createQuoteRequest, deleteQuoteRequest, deleteQuoteRequestFile, downloadQuoteRequestFile, fetchQuoteRequestFiles, fetchQuoteRequests, fetchQuoteTypeOptions, rememberQuoteTypeOption, updateQuoteRequest, uploadQuoteRequestFile } from '@/lib/api';
 import { saveAs } from 'file-saver';
+import { extractQuoteValueFromFiles, type QuoteValueExtractionResult } from '@/lib/quote-value-extraction';
 
 const STATUSES: QuoteStatus[] = ['DA VERIFICARE','DA GESTIRE','IN PREPARAZIONE','INVIATO','ACCETTATO','RIFIUTATO','SOSPESO'];
 const COLORS = ['#2563eb','#ef4444','#16a34a','#f59e0b','#8b5cf6','#06b6d4','#ec4899','#64748b'];
@@ -129,15 +130,35 @@ export function QuoteDashboard() {
     }).join(', ');
   }, [sourceData]);
 
-  const save = async (input: QuoteRequestInsert) => {
+  const save = async (input: QuoteRequestInsert, pendingFiles: File[]) => {
+    const saved = editing && editing !== 'new'
+      ? await updateQuoteRequest(editing.id, input)
+      : await createQuoteRequest(input);
+
     if (editing && editing !== 'new') {
-      const saved = await updateQuoteRequest(editing.id, input);
       setRows((prev) => prev.map((r) => r.id === saved.id ? saved : r));
     } else {
-      const saved = await createQuoteRequest(input);
       setRows((prev) => [saved, ...prev]);
       setYear(saved.quote_year);
     }
+
+    if (pendingFiles.length > 0) {
+      setUploadingQuoteId(saved.id);
+      try {
+        const uploadedFiles: QuoteRequestFile[] = [];
+        for (const file of pendingFiles) {
+          uploadedFiles.push(await uploadQuoteRequestFile(saved.id, file));
+        }
+        setQuoteFiles((prev) => [...uploadedFiles, ...prev]);
+      } catch (err) {
+        setError(err instanceof Error
+          ? `Preventivo salvato, ma almeno un allegato non è stato caricato: ${err.message}`
+          : 'Preventivo salvato, ma almeno un allegato non è stato caricato.');
+      } finally {
+        setUploadingQuoteId(null);
+      }
+    }
+
     setEditing(null);
   };
 
@@ -419,7 +440,7 @@ function QuoteFormModal({ person, rows, quoteTypeOptions, onRememberQuoteType, o
   quoteTypeOptions: QuoteTypeOption[];
   onRememberQuoteType: (label: string) => Promise<QuoteTypeOption>;
   onClose: () => void;
-  onSave: (input: QuoteRequestInsert) => Promise<void>;
+  onSave: (input: QuoteRequestInsert, files: File[]) => Promise<void>;
 }) {
   const today = new Date().toISOString().slice(0,10);
   const initialYear = person?.quote_year ?? new Date().getFullYear();
@@ -436,6 +457,10 @@ function QuoteFormModal({ person, rows, quoteTypeOptions, onRememberQuoteType, o
   const [value, setValue] = useState(person?.value_ex_vat != null ? String(person.value_ex_vat) : '');
   const [status, setStatus] = useState<QuoteStatus>(person?.status ?? 'DA GESTIRE');
   const [notes, setNotes] = useState(person?.notes ?? '');
+  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
+  const [analyzingFiles, setAnalyzingFiles] = useState(false);
+  const [extractionResult, setExtractionResult] = useState<QuoteValueExtractionResult | null>(null);
+  const [extractionWarnings, setExtractionWarnings] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const sources = [...new Set([
@@ -451,6 +476,47 @@ function QuoteFormModal({ person, rows, quoteTypeOptions, onRememberQuoteType, o
       const y = Number(v.slice(0,4));
       setYear(y);
       setProgressive(nextFor(y));
+    }
+  };
+
+  const analyzeAndQueueFiles = async (selectedFiles: File[]) => {
+    if (selectedFiles.length === 0) return;
+
+    const oversized = selectedFiles.find((file) => file.size > 20 * 1024 * 1024);
+    if (oversized) {
+      setError(`Il file "${oversized.name}" supera il limite di 20 MB.`);
+      return;
+    }
+
+    const nextFiles = [...pendingFiles];
+    selectedFiles.forEach((file) => {
+      const duplicate = nextFiles.some((current) =>
+        current.name === file.name &&
+        current.size === file.size &&
+        current.lastModified === file.lastModified
+      );
+      if (!duplicate) nextFiles.push(file);
+    });
+    setPendingFiles(nextFiles);
+    setAnalyzingFiles(true);
+    setError(null);
+    setExtractionWarnings([]);
+
+    try {
+      const extraction = await extractQuoteValueFromFiles(nextFiles);
+      setExtractionWarnings(extraction.warnings);
+      setExtractionResult(extraction.result);
+
+      if (extraction.result) {
+        setValue(String(extraction.result.value));
+      }
+    } catch (err) {
+      setExtractionResult(null);
+      setExtractionWarnings([
+        err instanceof Error ? err.message : 'Analisi automatica del documento non riuscita.',
+      ]);
+    } finally {
+      setAnalyzingFiles(false);
     }
   };
 
@@ -472,7 +538,7 @@ function QuoteFormModal({ person, rows, quoteTypeOptions, onRememberQuoteType, o
         value_ex_vat: value === '' ? null : Number(value),
         status,
         notes: notes.trim().toUpperCase() || null,
-      });
+      }, pendingFiles);
     } catch (err) { setError(err instanceof Error ? err.message : 'Salvataggio non riuscito.'); }
     finally { setBusy(false); }
   };
@@ -550,8 +616,88 @@ function QuoteFormModal({ person, rows, quoteTypeOptions, onRememberQuoteType, o
           </select>
           <span className="mt-1 block text-[10px] font-normal text-slate-400">Con “Altro…” la nuova voce viene aggiunta automaticamente al menu.</span>
         </label>
+        <div className="sm:col-span-2 rounded-xl border border-blue-100 bg-blue-50/60 p-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <label className={`inline-flex items-center gap-1.5 rounded-lg border border-blue-200 bg-white px-3 py-2 text-xs font-semibold text-blue-900 ${analyzingFiles ? 'cursor-wait opacity-60' : 'cursor-pointer hover:bg-blue-50'}`}>
+              {analyzingFiles ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
+              {analyzingFiles ? 'Analisi documento...' : 'Carica preventivo e rileva valore'}
+              <input
+                type="file"
+                multiple
+                disabled={analyzingFiles || busy}
+                accept=".pdf,.jpg,.jpeg,.png,.webp,.heic,.doc,.docx,.xls,.xlsx"
+                className="hidden"
+                onChange={(e) => {
+                  const selected = Array.from(e.currentTarget.files ?? []);
+                  e.currentTarget.value = '';
+                  void analyzeAndQueueFiles(selected);
+                }}
+              />
+            </label>
+            {pendingFiles.length > 0 && (
+              <span className="text-[11px] text-slate-500">
+                {pendingFiles.length} {pendingFiles.length === 1 ? 'file pronto' : 'file pronti'} per il salvataggio
+              </span>
+            )}
+          </div>
+
+          {pendingFiles.length > 0 && (
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {pendingFiles.map((file, index) => (
+                <span key={`${file.name}-${file.size}-${file.lastModified}`} className="inline-flex max-w-full items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px] text-slate-700">
+                  <Paperclip size={11} className="shrink-0" />
+                  <span className="max-w-[210px] truncate">{file.name}</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPendingFiles((files) => files.filter((_, currentIndex) => currentIndex !== index));
+                      if (extractionResult?.fileName === file.name) setExtractionResult(null);
+                    }}
+                    className="ml-1 rounded p-0.5 text-red-600 hover:bg-red-50"
+                    aria-label={`Rimuovi ${file.name}`}
+                  >
+                    <X size={11} />
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
+
+          {extractionResult && (
+            <p className={`mt-2 rounded-lg px-2.5 py-2 text-xs ${extractionResult.confidence === 'high' ? 'bg-emerald-50 text-emerald-800' : 'bg-amber-50 text-amber-900'}`}>
+              <strong>Valore rilevato automaticamente:</strong>{' '}
+              {money(extractionResult.value)} · {extractionResult.label} · {extractionResult.fileName}.
+              {' '}Verifica il valore prima di salvare.
+            </p>
+          )}
+
+          {!analyzingFiles && pendingFiles.length > 0 && !extractionResult && (
+            <p className="mt-2 rounded-lg bg-amber-50 px-2.5 py-2 text-xs text-amber-900">
+              Non ho individuato con sufficiente affidabilità il totale senza IVA. Il file verrà comunque allegato: inserisci il valore manualmente.
+            </p>
+          )}
+
+          {extractionWarnings.length > 0 && (
+            <div className="mt-2 space-y-1">
+              {extractionWarnings.map((warning) => (
+                <p key={warning} className="text-[10px] text-slate-500">{warning}</p>
+              ))}
+            </div>
+          )}
+        </div>
+
         <label className="text-xs font-semibold text-slate-600">Valore senza IVA
-          <input type="number" step="0.01" min="0" value={value} onChange={(e) => setValue(e.target.value)} className={inputClass + ' mt-1'} />
+          <input
+            type="number"
+            step="0.01"
+            min="0"
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            className={inputClass + ' mt-1'}
+          />
+          <span className="mt-1 block text-[10px] font-normal text-slate-400">
+            Se carichi il preventivo, il sistema prova a compilare automaticamente questo importo.
+          </span>
         </label>
         <label className="text-xs font-semibold text-slate-600">Stato
           <select value={status} onChange={(e) => setStatus(e.target.value as QuoteStatus)} className={inputClass + ' mt-1'}>
@@ -567,7 +713,7 @@ function QuoteFormModal({ person, rows, quoteTypeOptions, onRememberQuoteType, o
         <button
           type="button"
           onClick={() => { void submit(); }}
-          disabled={busy || !client.trim()}
+          disabled={busy || analyzingFiles || !client.trim()}
           className="flex-1 rounded-xl bg-blue-900 py-3 text-sm font-semibold text-white disabled:opacity-50"
         >
           {busy ? 'Salvataggio...' : 'Salva'}
