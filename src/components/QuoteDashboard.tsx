@@ -503,7 +503,7 @@ function QuoteFormModal({ person, rows, quoteTypeOptions, onRememberQuoteType, o
     setExtractionWarnings([]);
 
     try {
-      const extraction = await extractQuoteValueFromFiles(selectedFiles);
+      const extraction = await extractQuoteValueFromFiles(nextFiles);
       setExtractionWarnings(extraction.warnings);
       setExtractionResult(extraction.result);
 
@@ -649,7 +649,10 @@ function QuoteFormModal({ person, rows, quoteTypeOptions, onRememberQuoteType, o
                   <span className="max-w-[210px] truncate">{file.name}</span>
                   <button
                     type="button"
-                    onClick={() => setPendingFiles((files) => files.filter((_, currentIndex) => currentIndex !== index))}
+                    onClick={() => {
+                      setPendingFiles((files) => files.filter((_, currentIndex) => currentIndex !== index));
+                      if (extractionResult?.fileName === file.name) setExtractionResult(null);
+                    }}
                     className="ml-1 rounded p-0.5 text-red-600 hover:bg-red-50"
                     aria-label={`Rimuovi ${file.name}`}
                   >
@@ -689,10 +692,7 @@ function QuoteFormModal({ person, rows, quoteTypeOptions, onRememberQuoteType, o
             step="0.01"
             min="0"
             value={value}
-            onChange={(e) => {
-              setValue(e.target.value);
-              setExtractionResult(null);
-            }}
+            onChange={(e) => setValue(e.target.value)}
             className={inputClass + ' mt-1'}
           />
           <span className="mt-1 block text-[10px] font-normal text-slate-400">
