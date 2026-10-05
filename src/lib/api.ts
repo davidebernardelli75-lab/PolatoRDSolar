@@ -1,5 +1,5 @@
 import { supabase, STORAGE_BUCKET, QUOTE_FILES_BUCKET } from './supabase';
-import type { Plant, Panel, PanelPhoto, PlantInsert, PlantUpdate, PanelInsert, RoadmapTask, PlantInverter, PlantStorage, PlantCharger, PlantInverterInsert, PlantStorageInsert, PlantChargerInsert, PlantPowerMeter, PlantPowerMeterInsert, Vehicle, VehicleInsert, Insurance, InsuranceInsert, EquipmentCatalogEntry, EquipmentCategory, QuoteRequest, QuoteRequestInsert, QuoteRequestFile, QuoteTypeOption, WorkReport, WorkReportInsert, WorkReportMaterial, WorkReportMaterialInput, WorkReportWorker, WorkReportWorkerInput, WorkReportStatus, WorkReportMaterialCatalogEntry, WorkReportWorkerCatalogEntry, WorkReportMaterialCostDefault, WorkReportLaborRateDefault, WorkReportMaterialCost, WorkReportWorkerCost, WorkReportAdminSummary, WorkReportSiteOption, WorkSite, WorkSiteInsert, WorkSiteOption, WorkSiteOptionField, WorkSitePhase, WorkSiteScope, WorkSitePlant, PlantQuoteLink, CalendarEvent, CalendarEventInsert, CalendarEventCategory } from './types';
+import type { Plant, Panel, PanelPhoto, PlantInsert, PlantUpdate, PanelInsert, RoadmapTask, PlantInverter, PlantStorage, PlantCharger, PlantInverterInsert, PlantStorageInsert, PlantChargerInsert, PlantPowerMeter, PlantPowerMeterInsert, Vehicle, VehicleInsert, Insurance, InsuranceInsert, EquipmentCatalogEntry, EquipmentCategory, QuoteRequest, QuoteRequestInsert, QuoteRequestFile, QuoteTypeOption, WorkReport, WorkReportInsert, WorkReportMaterial, WorkReportMaterialInput, WorkReportWorker, WorkReportWorkerInput, WorkReportStatus, WorkReportMaterialCatalogEntry, WorkReportMaterialCode, WorkReportWorkerCatalogEntry, WorkReportMaterialCostDefault, WorkReportLaborRateDefault, WorkReportMaterialCost, WorkReportWorkerCost, WorkReportAdminSummary, WorkReportSiteOption, WorkSite, WorkSiteInsert, WorkSiteOption, WorkSiteOptionField, WorkSitePhase, WorkSiteScope, WorkSitePlant, PlantQuoteLink, CalendarEvent, CalendarEventInsert, CalendarEventCategory } from './types';
 
 export async function fetchPlants(): Promise<Plant[]> {
   const { data, error } = await supabase
@@ -52,6 +52,15 @@ export async function fetchWorkReportMaterialCatalog(): Promise<WorkReportMateri
     .select('id, description, normalized_description, default_unit, usage_count, last_used_at')
     .order('usage_count', { ascending: false })
     .order('last_used_at', { ascending: false });
+  if (error) throw error;
+  return data ?? [];
+}
+
+export async function fetchWorkReportMaterialCodes(): Promise<WorkReportMaterialCode[]> {
+  const { data, error } = await supabase
+    .from('work_report_material_codes')
+    .select('id, material_catalog_id, code, code_type, created_at')
+    .order('created_at', { ascending: false });
   if (error) throw error;
   return data ?? [];
 }
@@ -987,9 +996,10 @@ export async function replaceWorkReportMaterials(reportId: string, materials: Wo
 
   const inserted: WorkReportMaterial[] = [];
   for (const material of materials) {
+    const itemCode = material.item_code?.trim() || null;
     const { data, error } = await supabase.from('work_report_materials').insert({
       report_id: reportId,
-      item_code: material.item_code?.trim().toUpperCase() || null,
+      item_code: itemCode,
       description: material.description.trim().toUpperCase(),
       quantity: material.quantity,
       unit: material.unit.trim().toUpperCase() || 'PZ',
@@ -998,11 +1008,21 @@ export async function replaceWorkReportMaterials(reportId: string, materials: Wo
     if (error) throw error;
     inserted.push(data);
 
-    const { error: rememberError } = await supabase.rpc('remember_work_report_material', {
-      p_description: material.description,
-      p_unit: material.unit || 'PZ',
-    });
-    if (rememberError) throw rememberError;
+    if (itemCode) {
+      const { error: rememberScanError } = await supabase.rpc('remember_work_report_material_scan', {
+        p_code: itemCode,
+        p_description: material.description,
+        p_unit: material.unit || 'PZ',
+        p_code_type: 'SCANNED',
+      });
+      if (rememberScanError) throw rememberScanError;
+    } else {
+      const { error: rememberError } = await supabase.rpc('remember_work_report_material', {
+        p_description: material.description,
+        p_unit: material.unit || 'PZ',
+      });
+      if (rememberError) throw rememberError;
+    }
   }
   return inserted;
 }

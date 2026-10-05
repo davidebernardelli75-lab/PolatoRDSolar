@@ -288,6 +288,14 @@ export interface WorkReportMaterialCatalogEntry {
   last_used_at: string | null;
 }
 
+export interface WorkReportMaterialCode {
+  id: string;
+  material_catalog_id: string;
+  code: string;
+  code_type: 'BARCODE' | 'QR' | 'DATA_MATRIX' | 'SCANNED' | 'MANUAL';
+  created_at: string;
+}
+
 export interface WorkReportWorkerCatalogEntry {
   id: string;
   worker_name: string;

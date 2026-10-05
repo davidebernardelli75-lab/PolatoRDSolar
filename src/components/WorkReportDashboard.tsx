@@ -24,6 +24,7 @@ import type {
   WorkReportLaborRateDefault,
   WorkReportMaterial,
   WorkReportMaterialCatalogEntry,
+  WorkReportMaterialCode,
   WorkReportMaterialCost,
   WorkReportMaterialCostDefault,
   WorkReportMaterialInput,
@@ -50,6 +51,7 @@ import {
   fetchWorkReportAdminSummary,
   fetchWorkReportLaborRateDefaults,
   fetchWorkReportMaterialCatalog,
+  fetchWorkReportMaterialCodes,
   fetchWorkReportMaterialCostDefaults,
   fetchWorkReportMaterialCosts,
   fetchWorkReportMaterials,
@@ -77,13 +79,14 @@ import {
   updateWorkSitePhase,
   rememberWorkSiteOption,
 } from '@/lib/api';
+import { MaterialScannerModal } from '@/components/work-reports/MaterialScannerModal';
 
 interface WorkReportDashboardProps {
   isAdmin: boolean;
 }
 
 type WorkerDraft = { worker_name: string; hours: string; rate_type: string; notes: string };
-type MaterialDraft = { source_id: string | null; description: string; quantity: string; unit: string; notes: string; unit_price: string };
+type MaterialDraft = { source_id: string | null; item_code: string; description: string; quantity: string; unit: string; notes: string; unit_price: string };
 
 const inputClass = 'w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-red-400 focus:ring-2 focus:ring-red-100';
 const WORK_REPORT_UNITS = ['PZ', 'MT', 'M²', 'M³', 'KG', 'L', 'ROTOLO', 'BOBINA', 'CONF.', 'SCATOLA', 'KIT', 'COPPIA', 'SET'] as const;
@@ -104,6 +107,7 @@ export function WorkReportDashboard({ isAdmin }: WorkReportDashboardProps) {
   const [workers, setWorkers] = useState<WorkReportWorker[]>([]);
   const [materials, setMaterials] = useState<WorkReportMaterial[]>([]);
   const [materialCatalog, setMaterialCatalog] = useState<WorkReportMaterialCatalogEntry[]>([]);
+  const [materialCodes, setMaterialCodes] = useState<WorkReportMaterialCode[]>([]);
   const [workerCatalog, setWorkerCatalog] = useState<WorkReportWorkerCatalogEntry[]>([]);
   const [materialCostDefaults, setMaterialCostDefaults] = useState<WorkReportMaterialCostDefault[]>([]);
   const [laborRateDefaults, setLaborRateDefaults] = useState<WorkReportLaborRateDefault[]>([]);
@@ -132,12 +136,13 @@ export function WorkReportDashboard({ isAdmin }: WorkReportDashboardProps) {
   const load = useCallback(async (showInitialLoader = false) => {
     if (showInitialLoader) setLoading(true);
     try {
-      const [reportRows, workerRows, materialRows, plantRows, materialOptions, workerOptions, siteOptionRows] = await Promise.all([
+      const [reportRows, workerRows, materialRows, plantRows, materialOptions, materialCodeRows, workerOptions, siteOptionRows] = await Promise.all([
         fetchWorkReports(),
         fetchWorkReportWorkers(),
         fetchWorkReportMaterials(),
         fetchPlants(),
         fetchWorkReportMaterialCatalog(),
+        fetchWorkReportMaterialCodes(),
         fetchWorkReportWorkerCatalog(),
         fetchWorkReportSiteOptions(),
       ]);
@@ -183,6 +188,7 @@ export function WorkReportDashboard({ isAdmin }: WorkReportDashboardProps) {
       setMaterials(materialRows);
       setPlants(plantRows);
       setMaterialCatalog(materialOptions);
+      setMaterialCodes(materialCodeRows);
       setWorkerCatalog(workerOptions);
       setQuotes(quoteRows);
       setSiteOptions(siteOptionRows);
@@ -647,6 +653,7 @@ export function WorkReportDashboard({ isAdmin }: WorkReportDashboardProps) {
           workers={editing === 'new' ? [] : workers.filter((worker) => worker.report_id === editing.id)}
           materials={editing === 'new' ? [] : materials.filter((material) => material.report_id === editing.id)}
           materialCatalog={materialCatalog}
+          materialCodes={materialCodes}
           workerCatalog={workerCatalog}
           quoteOptions={quotes}
           siteOptions={siteOptions}
@@ -2070,6 +2077,7 @@ function WorkReportFormModal({
   workers,
   materials,
   materialCatalog,
+  materialCodes,
   workerCatalog,
   quoteOptions,
   siteOptions,
@@ -2082,6 +2090,7 @@ function WorkReportFormModal({
   workers: WorkReportWorker[];
   materials: WorkReportMaterial[];
   materialCatalog: WorkReportMaterialCatalogEntry[];
+  materialCodes: WorkReportMaterialCode[];
   workerCatalog: WorkReportWorkerCatalogEntry[];
   quoteOptions: QuoteRequest[];
   siteOptions: WorkReportSiteOption[];
@@ -2104,6 +2113,7 @@ function WorkReportFormModal({
   const [materialRows, setMaterialRows] = useState<MaterialDraft[]>(
     materials.map((material) => ({
       source_id: material.id,
+      item_code: material.item_code ?? '',
       description: material.description,
       quantity: String(material.quantity),
       unit: material.unit,
@@ -2112,6 +2122,8 @@ function WorkReportFormModal({
     })),
   );
   const [materialDefaultPrices, setMaterialDefaultPrices] = useState<Record<string, string>>({});
+  const [materialScannerOpen, setMaterialScannerOpen] = useState(false);
+  const [materialScanNotice, setMaterialScanNotice] = useState<{ tone: 'success' | 'warning'; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -2151,7 +2163,60 @@ function WorkReportFormModal({
     return () => { active = false; };
   }, [isAdmin, materialCatalog]);
 
+  const handleMaterialScan = (rawCode: string) => {
+    const code = rawCode.trim();
+    if (!code) return;
+
+    const alreadyPresent = materialRows.some((row) => row.item_code.trim() === code);
+    if (alreadyPresent) {
+      setMaterialScanNotice({
+        tone: 'warning',
+        text: `Il codice ${code} è già presente nel rapportino. Modifica la quantità nella riga esistente.`,
+      });
+      setMaterialScannerOpen(false);
+      return;
+    }
+
+    const codeLink = materialCodes.find((row) => row.code === code);
+    const catalogItem = codeLink
+      ? materialCatalog.find((item) => item.id === codeLink.material_catalog_id)
+      : undefined;
+    const defaultPrice = catalogItem
+      ? materialDefaultPrices[catalogItem.normalized_description] ?? ''
+      : '';
+
+    setMaterialRows((rows) => [...rows, {
+      source_id: null,
+      item_code: code,
+      description: catalogItem?.description ?? '',
+      quantity: '',
+      unit: catalogItem?.default_unit ?? 'PZ',
+      notes: '',
+      unit_price: isAdmin ? defaultPrice : '',
+    }]);
+
+    setMaterialScanNotice(catalogItem
+      ? {
+          tone: 'success',
+          text: `Codice riconosciuto: ${catalogItem.description}. Inserisci la quantità e verifica l’unità di misura.`,
+        }
+      : {
+          tone: 'warning',
+          text: `Codice ${code} non ancora presente nel catalogo. Completa descrizione, quantità e unità: al salvataggio verrà memorizzato.`,
+        });
+    setMaterialScannerOpen(false);
+  };
+
   const save = async (submit: boolean) => {
+    const incompleteScannedMaterial = materialRows.find((material) =>
+      material.item_code.trim() &&
+      (!material.description.trim() || !(Number(material.quantity) > 0) || !material.unit.trim())
+    );
+    if (incompleteScannedMaterial) {
+      setError(`Completa descrizione, quantità e unità di misura per il codice ${incompleteScannedMaterial.item_code}.`);
+      return;
+    }
+
     const cleanWorkers: WorkReportWorkerInput[] = workerRows
       .filter((worker) => worker.worker_name.trim() && Number(worker.hours) > 0)
       .map((worker) => ({
@@ -2164,7 +2229,7 @@ function WorkReportFormModal({
       .filter((material) => material.description.trim() && Number(material.quantity) > 0);
     const cleanMaterials: WorkReportMaterialInput[] = cleanMaterialRows
       .map((material) => ({
-        item_code: null,
+        item_code: material.item_code.trim() || null,
         description: material.description,
         quantity: Number(material.quantity),
         unit: material.unit || 'PZ',
@@ -2360,14 +2425,32 @@ function WorkReportFormModal({
               <h3 className="inline-flex items-center gap-2 font-semibold text-slate-900"><PackagePlus size={17} /> Materiali utilizzati</h3>
               {isAdmin && <p className="mt-0.5 text-[11px] text-slate-500">In amministrazione puoi valorizzare direttamente il prezzo unitario; i valori già noti si auto-compilano.</p>}
             </div>
-            <button
-              type="button"
-              onClick={() => setMaterialRows((rows) => [...rows, { source_id: null, description: '', quantity: '1', unit: 'PZ', notes: '', unit_price: '' }])}
-              className="inline-flex items-center gap-1 rounded-lg bg-blue-50 px-2.5 py-1.5 text-xs font-semibold text-blue-900"
-            >
-              <Plus size={14} /> Aggiungi
-            </button>
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              {!isAdmin && (
+                <button
+                  type="button"
+                  onClick={() => setMaterialScannerOpen(true)}
+                  className="inline-flex items-center gap-1 rounded-lg bg-green-50 px-2.5 py-1.5 text-xs font-semibold text-green-800 ring-1 ring-green-200 hover:bg-green-100"
+                >
+                  <PackagePlus size={14} /> Scansiona barcode / QR
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => setMaterialRows((rows) => [...rows, { source_id: null, item_code: '', description: '', quantity: '1', unit: 'PZ', notes: '', unit_price: '' }])}
+                className="inline-flex items-center gap-1 rounded-lg bg-blue-50 px-2.5 py-1.5 text-xs font-semibold text-blue-900"
+              >
+                <Plus size={14} /> Aggiungi
+              </button>
+            </div>
           </div>
+          {materialScanNotice && (
+            <div className={`mb-3 rounded-xl border p-3 text-xs ${materialScanNotice.tone === 'success'
+              ? 'border-green-200 bg-green-50 text-green-800'
+              : 'border-amber-200 bg-amber-50 text-amber-800'}`}>
+              {materialScanNotice.text}
+            </div>
+          )}
           <datalist id="work-report-material-options">
             {materialCatalog.map((material) => <option key={material.id} value={material.description} />)}
           </datalist>
@@ -2422,12 +2505,32 @@ function WorkReportFormModal({
                     )}
                     <button type="button" onClick={() => setMaterialRows((rows) => rows.filter((_, i) => i !== index))} className="rounded-lg p-2 text-red-600 hover:bg-red-50"><Trash2 size={17} /></button>
                   </div>
+                  {material.item_code && (
+                    <div className="mt-2">
+                      <label className="text-[10px] font-semibold text-slate-500">
+                        Codice barcode / QR
+                        <input
+                          value={material.item_code}
+                          onChange={(e) => setMaterialRows((rows) => rows.map((row, i) => i === index ? { ...row, item_code: e.target.value } : row))}
+                          className={inputClass + ' mt-1 font-mono text-xs'}
+                          placeholder="Codice materiale"
+                        />
+                      </label>
+                    </div>
+                  )}
                   <input value={material.notes} onChange={(e) => setMaterialRows((rows) => rows.map((row, i) => i === index ? { ...row, notes: e.target.value.toUpperCase() } : row))} className={inputClass + ' mt-2'} placeholder="Nota materiale opzionale" />
                 </div>
               ))}
             </div>
           )}
         </section>
+
+        {materialScannerOpen && (
+          <MaterialScannerModal
+            onClose={() => setMaterialScannerOpen(false)}
+            onScan={handleMaterialScan}
+          />
+        )}
 
         <label className="mt-4 block text-xs font-semibold text-slate-600">Note della giornata
           <textarea rows={3} value={notes} onChange={(e) => setNotes(e.target.value.toUpperCase())} className={inputClass + ' mt-1 resize-none'} placeholder="Problemi, materiale mancante, attività da completare..." />
