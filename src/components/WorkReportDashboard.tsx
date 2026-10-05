@@ -1149,16 +1149,6 @@ function WorkSiteFormModal({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const orderedSiteOptions = useMemo(
-    () => isAdmin
-      ? siteOptions
-      : [...siteOptions].sort((a, b) =>
-          a.name.localeCompare(b.name, 'it', { sensitivity: 'base' }) ||
-          (a.location ?? '').localeCompare(b.location ?? '', 'it', { sensitivity: 'base' }),
-        ),
-    [isAdmin, siteOptions],
-  );
-
   const fieldOptions = (fieldKey: WorkSiteOption['field_key']) =>
     options.filter((option) => option.field_key === fieldKey && option.active);
 
@@ -2136,6 +2126,16 @@ function WorkReportFormModal({
   const [materialScanNotice, setMaterialScanNotice] = useState<{ tone: 'success' | 'warning'; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const orderedSiteOptions = useMemo(
+    () => isAdmin
+      ? siteOptions
+      : [...siteOptions].sort((a, b) =>
+          a.name.localeCompare(b.name, 'it', { sensitivity: 'base' }) ||
+          (a.location ?? '').localeCompare(b.location ?? '', 'it', { sensitivity: 'base' }),
+        ),
+    [isAdmin, siteOptions],
+  );
 
   useEffect(() => {
     if (!isAdmin) return;
