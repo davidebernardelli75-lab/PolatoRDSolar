@@ -1149,6 +1149,16 @@ function WorkSiteFormModal({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const orderedSiteOptions = useMemo(
+    () => isAdmin
+      ? siteOptions
+      : [...siteOptions].sort((a, b) =>
+          a.name.localeCompare(b.name, 'it', { sensitivity: 'base' }) ||
+          (a.location ?? '').localeCompare(b.location ?? '', 'it', { sensitivity: 'base' }),
+        ),
+    [isAdmin, siteOptions],
+  );
+
   const fieldOptions = (fieldKey: WorkSiteOption['field_key']) =>
     options.filter((option) => option.field_key === fieldKey && option.active);
 
@@ -2357,13 +2367,13 @@ function WorkReportFormModal({
               className={inputClass + ' mt-1'}
             >
               <option value="">Nessun cantiere / da associare</option>
-              {siteOptions.map((site) => (
+              {orderedSiteOptions.map((site) => (
                 <option key={site.site_id} value={site.site_id}>
                   {site.name}{site.location ? ` · ${site.location}` : ''} · {site.site_status}
                 </option>
               ))}
             </select>
-            {siteOptions.length === 0 && (
+            {orderedSiteOptions.length === 0 && (
               <span className="mt-1 block text-[10px] font-normal text-slate-400">
                 Nessun cantiere disponibile: lascia il rapportino da associare.
               </span>
