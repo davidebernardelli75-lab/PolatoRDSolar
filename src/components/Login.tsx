@@ -54,7 +54,7 @@ export function Login({ signedIn = false, canAdmin = true, onSignedIn, onSelectA
       <div className="mx-auto w-full max-w-4xl overflow-hidden rounded-3xl bg-white shadow-xl">
         <header className="border-b-4 border-red-500 bg-blue-900 px-6 py-8 text-center text-white">
           <img src="/assets/images/Polato_R&D.png" alt="Polato R&D" className="mx-auto mb-4 h-20 w-36 rounded-xl bg-white object-contain p-2" />
-          <h1 className="text-2xl font-bold tracking-tight">Polato R&D Solar Archive</h1>
+          <h1 className="text-2xl font-bold tracking-tight">Polato R&D Archive</h1>
           <p className="mt-2 text-sm text-blue-100">Scegli l'area a cui desideri accedere</p>
         </header>
 

@@ -122,7 +122,7 @@ export default function App() {
       {accessError && <button className="rounded-lg bg-blue-900 px-5 py-2 text-white" onClick={() => { void supabase.auth.signOut(); }}>Esci e riprova</button>}
     </main>
   );
-  if (area === 'home') return <Login signedIn canAdmin={access.role === 'admin'} onSelectArea={(selected) => { setArea(selected); setView({ name: 'launcher' }); }} />;
+  if (area === 'home') return <Login onSignedIn={(selected) => { setArea(selected); setView({ name: 'launcher' }); }} />;
 
   const isAdmin = access?.userId === session.user.id && access.role === 'admin';
   const adminArea = isAdmin && area === 'admin';
@@ -151,13 +151,6 @@ export default function App() {
     } catch {
       setError('Impossibile cancellare l\'alert dell\'impianto. Riprova.');
     }
-  };
-
-  const handleChangeArea = () => {
-    setSidebarOpen(false);
-    setError(null);
-    setArea('home');
-    setView({ name: 'launcher' });
   };
 
   const handleSignOut = async () => {
@@ -189,6 +182,12 @@ export default function App() {
     setRoadmapProgress({});
   };
 
+  const handleChangeArea = async () => {
+    // Switching operational areas must also switch the authenticated identity.
+    // Reuse the logout flow so the next area always requires its own password.
+    await handleSignOut();
+  };
+
   return (
     <div className="flex h-screen bg-slate-50">
       <Sidebar
@@ -197,7 +196,7 @@ export default function App() {
         onNavigate={navigate}
         currentView={currentView}
         isAdmin={adminArea}
-        onChangeArea={handleChangeArea}
+        onChangeArea={() => { void handleChangeArea(); }}
         onSignOut={() => { void handleSignOut(); }}
       />
 
