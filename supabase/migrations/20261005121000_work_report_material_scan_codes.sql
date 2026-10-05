@@ -33,6 +33,19 @@ USING (
   )
 );
 
+DROP POLICY IF EXISTS work_report_material_codes_member_insert ON public.work_report_material_codes;
+CREATE POLICY work_report_material_codes_member_insert
+ON public.work_report_material_codes
+FOR INSERT TO authenticated
+WITH CHECK (
+  created_by = (SELECT auth.uid())
+  AND EXISTS (
+    SELECT 1
+    FROM public.app_members m
+    WHERE m.user_id = (SELECT auth.uid())
+  )
+);
+
 DROP POLICY IF EXISTS work_report_material_codes_admin_all ON public.work_report_material_codes;
 CREATE POLICY work_report_material_codes_admin_all
 ON public.work_report_material_codes
@@ -48,7 +61,7 @@ CREATE OR REPLACE FUNCTION public.remember_work_report_material_scan(
 )
 RETURNS uuid
 LANGUAGE plpgsql
-SECURITY DEFINER
+SECURITY INVOKER
 SET search_path = ''
 AS $$
 DECLARE
@@ -57,6 +70,8 @@ DECLARE
   v_unit text := regexp_replace(upper(btrim(coalesce(p_unit, 'PZ'))), '[[:space:]]+', ' ', 'g');
   v_code_type text := upper(btrim(coalesce(p_code_type, 'SCANNED')));
   v_catalog_id uuid;
+  v_existing_description text;
+  v_existing_unit text;
 BEGIN
   IF NOT EXISTS (
     SELECT 1 FROM public.app_members m WHERE m.user_id = auth.uid()
@@ -72,49 +87,41 @@ BEGIN
     v_code_type := 'SCANNED';
   END IF;
 
-  SELECT c.material_catalog_id
-  INTO v_catalog_id
+  SELECT
+    c.material_catalog_id,
+    m.description,
+    m.default_unit
+  INTO
+    v_catalog_id,
+    v_existing_description,
+    v_existing_unit
   FROM public.work_report_material_codes c
+  JOIN public.work_report_material_catalog m ON m.id = c.material_catalog_id
   WHERE c.code = v_code
   LIMIT 1;
 
   IF v_catalog_id IS NOT NULL THEN
-    UPDATE public.work_report_material_catalog
-    SET
-      usage_count = usage_count + 1,
-      last_used_at = now(),
-      updated_at = now()
-    WHERE id = v_catalog_id;
-
+    PERFORM public.remember_work_report_material(
+      v_existing_description,
+      coalesce(nullif(v_existing_unit, ''), 'PZ')
+    );
     RETURN v_catalog_id;
   END IF;
 
-  INSERT INTO public.work_report_material_catalog (
-    description,
-    normalized_description,
-    default_unit,
-    usage_count,
-    last_used_at
-  )
-  VALUES (
+  PERFORM public.remember_work_report_material(
     v_description,
-    v_description,
-    coalesce(nullif(v_unit, ''), 'PZ'),
-    1,
-    now()
-  )
-  ON CONFLICT (normalized_description) DO UPDATE SET
-    description = EXCLUDED.description,
-    default_unit = CASE
-      WHEN public.work_report_material_catalog.default_unit IS NULL
-        OR public.work_report_material_catalog.default_unit = ''
-      THEN EXCLUDED.default_unit
-      ELSE public.work_report_material_catalog.default_unit
-    END,
-    usage_count = public.work_report_material_catalog.usage_count + 1,
-    last_used_at = now(),
-    updated_at = now()
-  RETURNING id INTO v_catalog_id;
+    coalesce(nullif(v_unit, ''), 'PZ')
+  );
+
+  SELECT m.id
+  INTO v_catalog_id
+  FROM public.work_report_material_catalog m
+  WHERE m.normalized_description = v_description
+  LIMIT 1;
+
+  IF v_catalog_id IS NULL THEN
+    RAISE EXCEPTION 'Unable to resolve material catalog entry';
+  END IF;
 
   INSERT INTO public.work_report_material_codes (
     material_catalog_id,
@@ -129,6 +136,12 @@ BEGIN
     auth.uid()
   )
   ON CONFLICT (code) DO NOTHING;
+
+  SELECT c.material_catalog_id
+  INTO v_catalog_id
+  FROM public.work_report_material_codes c
+  WHERE c.code = v_code
+  LIMIT 1;
 
   RETURN v_catalog_id;
 END;
