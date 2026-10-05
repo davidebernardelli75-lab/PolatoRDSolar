@@ -70,9 +70,9 @@ export function Login({ signedIn = false, canAdmin = true, onSignedIn, onSelectA
             <button type="button" onClick={() => select('fv')}
               className="group rounded-2xl border-2 border-slate-200 bg-white p-6 text-left transition hover:border-red-500 hover:shadow-lg focus-visible:outline focus-visible:outline-4 focus-visible:outline-red-400">
               <span className="mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-red-500 text-white"><HardHat size={32} /></span>
-              <h2 className="text-xl font-bold text-blue-900">Impianti fotovoltaici</h2>
+              <h2 className="text-xl font-bold text-blue-900">Impianti</h2>
               <p className="mt-2 text-sm leading-relaxed text-slate-600">Area dedicata alle attività sugli impianti, anche da smartphone.</p>
-              <span className="mt-6 inline-flex items-center rounded-lg bg-red-500 px-5 py-2.5 text-sm font-semibold text-white group-hover:bg-red-600">{signedIn ? 'Apri impianti FV' : 'Accesso riservato'}</span>
+              <span className="mt-6 inline-flex items-center rounded-lg bg-red-500 px-5 py-2.5 text-sm font-semibold text-white group-hover:bg-red-600">{signedIn ? 'Apri impianti' : 'Accesso riservato'}</span>
             </button>
           </div>
         ) : (
@@ -81,7 +81,7 @@ export function Login({ signedIn = false, canAdmin = true, onSignedIn, onSelectA
               className="flex items-center gap-2 text-sm text-slate-600 hover:text-blue-900"><ArrowLeft size={16} />Torna alla scelta</button>
             <div className="flex items-center gap-3 text-blue-900">
               {portal === 'admin' ? <Building2 size={27} /> : <HardHat size={27} />}
-              <h2 className="text-xl font-bold">{portal === 'admin' ? 'Accesso amministrazione' : 'Accesso impianti FV'}</h2>
+              <h2 className="text-xl font-bold">{portal === 'admin' ? 'Accesso amministrazione' : 'Accesso impianti'}</h2>
             </div>
             <form
               key={portal}
