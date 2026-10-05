@@ -51,7 +51,6 @@ export function QuoteDashboard() {
   const [rows, setRows] = useState<QuoteRequest[]>([]);
   const [quoteFiles, setQuoteFiles] = useState<QuoteRequestFile[]>([]);
   const [quoteTypeOptions, setQuoteTypeOptions] = useState<QuoteTypeOption[]>([]);
-  const [uploadingQuoteId, setUploadingQuoteId] = useState<string | null>(null);
   const [clearingNoteId, setClearingNoteId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -143,7 +142,6 @@ export function QuoteDashboard() {
     }
 
     if (pendingFiles.length > 0) {
-      setUploadingQuoteId(saved.id);
       try {
         const uploadedFiles: QuoteRequestFile[] = [];
         for (const file of pendingFiles) {
@@ -154,8 +152,6 @@ export function QuoteDashboard() {
         setError(err instanceof Error
           ? `Preventivo salvato, ma almeno un allegato non è stato caricato: ${err.message}`
           : 'Preventivo salvato, ma almeno un allegato non è stato caricato.');
-      } finally {
-        setUploadingQuoteId(null);
       }
     }
 
@@ -170,22 +166,6 @@ export function QuoteDashboard() {
       setQuoteFiles((prev) => prev.filter((file) => file.quote_request_id !== row.id));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Eliminazione preventivo non riuscita.');
-    }
-  };
-
-  const uploadFiles = async (quoteId: string, files: File[]) => {
-    if (files.length === 0) return;
-    setUploadingQuoteId(quoteId);
-    setError(null);
-    try {
-      for (const file of files) {
-        const uploaded = await uploadQuoteRequestFile(quoteId, file);
-        setQuoteFiles((prev) => [uploaded, ...prev]);
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Caricamento file non riuscito.');
-    } finally {
-      setUploadingQuoteId(null);
     }
   };
 
@@ -338,8 +318,6 @@ export function QuoteDashboard() {
                     )}
                     <QuoteAttachments
                       files={filesByQuote.get(r.id) ?? []}
-                      uploading={uploadingQuoteId === r.id}
-                      onUpload={(selected) => { void uploadFiles(r.id, selected); }}
                       onDownload={(file) => { void downloadFile(file); }}
                       onDelete={(file) => { void removeFile(file); }}
                     />
@@ -376,53 +354,35 @@ export function QuoteDashboard() {
   );
 }
 
-function QuoteAttachments({ files, uploading, onUpload, onDownload, onDelete }: {
+function QuoteAttachments({ files, onDownload, onDelete }: {
   files: QuoteRequestFile[];
-  uploading: boolean;
-  onUpload: (files: File[]) => void;
   onDownload: (file: QuoteRequestFile) => void;
   onDelete: (file: QuoteRequestFile) => void;
 }) {
+  if (files.length === 0) return null;
+
   return <div className="mt-2 border-t border-slate-100 pt-2">
-    <div className="flex flex-wrap items-center gap-2">
-      <label className={`inline-flex cursor-pointer items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium ${uploading ? 'cursor-wait border-slate-200 bg-slate-100 text-slate-400' : 'border-blue-200 bg-blue-50 text-blue-800 hover:bg-blue-100'}`}>
-        {uploading ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
-        {uploading ? 'Caricamento...' : 'Carica preventivo'}
-        <input
-          type="file"
-          multiple
-          disabled={uploading}
-          accept=".pdf,.jpg,.jpeg,.png,.webp,.heic,.doc,.docx,.xls,.xlsx"
-          className="hidden"
-          onChange={(e) => {
-            const selected = Array.from(e.currentTarget.files ?? []);
-            e.currentTarget.value = '';
-            onUpload(selected);
-          }}
-        />
-      </label>
-      {files.length > 0 && <span className="inline-flex items-center gap-1 text-[11px] text-slate-500"><Paperclip size={12}/>{files.length} {files.length === 1 ? 'allegato' : 'allegati'}</span>}
+    <div className="inline-flex items-center gap-1 text-[11px] text-slate-500">
+      <Paperclip size={12}/>
+      {files.length} {files.length === 1 ? 'allegato' : 'allegati'}
     </div>
-    {files.length > 0 && (
-      <div className="mt-2 flex flex-wrap gap-1.5">
-        {files.map((file) => (
-          <div key={file.id} className="inline-flex max-w-full items-center rounded-lg border border-slate-200 bg-slate-50 text-xs">
-            <button type="button" onClick={() => onDownload(file)}
-              className="inline-flex min-w-0 items-center gap-1.5 px-2 py-1.5 text-slate-700 hover:text-blue-900"
-              title={file.file_name}>
-              <Download size={13} className="shrink-0" />
-              <span className="max-w-[180px] truncate">{file.file_name}</span>
-            </button>
-            <button type="button" onClick={() => onDelete(file)}
-              className="border-l border-slate-200 p-1.5 text-red-600 hover:bg-red-50"
-              aria-label={`Elimina ${file.file_name}`}>
-              <Trash2 size={13} />
-            </button>
-          </div>
-        ))}
-      </div>
-    )}
-    <p className="mt-1 text-[10px] text-slate-400">PDF, foto, Word o Excel · massimo 20 MB per file</p>
+    <div className="mt-2 flex flex-wrap gap-1.5">
+      {files.map((file) => (
+        <div key={file.id} className="inline-flex max-w-full items-center rounded-lg border border-slate-200 bg-slate-50 text-xs">
+          <button type="button" onClick={() => onDownload(file)}
+            className="inline-flex min-w-0 items-center gap-1.5 px-2 py-1.5 text-slate-700 hover:text-blue-900"
+            title={file.file_name}>
+            <Download size={13} className="shrink-0" />
+            <span className="max-w-[180px] truncate">{file.file_name}</span>
+          </button>
+          <button type="button" onClick={() => onDelete(file)}
+            className="border-l border-slate-200 p-1.5 text-red-600 hover:bg-red-50"
+            aria-label={`Elimina ${file.file_name}`}>
+            <Trash2 size={13} />
+          </button>
+        </div>
+      ))}
+    </div>
   </div>;
 }
 
