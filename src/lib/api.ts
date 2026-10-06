@@ -1,5 +1,6 @@
 import { supabase, STORAGE_BUCKET, QUOTE_FILES_BUCKET } from './supabase';
 import type { Plant, Panel, PanelPhoto, PlantInsert, PlantUpdate, PanelInsert, RoadmapTask, PlantInverter, PlantStorage, PlantCharger, PlantInverterInsert, PlantStorageInsert, PlantChargerInsert, PlantPowerMeter, PlantPowerMeterInsert, Vehicle, VehicleInsert, Insurance, InsuranceInsert, EquipmentCatalogEntry, EquipmentCategory, QuoteRequest, QuoteRequestInsert, QuoteRequestFile, QuoteTypeOption, WorkReport, WorkReportInsert, WorkReportMaterial, WorkReportMaterialInput, WorkReportWorker, WorkReportWorkerInput, WorkReportStatus, WorkReportMaterialCatalogEntry, WorkReportMaterialCode, WorkReportWorkerCatalogEntry, WorkReportMaterialCostDefault, WorkReportLaborRateDefault, WorkReportMaterialCost, WorkReportWorkerCost, WorkReportAdminSummary, WorkReportSiteOption, WorkSite, WorkSiteInsert, WorkSiteOption, WorkSiteOptionField, WorkSitePhase, WorkSiteScope, WorkSitePlant, PlantQuoteLink, CalendarEvent, CalendarEventInsert, CalendarEventCategory } from './types';
+import { normalizePanelSerial } from './panel-serial';
 
 export async function fetchPlants(): Promise<Plant[]> {
   const { data, error } = await supabase
@@ -198,24 +199,38 @@ export async function fetchPanels(plantId: string): Promise<Panel[]> {
   return data ?? [];
 }
 
+function panelMutationError(error: { code?: string; message?: string }): Error {
+  if (error.code === '23505') {
+    return new Error('Barcode già registrato. Il pannello non è stato aggiunto.');
+  }
+  return new Error(error.message || 'Operazione pannello non riuscita.');
+}
+
 export async function createPanel(input: PanelInsert): Promise<Panel> {
+  const payload = {
+    ...input,
+    serial_number: normalizePanelSerial(input.serial_number),
+  };
   const { data, error } = await supabase
     .from('panels')
-    .insert(input)
+    .insert(payload)
     .select()
     .single();
-  if (error) throw error;
+  if (error) throw panelMutationError(error);
   return data;
 }
 
 export async function updatePanel(id: string, input: Partial<PanelInsert>): Promise<Panel> {
+  const payload = input.serial_number == null
+    ? input
+    : { ...input, serial_number: normalizePanelSerial(input.serial_number) };
   const { data, error } = await supabase
     .from('panels')
-    .update(input)
+    .update(payload)
     .eq('id', id)
     .select()
     .single();
-  if (error) throw error;
+  if (error) throw panelMutationError(error);
   return data;
 }
 
