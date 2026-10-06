@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { X, Loader2, ImagePlus, Video, CheckCircle2, Plus } from 'lucide-react';
 import { scanImageFile, CameraScanner } from '@/lib/scanner';
 import { PANEL_BRANDS, PANEL_POWERS } from '@/lib/equipment-presets';
+import { hasDuplicatePanelSerial, normalizePanelSerial } from '@/lib/panel-serial';
 
 function readPanelDefaults(plantId: string): { brand: string; powerWp: string } {
   try {
@@ -19,10 +20,12 @@ function readPanelDefaults(plantId: string): { brand: string; powerWp: string } 
 
 export function PanelFormModal({
   plantId,
+  existingSerials,
   onClose,
   onSave,
 }: {
   plantId: string;
+  existingSerials: readonly string[];
   onClose: () => void;
   onSave: (data: { serial: string; notes: string | null; brand: string | null; power_wp: number | null }) => Promise<void>;
 }) {
@@ -47,6 +50,26 @@ export function PanelFormModal({
   const cameraStartTimerRef = useRef<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const acceptScannedSerial = (rawSerial: string): boolean => {
+    const normalized = normalizePanelSerial(rawSerial);
+    if (!normalized) {
+      setSerial('');
+      setScanSuccess(false);
+      setScanError('Il codice letto è vuoto. Riprova.');
+      return false;
+    }
+    if (hasDuplicatePanelSerial(normalized, existingSerials)) {
+      setSerial('');
+      setScanSuccess(false);
+      setScanError(`Barcode ${normalized} già registrato. Il pannello non è stato aggiunto.`);
+      return false;
+    }
+    setSerial(normalized);
+    setScanSuccess(true);
+    setScanError(null);
+    return true;
+  };
+
   const handleFileScan = async (file: File) => {
     setScanning(true); setScanError(null); setScanSuccess(false);
     if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
@@ -54,8 +77,11 @@ export function PanelFormModal({
     previewUrlRef.current = nextPreviewUrl; setPreviewUrl(nextPreviewUrl);
     try {
       const result = await scanImageFile(file);
-      if (result?.text) { setSerial(result.text); setScanSuccess(true); }
-      else { setScanError("Nessun codice rilevato nell'immagine. Inserisci la matricola manualmente."); }
+      if (result?.text) {
+        acceptScannedSerial(result.text);
+      } else {
+        setScanError("Nessun codice rilevato nell'immagine. Inserisci la matricola manualmente.");
+      }
     } finally { setScanning(false); }
   };
 
@@ -66,7 +92,10 @@ export function PanelFormModal({
       const scanner = new CameraScanner('barcode-reader-camera');
       cameraScannerRef.current = scanner;
       try {
-        await scanner.start((text) => { setSerial(text); setScanSuccess(true); stopCamera(); });
+        await scanner.start((text) => {
+          acceptScannedSerial(text);
+          stopCamera();
+        });
       } catch (err) {
         console.error('Camera start error:', err);
         setScanError('Impossibile accedere alla fotocamera. Verifica i permessi del browser.');
@@ -96,17 +125,35 @@ export function PanelFormModal({
   }, []);
 
   const handleSave = async () => {
-    if (!serial.trim()) return;
+    const normalizedSerial = normalizePanelSerial(serial);
+    if (!normalizedSerial) return;
+    if (hasDuplicatePanelSerial(normalizedSerial, existingSerials)) {
+      setSerial('');
+      setScanSuccess(false);
+      setScanError(`Barcode ${normalizedSerial} già registrato. Il pannello non è stato aggiunto.`);
+      return;
+    }
+
     setSaving(true);
+    setScanError(null);
     try {
       await onSave({
-        serial: serial.trim(), notes: notes || null,
-        brand: brand || null, power_wp: powerWp ? parseInt(powerWp) : null,
+        serial: normalizedSerial,
+        notes: notes || null,
+        brand: brand || null,
+        power_wp: powerWp ? parseInt(powerWp) : null,
       });
       setSavedCount((c) => c + 1);
-      setSerial(''); setNotes(''); setScanSuccess(false);
+      setSerial('');
+      setNotes('');
+      setScanSuccess(false);
       if (previewUrlRef.current) { URL.revokeObjectURL(previewUrlRef.current); previewUrlRef.current = null; setPreviewUrl(null); }
-    } catch { /* skip */ } finally { setSaving(false); }
+    } catch (err) {
+      setScanSuccess(false);
+      setScanError(err instanceof Error ? err.message : 'Pannello non salvato. Riprova.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -182,7 +229,7 @@ export function PanelFormModal({
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1.5">Matricola / Barcode <span className="text-red-500">*</span></label>
             <div className="relative">
-              <input value={serial} onChange={(e) => { setSerial(e.target.value.toUpperCase()); setScanSuccess(false); }} placeholder="Scansiona o inserisci manualmente"
+              <input value={serial} onChange={(e) => { setSerial(e.target.value.toUpperCase()); setScanSuccess(false); setScanError(null); }} placeholder="Scansiona o inserisci manualmente"
                 className={`w-full pl-3 pr-10 py-2.5 bg-slate-50 border rounded-xl text-sm font-mono uppercase focus:outline-none focus:ring-2 focus:border-transparent transition-colors ${
                   scanSuccess ? 'border-green-400 focus:ring-green-400' : 'border-slate-200 focus:ring-red-400'}`} />
               {scanSuccess && <CheckCircle2 className="absolute right-3 top-1/2 -translate-y-1/2 text-green-500" size={18} />}
