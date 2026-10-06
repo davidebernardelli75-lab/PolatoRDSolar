@@ -951,7 +951,7 @@ function WorkSiteRegister({
                       </div>
                     </div>
 
-                    <div className="flex flex-wrap items-center justify-end gap-2">
+                    <div className="flex w-full flex-wrap items-center justify-end gap-2 border-t border-slate-100 pt-3 sm:ml-auto sm:w-auto sm:border-t-0 sm:pt-0">
                       <button
                         type="button"
                         onClick={() => onEditSite(site)}
