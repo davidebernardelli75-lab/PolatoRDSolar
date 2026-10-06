@@ -165,7 +165,9 @@ export function PlantDetail({ plantId, onBack, onDeleted }: PlantDetailProps) {
         onDeletePhoto={async (photo) => { await deletePhoto(photo); loadAll(); }} />
 
       {showPanelForm && (
-        <PanelFormModal onClose={() => setShowPanelForm(false)}
+        <PanelFormModal
+          plantId={plantId}
+          onClose={() => setShowPanelForm(false)}
           onSave={async (data) => {
             const created = await createPanel({ plant_id: plantId, serial_number: data.serial, position_label: null, notes: data.notes, brand: data.brand, power_wp: data.power_wp });
             setPanels((current) => [...current, created]);

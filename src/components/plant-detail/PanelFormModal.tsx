@@ -3,18 +3,38 @@ import { X, Loader2, ImagePlus, Video, CheckCircle2, Plus } from 'lucide-react';
 import { scanImageFile, CameraScanner } from '@/lib/scanner';
 import { PANEL_BRANDS, PANEL_POWERS } from '@/lib/equipment-presets';
 
+function readPanelDefaults(plantId: string): { brand: string; powerWp: string } {
+  try {
+    const raw = window.sessionStorage.getItem(`polato-panel-defaults:${plantId}`);
+    if (!raw) return { brand: '', powerWp: '' };
+    const parsed = JSON.parse(raw) as { brand?: unknown; powerWp?: unknown };
+    return {
+      brand: typeof parsed.brand === 'string' ? parsed.brand : '',
+      powerWp: typeof parsed.powerWp === 'string' ? parsed.powerWp : '',
+    };
+  } catch {
+    return { brand: '', powerWp: '' };
+  }
+}
+
 export function PanelFormModal({
+  plantId,
   onClose,
   onSave,
 }: {
+  plantId: string;
   onClose: () => void;
   onSave: (data: { serial: string; notes: string | null; brand: string | null; power_wp: number | null }) => Promise<void>;
 }) {
+  const initialDefaultsRef = useRef(readPanelDefaults(plantId));
   const [serial, setSerial] = useState('');
   const [notes, setNotes] = useState('');
-  const [brand, setBrand] = useState('');
-  const [customBrand, setCustomBrand] = useState(false);
-  const [powerWp, setPowerWp] = useState('');
+  const [brand, setBrand] = useState(initialDefaultsRef.current.brand);
+  const [customBrand, setCustomBrand] = useState(
+    Boolean(initialDefaultsRef.current.brand) &&
+    !PANEL_BRANDS.some((option) => option === initialDefaultsRef.current.brand),
+  );
+  const [powerWp, setPowerWp] = useState(initialDefaultsRef.current.powerWp);
   const [saving, setSaving] = useState(false);
   const [scanning, setScanning] = useState(false);
   const [scanError, setScanError] = useState<string | null>(null);
@@ -59,6 +79,17 @@ export function PanelFormModal({
     if (cameraStartTimerRef.current !== null) { window.clearTimeout(cameraStartTimerRef.current); cameraStartTimerRef.current = null; }
     cameraScannerRef.current?.stop(); cameraScannerRef.current = null; setCameraActive(false);
   };
+
+  useEffect(() => {
+    try {
+      window.sessionStorage.setItem(
+        `polato-panel-defaults:${plantId}`,
+        JSON.stringify({ brand, powerWp }),
+      );
+    } catch {
+      // La persistenza temporanea è solo un rinforzo UX: il form continua a funzionare anche senza storage.
+    }
+  }, [plantId, brand, powerWp]);
 
   useEffect(() => {
     return () => { stopCamera(); if (previewUrlRef.current) { URL.revokeObjectURL(previewUrlRef.current); previewUrlRef.current = null; } };
