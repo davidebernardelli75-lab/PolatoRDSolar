@@ -7,9 +7,11 @@ on:
       - 'src/components/plant-detail/**'
       - 'src/lib/scanner.ts'
       - 'src/lib/equipment-presets.ts'
+      - 'src/lib/panel-serial.ts'
       - 'src/lib/api.ts'
       - 'src/lib/types.ts'
       - 'supabase/migrations/*work_report*.sql'
+      - 'supabase/migrations/*panel*.sql'
       - '.github/workflows/check-work-reports.yml'
 jobs:
   check:
