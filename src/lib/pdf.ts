@@ -1,5 +1,20 @@
 import { jsPDF } from 'jspdf';
-import type { Plant, Panel, PanelPhoto, PlantInverter, PlantStorage, PlantCharger, Vehicle, Insurance } from './types';
+import type {
+  Plant,
+  Panel,
+  PanelPhoto,
+  PlantInverter,
+  PlantStorage,
+  PlantCharger,
+  Vehicle,
+  Insurance,
+  QuoteRequest,
+  WorkReport,
+  WorkReportMaterial,
+  WorkReportWorker,
+  WorkSite,
+  WorkSitePhase,
+} from './types';
 import { downloadPhotoBlob } from './api';
 
 const POLATO_BLUE: [number, number, number] = [31, 64, 142];
@@ -576,6 +591,323 @@ export async function generateInsurancePdf(insurance: Insurance): Promise<Blob> 
     y = addSectionTitle(doc, 'NOTE', y + 3);
     addRows(doc, [['Note', insurance.notes]], y);
   }
+
+  addFooters(doc);
+  return doc.output('blob');
+}
+
+
+export interface WorkSitePdfWorkerRow {
+  worker: WorkReportWorker;
+  hourly_rate: number | null;
+}
+
+export interface WorkSitePdfMaterialRow {
+  material: WorkReportMaterial;
+  unit_price: number | null;
+}
+
+export interface WorkSitePdfReportRow {
+  report: WorkReport;
+  workers: WorkSitePdfWorkerRow[];
+  materials: WorkSitePdfMaterialRow[];
+}
+
+export interface WorkSitePdfData {
+  site: WorkSite;
+  phases: WorkSitePhase[];
+  scopes: string[];
+  linkedPlants: Plant[];
+  quote: QuoteRequest | null;
+  progressPercent: number;
+  billingPercent: number;
+  reports: WorkSitePdfReportRow[];
+}
+
+function formatCurrency(value: number | null): string {
+  if (value == null || !Number.isFinite(value)) return 'N/D';
+  return value.toLocaleString('it-IT', { style: 'currency', currency: 'EUR' });
+}
+
+function sanitizePdfText(value: string | null | undefined): string {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : 'N/D';
+}
+
+function addWorkSiteHeader(doc: jsPDF, logoDataUrl: string | null, title: string): number {
+  doc.setFillColor(...POLATO_BLUE);
+  doc.rect(0, 0, PAGE_W, 28, 'F');
+  doc.setFillColor(...POLATO_RED);
+  doc.rect(0, 28, PAGE_W, 1.4, 'F');
+
+  if (logoDataUrl) {
+    doc.setFillColor(...WHITE);
+    doc.roundedRect(MARGIN, 4, 38, 20, 2, 2, 'F');
+    addContainedLogo(doc, logoDataUrl, MARGIN + 2, 5.5, 34, 17);
+  } else {
+    doc.setTextColor(...WHITE);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(14);
+    doc.text('POLATO R&D', MARGIN, 15);
+  }
+
+  doc.setTextColor(...WHITE);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(13);
+  doc.text(title, PAGE_W - MARGIN, 12, { align: 'right' });
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8);
+  doc.setTextColor(227, 232, 245);
+  doc.text(`Generato: ${new Date().toLocaleString('it-IT')}`, PAGE_W - MARGIN, 20, { align: 'right' });
+  return 38;
+}
+
+function ensureWorkSiteSpace(
+  doc: jsPDF,
+  logoDataUrl: string | null,
+  y: number,
+  requiredHeight: number,
+  continuationTitle = 'RESOCONTO CANTIERE',
+): number {
+  if (y + requiredHeight <= PAGE_H - 20) return y;
+  doc.addPage();
+  return addCompactHeader(doc, logoDataUrl, continuationTitle);
+}
+
+function addWorkSiteTableHeader(
+  doc: jsPDF,
+  y: number,
+  columns: Array<{ label: string; x: number; width: number; align?: 'left' | 'right' }>,
+): number {
+  doc.setFillColor(...POLATO_BLUE);
+  doc.rect(MARGIN, y, CONTENT_W, 7, 'F');
+  doc.setTextColor(...WHITE);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(7);
+  columns.forEach((column) => {
+    const x = column.align === 'right' ? column.x + column.width - 1.5 : column.x + 1.5;
+    doc.text(column.label, x, y + 4.8, { align: column.align ?? 'left' });
+  });
+  return y + 7;
+}
+
+function addWorkSiteTableRow(
+  doc: jsPDF,
+  y: number,
+  columns: Array<{ value: string; x: number; width: number; align?: 'left' | 'right' }>,
+  alternate: boolean,
+): number {
+  const wrapped = columns.map((column) => doc.splitTextToSize(column.value || '—', Math.max(8, column.width - 3)));
+  const lineCount = Math.max(1, ...wrapped.map((lines) => lines.length));
+  const height = Math.max(7, lineCount * 3.4 + 3);
+
+  doc.setFillColor(...(alternate ? POLATO_BLUE_PALE : WHITE));
+  doc.setDrawColor(225, 231, 239);
+  doc.rect(MARGIN, y, CONTENT_W, height, 'FD');
+  doc.setTextColor(...SLATE_DARK);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(7);
+
+  columns.forEach((column, index) => {
+    const x = column.align === 'right' ? column.x + column.width - 1.5 : column.x + 1.5;
+    doc.text(wrapped[index], x, y + 4.5, {
+      align: column.align ?? 'left',
+      baseline: 'alphabetic',
+    });
+  });
+  return y + height;
+}
+
+export async function generateWorkSitePdf(data: WorkSitePdfData): Promise<Blob> {
+  const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+  const logoDataUrl = await loadLogoDataUrl();
+  let y = addWorkSiteHeader(doc, logoDataUrl, 'RESOCONTO FINALE CANTIERE');
+
+  const markupPercent = Number(data.site.material_markup_percent || 0);
+  const safeMarkup = Number.isFinite(markupPercent) ? markupPercent : 0;
+  const quoteValue = data.quote?.value_ex_vat == null ? null : Number(data.quote.value_ex_vat);
+
+  let totalLabor = 0;
+  let totalMaterial = 0;
+  let totalMarkedMaterial = 0;
+  let missingCosts = 0;
+  let totalHours = 0;
+
+  data.reports.forEach((entry) => {
+    entry.workers.forEach(({ worker, hourly_rate }) => {
+      totalHours += Number(worker.hours || 0);
+      if (hourly_rate == null || !Number.isFinite(hourly_rate)) {
+        missingCosts += 1;
+        return;
+      }
+      totalLabor += Number(worker.hours || 0) * hourly_rate;
+    });
+    entry.materials.forEach(({ material, unit_price }) => {
+      if (unit_price == null || !Number.isFinite(unit_price)) {
+        missingCosts += 1;
+        return;
+      }
+      const raw = Number(material.quantity || 0) * unit_price;
+      totalMaterial += raw;
+      totalMarkedMaterial += raw * (1 + safeMarkup / 100);
+    });
+  });
+
+  const totalCost = totalLabor + totalMaterial;
+  const usedPercent = quoteValue != null && quoteValue > 0 ? totalCost / quoteValue * 100 : null;
+  const margin = quoteValue == null ? null : quoteValue - totalCost;
+  const marginPercent = quoteValue != null && quoteValue > 0 && margin != null ? margin / quoteValue * 100 : null;
+
+  y = addSectionTitle(doc, 'DATI CANTIERE', y);
+  y = addRows(doc, [
+    ['Cantiere', data.site.name],
+    ['Località', sanitizePdfText(data.site.location)],
+    ['Categoria', data.site.category],
+    ['Stato', data.site.site_status],
+    ['Data inizio', data.site.start_date ? formatDate(data.site.start_date) : sanitizePdfText(data.site.start_date_note)],
+    ['Fine prevista', formatDate(data.site.planned_end_date)],
+    ['Ambiti', data.scopes.length > 0 ? data.scopes.join(' · ') : 'N/D'],
+    ['Impianti FV collegati', data.linkedPlants.length > 0 ? data.linkedPlants.map((plant) => plant.owner_name).join(' · ') : 'Nessuno'],
+    ['Note', sanitizePdfText(data.site.notes)],
+  ], y);
+
+  y = ensureWorkSiteSpace(doc, logoDataUrl, y + 3, 55);
+  y = addSectionTitle(doc, 'RIEPILOGO ECONOMICO', y + 3);
+  y = addRows(doc, [
+    ['Preventivo', data.quote ? `${data.quote.progressive_number}/${data.quote.series} · ${data.quote.client}` : 'N/D'],
+    ['Valore preventivo senza IVA', formatCurrency(quoteValue)],
+    ['Ricarico materiali cantiere', `${safeMarkup.toLocaleString('it-IT', { maximumFractionDigits: 2 })}%`],
+    ['Costo manodopera', formatCurrency(totalLabor)],
+    ['Costo materiali', formatCurrency(totalMaterial)],
+    ['Valore materiali con ricarico', formatCurrency(totalMarkedMaterial)],
+    ['Costo totale sostenuto', formatCurrency(totalCost)],
+    ['Preventivo utilizzato', usedPercent == null ? 'N/D' : `${usedPercent.toLocaleString('it-IT', { maximumFractionDigits: 2 })}%`],
+    ['Margine residuo', formatCurrency(margin)],
+    ['Margine residuo %', marginPercent == null ? 'N/D' : `${marginPercent.toLocaleString('it-IT', { maximumFractionDigits: 2 })}%`],
+    ['Ore registrate', `${totalHours.toLocaleString('it-IT', { maximumFractionDigits: 2 })} h`],
+    ['Costi mancanti/non valorizzati', String(missingCosts)],
+  ], y);
+
+  y = ensureWorkSiteSpace(doc, logoDataUrl, y + 3, 45);
+  y = addSectionTitle(doc, 'AVANZAMENTO CANTIERE', y + 3);
+  y = addRows(doc, [
+    ['Avanzamento operativo', `${data.progressPercent.toLocaleString('it-IT', { maximumFractionDigits: 1 })}%`],
+    ['Fatturazione fasi', `${data.billingPercent.toLocaleString('it-IT', { maximumFractionDigits: 1 })}%`],
+    ['Numero rapportini', String(data.reports.length)],
+  ], y);
+
+  if (data.phases.length > 0) {
+    y = ensureWorkSiteSpace(doc, logoDataUrl, y + 4, 25);
+    y = addSectionTitle(doc, 'FASI CANTIERE', y + 4);
+    const phaseCols = [
+      { label: 'Fase', x: MARGIN, width: 57 },
+      { label: 'Peso', x: MARGIN + 57, width: 20, align: 'right' as const },
+      { label: 'Avanzamento', x: MARGIN + 77, width: 42 },
+      { label: 'Fatturazione', x: MARGIN + 119, width: 61 },
+    ];
+    y = addWorkSiteTableHeader(doc, y, phaseCols);
+    data.phases.forEach((phase, index) => {
+      y = ensureWorkSiteSpace(doc, logoDataUrl, y, 14, 'FASI CANTIERE');
+      if (y < 35) y = addWorkSiteTableHeader(doc, y, phaseCols);
+      y = addWorkSiteTableRow(doc, y, [
+        { value: phase.phase_label, x: MARGIN, width: 57 },
+        { value: `${Number(phase.weight_percent).toLocaleString('it-IT')}%`, x: MARGIN + 57, width: 20, align: 'right' },
+        { value: phase.progress_status, x: MARGIN + 77, width: 42 },
+        { value: phase.billing_status, x: MARGIN + 119, width: 61 },
+      ], index % 2 === 0);
+    });
+  }
+
+  const sortedReports = [...data.reports].sort((a, b) =>
+    a.report.report_date.localeCompare(b.report.report_date) ||
+    a.report.created_at.localeCompare(b.report.created_at)
+  );
+
+  sortedReports.forEach((entry, reportIndex) => {
+    y = ensureWorkSiteSpace(doc, logoDataUrl, y + 6, 42, 'RAPPORTINI CANTIERE');
+    y = addSectionTitle(
+      doc,
+      `RAPPORTINO ${reportIndex + 1} · ${formatDate(entry.report.report_date)}`,
+      y + 6,
+    );
+
+    y = addRows(doc, [
+      ['Riferimento', entry.report.client_reference],
+      ['Stato', entry.report.status],
+      ['Lavorazione', sanitizePdfText(entry.report.work_description)],
+      ['Note', sanitizePdfText(entry.report.notes)],
+    ], y);
+
+    if (entry.workers.length > 0) {
+      y = ensureWorkSiteSpace(doc, logoDataUrl, y + 2, 20, 'RAPPORTINI · MANODOPERA');
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(8);
+      doc.setTextColor(...POLATO_BLUE);
+      doc.text('MANODOPERA', MARGIN, y + 4);
+      y += 7;
+      const workerCols = [
+        { label: 'Operatore', x: MARGIN, width: 65 },
+        { label: 'Ore', x: MARGIN + 65, width: 20, align: 'right' as const },
+        { label: 'Tipo', x: MARGIN + 85, width: 35 },
+        { label: 'Costo/h', x: MARGIN + 120, width: 28, align: 'right' as const },
+        { label: 'Totale', x: MARGIN + 148, width: 32, align: 'right' as const },
+      ];
+      y = addWorkSiteTableHeader(doc, y, workerCols);
+      entry.workers.forEach(({ worker, hourly_rate }, index) => {
+        y = ensureWorkSiteSpace(doc, logoDataUrl, y, 12, 'RAPPORTINI · MANODOPERA');
+        if (y < 35) y = addWorkSiteTableHeader(doc, y, workerCols);
+        const lineTotal = hourly_rate == null ? null : Number(worker.hours) * hourly_rate;
+        y = addWorkSiteTableRow(doc, y, [
+          { value: worker.worker_name, x: MARGIN, width: 65 },
+          { value: Number(worker.hours).toLocaleString('it-IT'), x: MARGIN + 65, width: 20, align: 'right' },
+          { value: worker.rate_type || 'ORDINARIA', x: MARGIN + 85, width: 35 },
+          { value: formatCurrency(hourly_rate), x: MARGIN + 120, width: 28, align: 'right' },
+          { value: formatCurrency(lineTotal), x: MARGIN + 148, width: 32, align: 'right' },
+        ], index % 2 === 0);
+      });
+    }
+
+    if (entry.materials.length > 0) {
+      y = ensureWorkSiteSpace(doc, logoDataUrl, y + 3, 20, 'RAPPORTINI · MATERIALI');
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(8);
+      doc.setTextColor(...POLATO_BLUE);
+      doc.text('MATERIALI', MARGIN, y + 4);
+      y += 7;
+      const materialCols = [
+        { label: 'Materiale', x: MARGIN, width: 60 },
+        { label: 'Q.tà', x: MARGIN + 60, width: 22, align: 'right' as const },
+        { label: 'Costo/u', x: MARGIN + 82, width: 30, align: 'right' as const },
+        { label: 'Rincar./u', x: MARGIN + 112, width: 32, align: 'right' as const },
+        { label: 'Costo', x: MARGIN + 144, width: 36, align: 'right' as const },
+      ];
+      y = addWorkSiteTableHeader(doc, y, materialCols);
+      entry.materials.forEach(({ material, unit_price }, index) => {
+        y = ensureWorkSiteSpace(doc, logoDataUrl, y, 12, 'RAPPORTINI · MATERIALI');
+        if (y < 35) y = addWorkSiteTableHeader(doc, y, materialCols);
+        const markedUnit = unit_price == null ? null : unit_price * (1 + safeMarkup / 100);
+        const rawTotal = unit_price == null ? null : Number(material.quantity) * unit_price;
+        y = addWorkSiteTableRow(doc, y, [
+          { value: material.description, x: MARGIN, width: 60 },
+          { value: `${Number(material.quantity).toLocaleString('it-IT')} ${material.unit}`, x: MARGIN + 60, width: 22, align: 'right' },
+          { value: formatCurrency(unit_price), x: MARGIN + 82, width: 30, align: 'right' },
+          { value: formatCurrency(markedUnit), x: MARGIN + 112, width: 32, align: 'right' },
+          { value: formatCurrency(rawTotal), x: MARGIN + 144, width: 36, align: 'right' },
+        ], index % 2 === 0);
+      });
+    }
+  });
+
+  y = ensureWorkSiteSpace(doc, logoDataUrl, y + 6, 45, 'RIEPILOGO FINALE');
+  y = addSectionTitle(doc, 'RIEPILOGO FINALE', y + 6);
+  addRows(doc, [
+    ['Costo manodopera', formatCurrency(totalLabor)],
+    ['Costo materiali', formatCurrency(totalMaterial)],
+    ['Valore materiali con ricarico', formatCurrency(totalMarkedMaterial)],
+    ['Costo totale sostenuto', formatCurrency(totalCost)],
+    ['Margine residuo', formatCurrency(margin)],
+    ['Costi mancanti', String(missingCosts)],
+  ], y);
 
   addFooters(doc);
   return doc.output('blob');
