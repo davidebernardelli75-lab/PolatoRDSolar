@@ -216,7 +216,7 @@ export default function App() {
           <span className="font-semibold text-sm tracking-wide">Polato R&D</span>
         </header>
 
-        <main className="flex-1 overflow-y-auto">
+        <main className="min-w-0 flex-1 overflow-x-hidden overflow-y-auto">
           {(error || accessError) && (
             <div role="alert" className="mx-4 mt-4 p-4 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm">
               {error && <p>{error}</p>}

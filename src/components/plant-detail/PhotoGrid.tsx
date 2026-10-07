@@ -1,5 +1,5 @@
-import { useState, useRef } from 'react';
-import { Upload, Trash2, Loader2, Image as ImageIcon } from 'lucide-react';
+import { useEffect, useState, useRef } from 'react';
+import { Upload, Trash2, Loader2, Image as ImageIcon, Maximize2, X } from 'lucide-react';
 import type { Panel, PanelPhoto } from '@/lib/types';
 import { uploadPhoto } from '@/lib/api';
 
@@ -20,7 +20,17 @@ export function PhotoGrid({
 }) {
   const [uploading, setUploading] = useState(false);
   const [selectedPanel, setSelectedPanel] = useState<string>('');
+  const [previewPhoto, setPreviewPhoto] = useState<PanelPhoto | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!previewPhoto) return;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setPreviewPhoto(null);
+    };
+    window.addEventListener('keydown', closeOnEscape);
+    return () => window.removeEventListener('keydown', closeOnEscape);
+  }, [previewPhoto]);
 
   const handleUpload = async (files: FileList) => {
     setUploading(true);
@@ -102,31 +112,76 @@ export function PhotoGrid({
             return (
               <div
                 key={photo.id}
-                className="group relative aspect-square rounded-xl overflow-hidden bg-slate-100 border border-slate-200"
+                className="group relative aspect-square overflow-hidden rounded-xl border border-slate-200 bg-slate-100"
               >
                 {url ? (
-                  <img src={url} alt={photo.file_name} className="w-full h-full object-cover" />
+                  <button
+                    type="button"
+                    onClick={() => setPreviewPhoto(photo)}
+                    className="absolute inset-0 block h-full w-full cursor-zoom-in"
+                    aria-label={`Ingrandisci ${photo.file_name}`}
+                  >
+                    <img src={url} alt={photo.file_name} className="h-full w-full object-cover" />
+                    <span className="absolute bottom-2 left-2 inline-flex items-center gap-1 rounded-lg bg-black/55 px-2 py-1 text-[10px] font-semibold text-white opacity-100 sm:opacity-0 sm:transition-opacity sm:group-hover:opacity-100">
+                      <Maximize2 size={12} /> Apri
+                    </span>
+                  </button>
                 ) : (
-                  <div className="w-full h-full flex items-center justify-center">
+                  <div className="flex h-full w-full items-center justify-center">
                     <Loader2 className="animate-spin text-slate-400" size={20} />
                   </div>
                 )}
-                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-end p-2">
-                  <button
-                    onClick={() => onDeletePhoto(photo)}
-                    className="opacity-0 group-hover:opacity-100 transition-opacity bg-red-500 hover:bg-red-600 text-white p-1.5 rounded-lg ml-auto"
-                  >
-                    <Trash2 size={14} />
-                  </button>
-                </div>
+                <button
+                  type="button"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    void onDeletePhoto(photo);
+                  }}
+                  className="absolute bottom-2 right-2 rounded-lg bg-red-500 p-2 text-white shadow-md transition hover:bg-red-600 sm:opacity-0 sm:group-hover:opacity-100"
+                  aria-label={`Elimina ${photo.file_name}`}
+                >
+                  <Trash2 size={14} />
+                </button>
                 {panel && (
-                  <div className="absolute top-2 left-2 bg-blue-900/80 text-white text-[10px] px-1.5 py-0.5 rounded">
+                  <div className="pointer-events-none absolute left-2 top-2 max-w-[75%] truncate rounded bg-blue-900/80 px-1.5 py-0.5 text-[10px] text-white">
                     {panel.serial_number.slice(0, 12)}
                   </div>
                 )}
               </div>
             );
           })}
+        </div>
+      )}
+
+      {previewPhoto && photoUrls[previewPhoto.id] && (
+        <div
+          className="fixed inset-0 z-[120] flex items-center justify-center bg-black/85 p-3 sm:p-6"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Anteprima foto impianto"
+          onClick={() => setPreviewPhoto(null)}
+        >
+          <div
+            className="relative flex max-h-full w-full max-w-5xl flex-col items-center"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <button
+              type="button"
+              onClick={() => setPreviewPhoto(null)}
+              className="absolute right-1 top-1 z-10 rounded-full bg-black/65 p-2.5 text-white shadow-lg hover:bg-black/80"
+              aria-label="Chiudi anteprima"
+            >
+              <X size={22} />
+            </button>
+            <img
+              src={photoUrls[previewPhoto.id]}
+              alt={previewPhoto.file_name}
+              className="max-h-[82vh] max-w-full rounded-xl object-contain shadow-2xl"
+            />
+            <div className="mt-3 max-w-full rounded-lg bg-black/55 px-3 py-2 text-center text-xs text-white">
+              <span className="break-all">{previewPhoto.file_name}</span>
+            </div>
+          </div>
         </div>
       )}
     </div>

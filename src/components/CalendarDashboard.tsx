@@ -350,18 +350,18 @@ export function CalendarDashboard() {
           )}
         </div>
 
-        <div className="flex rounded-xl border border-slate-200 bg-white p-1">
+        <div className="flex w-full rounded-xl border border-slate-200 bg-white p-1 sm:w-auto">
           <button
             type="button"
             onClick={() => setViewMode('month')}
-            className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold ${viewMode === 'month' ? 'bg-blue-900 text-white' : 'text-slate-600 hover:bg-slate-50'}`}
+            className={`inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold sm:flex-none ${viewMode === 'month' ? 'bg-blue-900 text-white' : 'text-slate-600 hover:bg-slate-50'}`}
           >
             <LayoutGrid size={15} /> Mese
           </button>
           <button
             type="button"
             onClick={() => setViewMode('list')}
-            className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold ${viewMode === 'list' ? 'bg-blue-900 text-white' : 'text-slate-600 hover:bg-slate-50'}`}
+            className={`inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold sm:flex-none ${viewMode === 'list' ? 'bg-blue-900 text-white' : 'text-slate-600 hover:bg-slate-50'}`}
           >
             <List size={15} /> Elenco
           </button>
@@ -401,11 +401,11 @@ export function CalendarDashboard() {
             </span>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
             <select
               value={month.getMonth()}
               onChange={(e) => setDisplayedMonth(month.getFullYear(), Number(e.target.value))}
-              className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-blue-950"
+              className="min-w-0 flex-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-blue-950 sm:flex-none"
               aria-label="Seleziona mese"
             >
               {MONTH_NAMES.map((name, index) => (
@@ -415,7 +415,7 @@ export function CalendarDashboard() {
             <select
               value={month.getFullYear()}
               onChange={(e) => setDisplayedMonth(Number(e.target.value), month.getMonth())}
-              className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-blue-950"
+              className="min-w-0 flex-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-blue-950 sm:flex-none"
               aria-label="Seleziona anno"
             >
               {calendarYears.map((year) => (
@@ -434,8 +434,12 @@ export function CalendarDashboard() {
             <Loader2 className="mx-auto animate-spin text-blue-900" />
           </div>
         ) : viewMode === 'month' ? (
-          <div className="overflow-x-auto">
-            <div className="min-w-[900px]">
+          <div>
+            <p className="border-b border-slate-100 bg-slate-50 px-4 py-2 text-[10px] font-medium text-slate-500 sm:hidden">
+              Scorri orizzontalmente per vedere l’intero mese.
+            </p>
+            <div className="overflow-x-auto overscroll-x-contain">
+              <div className="min-w-[900px]">
               <div className="grid grid-cols-7 border-b border-slate-200 bg-slate-50">
                 {WEEK_DAYS.map((day) => (
                   <div key={day} className="px-3 py-2 text-center text-[10px] font-bold uppercase tracking-wide text-slate-500">
@@ -520,6 +524,7 @@ export function CalendarDashboard() {
                 })}
               </div>
             </div>
+          </div>
           </div>
         ) : (
           <CalendarList

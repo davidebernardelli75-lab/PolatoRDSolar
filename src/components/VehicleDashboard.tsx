@@ -234,8 +234,8 @@ export function VehicleDashboard() {
           <h2 className="font-semibold text-slate-900">{showAllVehicles ? 'Tutti i veicoli' : 'Veicoli con alert'}</h2>
           {!showAllVehicles && <p className="text-xs text-slate-500 mt-0.5">Sono mostrati solo gli automezzi che richiedono attenzione.</p>}
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <label className="relative min-w-[210px]">
+        <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
+          <label className="relative w-full min-w-0 sm:w-auto sm:min-w-[210px]">
             <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
               value={brandSearch}
@@ -246,12 +246,12 @@ export function VehicleDashboard() {
             />
           </label>
           <button type="button" onClick={() => { setShowAllVehicles((v) => !v); setExpandedId(null); }}
-            className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
+            className="flex-1 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 sm:flex-none">
             {showAllVehicles ? 'Riepilogo alert' : 'Gestisci parco completo'}
           </button>
           {showAllVehicles && (
             <button onClick={() => setShowForm(true)}
-              className="flex items-center gap-1.5 bg-blue-900 hover:bg-blue-800 text-white text-sm font-medium px-3 py-2 rounded-lg transition-colors">
+              className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-blue-900 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-800 sm:flex-none">
               <Plus size={16} /> Aggiungi Veicolo
             </button>
           )}
