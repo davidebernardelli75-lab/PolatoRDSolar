@@ -2020,40 +2020,53 @@ function AdminReportCostEditor({
             {workers.length === 0 ? (
               <p className="rounded-xl bg-slate-50 p-3 text-xs text-slate-400">Nessun componente della squadra registrato.</p>
             ) : (
-              <div className="overflow-x-auto">
-                <div className="min-w-[780px] space-y-2">
-                  <div className="grid grid-cols-[2fr_0.65fr_1fr_1fr_1fr] gap-2 px-2 text-[10px] font-bold uppercase tracking-wide text-slate-400">
-                    <span>Dipendente</span>
-                    <span>Ore</span>
-                    <span>Tipo ore</span>
-                    <span>Costo orario €/h</span>
-                    <span className="text-right">Totale</span>
-                  </div>
-                  {workers.map((worker) => {
-                    const rate = workerRates[worker.id] ?? '';
-                    const lineTotal = rate === '' ? null : Number(worker.hours) * Number(rate);
-                    return (
-                      <div key={worker.id} className="grid grid-cols-[2fr_0.65fr_1fr_1fr_1fr] items-center gap-2 rounded-xl bg-slate-50 p-2">
+              <div className="space-y-2">
+                <div className="hidden grid-cols-[2fr_0.65fr_1fr_1fr_1fr] gap-2 px-2 text-[10px] font-bold uppercase tracking-wide text-slate-400 md:grid">
+                  <span>Dipendente</span>
+                  <span>Ore</span>
+                  <span>Tipo ore</span>
+                  <span>Costo orario €/h</span>
+                  <span className="text-right">Totale</span>
+                </div>
+                {workers.map((worker) => {
+                  const rate = workerRates[worker.id] ?? '';
+                  const lineTotal = rate === '' ? null : Number(worker.hours) * Number(rate);
+                  return (
+                    <div key={worker.id} className="grid grid-cols-2 items-end gap-2 rounded-xl bg-slate-50 p-3 md:grid-cols-[2fr_0.65fr_1fr_1fr_1fr] md:p-2">
+                      <div className="col-span-2 md:col-span-1">
+                        <span className="mb-1 block text-[10px] font-bold uppercase text-slate-400 md:hidden">Dipendente</span>
                         <div className="rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm font-semibold text-slate-900">{worker.worker_name}</div>
+                      </div>
+                      <div>
+                        <span className="mb-1 block text-[10px] font-bold uppercase text-slate-400 md:hidden">Ore</span>
                         <div className="rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700">{Number(worker.hours).toLocaleString('it-IT')} h</div>
+                      </div>
+                      <div>
+                        <span className="mb-1 block text-[10px] font-bold uppercase text-slate-400 md:hidden">Tipo ore</span>
                         <div className="rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-xs font-semibold text-slate-600">{worker.rate_type || 'ORDINARIA'}</div>
+                      </div>
+                      <label className="text-[10px] font-bold uppercase text-slate-400 md:text-transparent">
+                        <span className="md:hidden">Costo orario €/h</span>
                         <input
                           type="number"
                           min="0"
                           step="0.01"
                           value={rate}
                           onChange={(e) => setWorkerRates((current) => ({ ...current, [worker.id]: e.target.value }))}
-                          className={inputClass}
+                          className={inputClass + ' mt-1 md:mt-0'}
                           placeholder="€/h"
                           aria-label={`Costo orario di ${worker.worker_name}`}
                         />
+                      </label>
+                      <div>
+                        <span className="mb-1 block text-[10px] font-bold uppercase text-slate-400 md:hidden">Totale</span>
                         <div className="rounded-lg bg-emerald-50 px-3 py-2.5 text-right text-sm font-bold text-emerald-900">
                           {lineTotal == null || !Number.isFinite(lineTotal) ? '—' : lineTotal.toLocaleString('it-IT', { style: 'currency', currency: 'EUR' })}
                         </div>
                       </div>
-                    );
-                  })}
-                </div>
+                    </div>
+                  );
+                })}
               </div>
             )}
           </section>
@@ -2084,51 +2097,70 @@ function AdminReportCostEditor({
             {materials.length === 0 ? (
               <p className="rounded-xl bg-slate-50 p-3 text-xs text-slate-400">Nessun materiale registrato.</p>
             ) : (
-              <div className="overflow-x-auto">
-                <div className="min-w-[1120px] space-y-2">
-                  <div className="grid grid-cols-[2.2fr_0.6fr_0.55fr_1fr_1fr_1fr_1fr] gap-2 px-2 text-[10px] font-bold uppercase tracking-wide text-slate-400">
-                    <span>Materiale</span>
-                    <span>Quantità</span>
-                    <span>U.M.</span>
-                    <span>Costo unitario €</span>
-                    <span>Prezzo rincarato €</span>
-                    <span className="text-right">Totale costo</span>
-                    <span className="text-right">Totale rincarato</span>
-                  </div>
-                  {materials.map((material) => {
-                    const price = materialPrices[material.id] ?? '';
-                    const numericPrice = Number(price);
-                    const lineTotal = price === '' || !Number.isFinite(numericPrice) ? null : Number(material.quantity) * numericPrice;
-                    const markedUnitPrice = price === '' || !Number.isFinite(numericPrice) ? null : numericPrice * (1 + safeMarkupPercent / 100);
-                    const markedLineTotal = markedUnitPrice == null ? null : Number(material.quantity) * markedUnitPrice;
-                    return (
-                      <div key={material.id} className="grid grid-cols-[2.2fr_0.6fr_0.55fr_1fr_1fr_1fr_1fr] items-center gap-2 rounded-xl bg-slate-50 p-2">
-                        <div className="rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm font-semibold text-slate-900">{material.description}</div>
+              <div className="space-y-2">
+                <div className="hidden grid-cols-[2.2fr_0.6fr_0.55fr_1fr_1fr_1fr_1fr] gap-2 px-2 text-[10px] font-bold uppercase tracking-wide text-slate-400 lg:grid">
+                  <span>Materiale</span>
+                  <span>Quantità</span>
+                  <span>U.M.</span>
+                  <span>Costo unitario €</span>
+                  <span>Prezzo rincarato €</span>
+                  <span className="text-right">Totale costo</span>
+                  <span className="text-right">Totale rincarato</span>
+                </div>
+                {materials.map((material) => {
+                  const price = materialPrices[material.id] ?? '';
+                  const numericPrice = Number(price);
+                  const lineTotal = price === '' || !Number.isFinite(numericPrice) ? null : Number(material.quantity) * numericPrice;
+                  const markedUnitPrice = price === '' || !Number.isFinite(numericPrice) ? null : numericPrice * (1 + safeMarkupPercent / 100);
+                  const markedLineTotal = markedUnitPrice == null ? null : Number(material.quantity) * markedUnitPrice;
+                  return (
+                    <div key={material.id} className="grid grid-cols-2 items-end gap-2 rounded-xl bg-slate-50 p-3 lg:grid-cols-[2.2fr_0.6fr_0.55fr_1fr_1fr_1fr_1fr] lg:p-2">
+                      <div className="col-span-2 lg:col-span-1">
+                        <span className="mb-1 block text-[10px] font-bold uppercase text-slate-400 lg:hidden">Materiale</span>
+                        <div className="break-words rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm font-semibold text-slate-900">{material.description}</div>
+                      </div>
+                      <div>
+                        <span className="mb-1 block text-[10px] font-bold uppercase text-slate-400 lg:hidden">Quantità</span>
                         <div className="rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700">{Number(material.quantity).toLocaleString('it-IT')}</div>
+                      </div>
+                      <div>
+                        <span className="mb-1 block text-[10px] font-bold uppercase text-slate-400 lg:hidden">U.M.</span>
                         <div className="rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700">{material.unit}</div>
+                      </div>
+                      <label className="text-[10px] font-bold uppercase text-slate-400 lg:text-transparent">
+                        <span className="lg:hidden">Costo unitario €</span>
                         <input
                           type="number"
                           min="0"
                           step="0.01"
                           value={price}
                           onChange={(e) => setMaterialPrices((current) => ({ ...current, [material.id]: e.target.value }))}
-                          className={inputClass}
+                          className={inputClass + ' mt-1 lg:mt-0'}
                           placeholder="€/unità"
                           aria-label={`Costo unitario di ${material.description}`}
                         />
+                      </label>
+                      <div>
+                        <span className="mb-1 block text-[10px] font-bold uppercase text-slate-400 lg:hidden">Prezzo rincarato €</span>
                         <div className="rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm font-semibold text-slate-700">
                           {markedUnitPrice == null ? '—' : markedUnitPrice.toLocaleString('it-IT', { style: 'currency', currency: 'EUR' })}
                         </div>
+                      </div>
+                      <div>
+                        <span className="mb-1 block text-[10px] font-bold uppercase text-slate-400 lg:hidden">Totale costo</span>
                         <div className="rounded-lg bg-slate-100 px-3 py-2.5 text-right text-sm font-bold text-slate-800">
                           {lineTotal == null ? '—' : lineTotal.toLocaleString('it-IT', { style: 'currency', currency: 'EUR' })}
                         </div>
+                      </div>
+                      <div>
+                        <span className="mb-1 block text-[10px] font-bold uppercase text-slate-400 lg:hidden">Totale rincarato</span>
                         <div className="rounded-lg bg-emerald-50 px-3 py-2.5 text-right text-sm font-bold text-emerald-900">
                           {markedLineTotal == null ? '—' : markedLineTotal.toLocaleString('it-IT', { style: 'currency', currency: 'EUR' })}
                         </div>
                       </div>
-                    );
-                  })}
-                </div>
+                    </div>
+                  );
+                })}
               </div>
             )}
 
@@ -2421,8 +2453,8 @@ function WorkReportFormModal({
   return (
     <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/60 p-3 sm:p-4">
       <div className="max-h-[95vh] w-full max-w-3xl overflow-y-auto rounded-2xl bg-white p-4 shadow-2xl sm:p-6">
-        <div className="mb-5 flex items-center justify-between">
-          <div>
+        <div className="mb-5 flex items-start justify-between gap-3">
+          <div className="min-w-0">
             <h2 className="text-lg font-bold text-slate-900">{report ? 'Modifica rapportino' : 'Nuovo rapportino'}</h2>
             <p className="text-xs text-slate-500">
               Compila i dati della giornata. Puoi collegare il rapportino a un cantiere già esistente; se non è ancora presente, lascialo da associare e l'amministrazione potrà abbinarlo successivamente.
@@ -2500,8 +2532,15 @@ function WorkReportFormModal({
         </div>
 
         <section className="mt-5 rounded-2xl border border-slate-200 p-4">
-          <div className="mb-3 flex items-center justify-between">
-            <h3 className="inline-flex items-center gap-2 font-semibold text-slate-900"><Users size={17} /> Manodopera</h3>
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h3 className="inline-flex items-center gap-2 font-semibold text-slate-900"><Users size={17} /> Manodopera</h3>
+              {!isAdmin && (
+                <p className="mt-0.5 text-[11px] text-slate-500">
+                  Indica il lavoratore e le ore svolte. La tipologia delle ore viene definita dall'amministrazione.
+                </p>
+              )}
+            </div>
             <button
               type="button"
               onClick={() => setWorkerRows((rows) => [...rows, { worker_name: '', hours: '', rate_type: 'ORDINARIA', notes: '' }])}
@@ -2515,7 +2554,12 @@ function WorkReportFormModal({
           </datalist>
           <div className="space-y-3">
             {workerRows.map((worker, index) => (
-              <div key={index} className="grid gap-2 rounded-xl bg-slate-50 p-3 sm:grid-cols-[1.25fr_0.5fr_0.8fr_1fr_auto]">
+              <div
+                key={index}
+                className={`grid gap-2 rounded-xl bg-slate-50 p-3 ${isAdmin
+                  ? 'sm:grid-cols-[1.25fr_0.5fr_0.8fr_1fr_auto]'
+                  : 'sm:grid-cols-[1.5fr_0.55fr_1fr_auto]'}`}
+              >
                 <input
                   list="work-report-worker-options"
                   value={worker.worker_name}
@@ -2524,15 +2568,17 @@ function WorkReportFormModal({
                   placeholder="Nome lavoratore"
                 />
                 <input type="number" min="0.25" max="24" step="0.25" value={worker.hours} onChange={(e) => setWorkerRows((rows) => rows.map((row, i) => i === index ? { ...row, hours: e.target.value } : row))} className={inputClass} placeholder="Ore" />
-                <select value={worker.rate_type} onChange={(e) => setWorkerRows((rows) => rows.map((row, i) => i === index ? { ...row, rate_type: e.target.value } : row))} className={inputClass}>
-                  <option value="ORDINARIA">Ordinaria</option>
-                  <option value="STRAORDINARIA">Straordinaria</option>
-                  <option value="FESTIVA">Festiva</option>
-                  <option value="NOTTURNA">Notturna</option>
-                  <option value="ALTRO">Altro</option>
-                </select>
+                {isAdmin && (
+                  <select value={worker.rate_type} onChange={(e) => setWorkerRows((rows) => rows.map((row, i) => i === index ? { ...row, rate_type: e.target.value } : row))} className={inputClass}>
+                    <option value="ORDINARIA">Ordinaria</option>
+                    <option value="STRAORDINARIA">Straordinaria</option>
+                    <option value="FESTIVA">Festiva</option>
+                    <option value="NOTTURNA">Notturna</option>
+                    <option value="ALTRO">Altro</option>
+                  </select>
+                )}
                 <input value={worker.notes} onChange={(e) => setWorkerRows((rows) => rows.map((row, i) => i === index ? { ...row, notes: e.target.value.toUpperCase() } : row))} className={inputClass} placeholder="Nota opzionale" />
-                <button type="button" onClick={() => setWorkerRows((rows) => rows.filter((_, i) => i !== index))} className="rounded-lg p-2 text-red-600 hover:bg-red-50"><Trash2 size={17} /></button>
+                <button type="button" onClick={() => setWorkerRows((rows) => rows.filter((_, i) => i !== index))} className="justify-self-end rounded-lg p-2 text-red-600 hover:bg-red-50 sm:justify-self-auto"><Trash2 size={17} /></button>
               </div>
             ))}
           </div>
