@@ -254,14 +254,14 @@ export function QuoteDashboard() {
 
         <section className="rounded-2xl border border-slate-200 bg-white p-5">
           <div className="mb-4 flex flex-wrap items-center gap-3">
-            <label className="relative min-w-[220px] flex-1">
+            <label className="relative w-full min-w-0 sm:min-w-[220px] sm:flex-1">
               <Search size={16} className="absolute left-3 top-3 text-slate-400"/>
               <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Cerca cliente, ref., tipo..." className={inputClass + ' pl-9'} />
             </label>
-            <select value={year} onChange={(e) => setYear(Number(e.target.value))} className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm">
+            <select value={year} onChange={(e) => setYear(Number(e.target.value))} className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm sm:w-auto">
               {years.map((y) => <option key={y}>{y}</option>)}
             </select>
-            <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as 'TUTTI' | QuoteStatus)} className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm">
+            <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as 'TUTTI' | QuoteStatus)} className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm sm:w-auto">
               <option value="TUTTI">Tutti gli stati</option>
               {STATUSES.map((s) => <option key={s}>{s}</option>)}
             </select>
