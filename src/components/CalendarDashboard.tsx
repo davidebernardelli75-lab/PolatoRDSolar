@@ -525,6 +525,7 @@ export function CalendarDashboard() {
               </div>
             </div>
           </div>
+          </div>
         ) : (
           <CalendarList
             events={listEvents}
