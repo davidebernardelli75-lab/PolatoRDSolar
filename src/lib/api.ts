@@ -173,6 +173,17 @@ export async function setWorkReportSiteLink(reportId: string, siteId: string | n
   if (error) throw error;
 }
 
+export async function setWorkSiteMaterialMarkup(siteId: string, markupPercent: number): Promise<void> {
+  const { error } = await supabase
+    .from('work_sites')
+    .update({
+      material_markup_percent: markupPercent,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', siteId);
+  if (error) throw error;
+}
+
 export async function setWorkReportMaterialCost(reportMaterialId: string, unitPrice: number): Promise<void> {
   const { error } = await supabase.rpc('set_work_report_material_cost', {
     p_report_material_id: reportMaterialId,
