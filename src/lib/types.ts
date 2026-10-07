@@ -359,6 +359,7 @@ export interface WorkSite {
   start_date_note: string | null;
   planned_end_date: string | null;
   quote_request_id: string | null;
+  material_markup_percent: number;
   notes: string | null;
   active: boolean;
   source_name: string | null;
