@@ -462,7 +462,10 @@ export function WorkReportDashboard({ isAdmin }: WorkReportDashboardProps) {
                 <div className="space-y-1.5">
                   {reportWorkers.map((worker) => (
                     <div key={worker.id} className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2 text-sm">
-                      <span>{worker.worker_name}<span className="ml-1 text-[10px] text-slate-400">({worker.rate_type || 'ORDINARIA'})</span></span>
+                      <span>
+                        {worker.worker_name}
+                        {isAdmin && <span className="ml-1 text-[10px] text-slate-400">({worker.rate_type || 'ORDINARIA'})</span>}
+                      </span>
                       <span className="font-semibold">{Number(worker.hours).toLocaleString('it-IT')} h</span>
                     </div>
                   ))}
@@ -2045,15 +2048,15 @@ function AdminReportCostEditor({
                         <span className="mb-1 block text-[10px] font-bold uppercase text-slate-400 md:hidden">Tipo ore</span>
                         <div className="rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-xs font-semibold text-slate-600">{worker.rate_type || 'ORDINARIA'}</div>
                       </div>
-                      <label className="text-[10px] font-bold uppercase text-slate-400 md:text-transparent">
-                        <span className="md:hidden">Costo orario €/h</span>
+                      <label className="block">
+                        <span className="mb-1 block text-[10px] font-bold uppercase text-slate-400 md:hidden">Costo orario €/h</span>
                         <input
                           type="number"
                           min="0"
                           step="0.01"
                           value={rate}
                           onChange={(e) => setWorkerRates((current) => ({ ...current, [worker.id]: e.target.value }))}
-                          className={inputClass + ' mt-1 md:mt-0'}
+                          className={inputClass}
                           placeholder="€/h"
                           aria-label={`Costo orario di ${worker.worker_name}`}
                         />
@@ -2127,15 +2130,15 @@ function AdminReportCostEditor({
                         <span className="mb-1 block text-[10px] font-bold uppercase text-slate-400 lg:hidden">U.M.</span>
                         <div className="rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700">{material.unit}</div>
                       </div>
-                      <label className="text-[10px] font-bold uppercase text-slate-400 lg:text-transparent">
-                        <span className="lg:hidden">Costo unitario €</span>
+                      <label className="block">
+                        <span className="mb-1 block text-[10px] font-bold uppercase text-slate-400 lg:hidden">Costo unitario €</span>
                         <input
                           type="number"
                           min="0"
                           step="0.01"
                           value={price}
                           onChange={(e) => setMaterialPrices((current) => ({ ...current, [material.id]: e.target.value }))}
-                          className={inputClass + ' mt-1 lg:mt-0'}
+                          className={inputClass}
                           placeholder="€/unità"
                           aria-label={`Costo unitario di ${material.description}`}
                         />
