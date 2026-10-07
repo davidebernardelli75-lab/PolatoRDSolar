@@ -6,6 +6,7 @@ import {
   ChevronUp,
   ClipboardList,
   Clock3,
+  FileDown,
   Loader2,
   PackagePlus,
   Pencil,
@@ -74,12 +75,15 @@ import {
   setWorkReportMaterialCost,
   setWorkReportMaterialMarkup,
   setWorkReportWorkerCost,
+  setWorkSiteMaterialMarkup,
   updateWorkReport,
   updateWorkSite,
   updateWorkSitePhase,
   rememberWorkSiteOption,
 } from '@/lib/api';
 import { MaterialScannerModal } from '@/components/work-reports/MaterialScannerModal';
+import { generateWorkSitePdf } from '@/lib/pdf';
+import { saveAs } from 'file-saver';
 
 interface WorkReportDashboardProps {
   isAdmin: boolean;
@@ -100,6 +104,10 @@ function statusClass(status: WorkReportStatus): string {
 
 function displayDate(value: string): string {
   return value.split('-').reverse().join('/');
+}
+
+function sanitizeFileName(value: string): string {
+  return value.replace(/[\\/:*?"<>|]/g, '_').trim() || 'Cantiere';
 }
 
 export function WorkReportDashboard({ isAdmin }: WorkReportDashboardProps) {
@@ -482,6 +490,8 @@ export function WorkReportDashboard({ isAdmin }: WorkReportDashboardProps) {
         {expanded && isAdmin && (
           <AdminReportCostEditor
             reportId={report.id}
+            linkedSiteId={report.site_id}
+            siteMarkupPercent={report.site_id ? Number(sites.find((site) => site.id === report.site_id)?.material_markup_percent ?? 0) : null}
             workers={reportWorkers}
             materials={reportMaterials}
             allReports={reports}
@@ -753,6 +763,7 @@ function WorkSiteRegister({
   const [siteStatusFilter, setSiteStatusFilter] = useState('TUTTI');
   const [expandedSiteId, setExpandedSiteId] = useState<string | null>(null);
   const [deletingSiteId, setDeletingSiteId] = useState<string | null>(null);
+  const [exportingSiteId, setExportingSiteId] = useState<string | null>(null);
 
   const quoteById = useMemo(() => new Map(quotes.map((quote) => [quote.id, quote])), [quotes]);
   const categories = siteOptions.filter((option) => option.field_key === 'CATEGORY');
@@ -802,6 +813,71 @@ function WorkSiteRegister({
       onError(err instanceof Error ? err.message : 'Eliminazione cantiere non riuscita.');
     } finally {
       setDeletingSiteId(null);
+    }
+  };
+
+  const exportSitePdf = async (site: WorkSite) => {
+    setExportingSiteId(site.id);
+    onError(null);
+    try {
+      const currentPhases = phases.filter((phase) => phase.site_id === site.id);
+      const currentReports = reports.filter((report) => report.site_id === site.id);
+      const currentScopes = siteScopes
+        .filter((scope) => scope.site_id === site.id)
+        .map((scope) => scopeOptionById.get(scope.option_id)?.label)
+        .filter((label): label is string => Boolean(label));
+      const linkedPlants = sitePlantLinks
+        .filter((link) => link.site_id === site.id)
+        .map((link) => plantById.get(link.plant_id))
+        .filter((plant): plant is Plant => Boolean(plant));
+      const totalWeight = currentPhases.reduce((sum, phase) => sum + Number(phase.weight_percent || 0), 0);
+      const progressPercent = totalWeight > 0
+        ? currentPhases.reduce((sum, phase) => sum + Number(phase.weight_percent || 0) * workSiteProgressFactor(phase.progress_status), 0) / totalWeight * 100
+        : 0;
+      const billingPercent = totalWeight > 0
+        ? currentPhases.reduce((sum, phase) => sum + Number(phase.weight_percent || 0) * workSiteBillingFactor(phase.billing_status), 0) / totalWeight * 100
+        : 0;
+
+      const pdfReports = currentReports.map((report) => {
+        const reportWorkers = workers
+          .filter((worker) => worker.report_id === report.id)
+          .map((worker) => {
+            let hourlyRate = workerCostByRow.get(worker.id);
+            if (hourlyRate == null) {
+              const catalog = workerCatalogByName.get(normalizeCatalogValue(worker.worker_name));
+              const key = catalog ? `${catalog.id}::${normalizeCatalogValue(worker.rate_type || 'ORDINARIA')}` : '';
+              hourlyRate = key ? laborDefaultByKey.get(key) : undefined;
+            }
+            return { worker, hourly_rate: hourlyRate == null || !Number.isFinite(hourlyRate) ? null : hourlyRate };
+          });
+        const reportMaterials = materials
+          .filter((material) => material.report_id === report.id)
+          .map((material) => {
+            let unitPrice = materialCostByRow.get(material.id);
+            if (unitPrice == null) {
+              const catalog = materialCatalogByDescription.get(normalizeCatalogValue(material.description));
+              unitPrice = catalog ? materialDefaultByCatalog.get(catalog.id) : undefined;
+            }
+            return { material, unit_price: unitPrice == null || !Number.isFinite(unitPrice) ? null : unitPrice };
+          });
+        return { report, workers: reportWorkers, materials: reportMaterials };
+      });
+
+      const blob = await generateWorkSitePdf({
+        site,
+        phases: currentPhases,
+        scopes: currentScopes,
+        linkedPlants,
+        quote: site.quote_request_id ? quoteById.get(site.quote_request_id) ?? null : null,
+        progressPercent,
+        billingPercent,
+        reports: pdfReports,
+      });
+      saveAs(blob, `Resoconto_Cantiere_${sanitizeFileName(site.name)}.pdf`);
+    } catch (err) {
+      onError(err instanceof Error ? err.message : 'Generazione PDF cantiere non riuscita.');
+    } finally {
+      setExportingSiteId(null);
     }
   };
 
@@ -889,6 +965,9 @@ function WorkSiteRegister({
               materialCost += Number(material.quantity) * unitPrice;
             });
 
+            const markupPercent = Number(site.material_markup_percent || 0);
+            const safeMarkupPercent = Number.isFinite(markupPercent) ? markupPercent : 0;
+            const markedMaterialValue = materialCost * (1 + safeMarkupPercent / 100);
             const totalCost = laborCost + materialCost;
             const quoteValue = quote?.value_ex_vat == null ? null : Number(quote.value_ex_vat);
             const usedPercent = quoteValue != null && quoteValue > 0 ? totalCost / quoteValue * 100 : null;
@@ -952,6 +1031,15 @@ function WorkSiteRegister({
                     </div>
 
                     <div className="flex w-full flex-wrap items-center justify-end gap-2 border-t border-slate-100 pt-3 sm:ml-auto sm:w-auto sm:border-t-0 sm:pt-0">
+                      <button
+                        type="button"
+                        onClick={() => void exportSitePdf(site)}
+                        disabled={exportingSiteId === site.id}
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-800 hover:bg-emerald-100 disabled:opacity-50"
+                      >
+                        {exportingSiteId === site.id ? <Loader2 size={14} className="animate-spin" /> : <FileDown size={14} />}
+                        {exportingSiteId === site.id ? 'PDF…' : 'PDF resoconto'}
+                      </button>
                       <button
                         type="button"
                         onClick={() => onEditSite(site)}
@@ -1032,6 +1120,10 @@ function WorkSiteRegister({
                       </div>
                       {!quote && <p className="mt-2 text-[10px] text-slate-500">Collega un preventivo al cantiere per attivare il confronto economico.</p>}
                       {quote && quoteValue == null && <p className="mt-2 text-[10px] text-amber-800">Il preventivo è collegato ma il valore economico non è ancora valorizzato.</p>}
+                      <p className="mt-2 text-[10px] text-emerald-800">
+                        Ricarico materiali cantiere <strong>{safeMarkupPercent.toLocaleString('it-IT', { maximumFractionDigits: 2 })}%</strong>
+                        {' · '}Valore materiali rincarato <strong>{markedMaterialValue.toLocaleString('it-IT', { style: 'currency', currency: 'EUR' })}</strong>
+                      </p>
                       {missingCosts > 0 && <p className="mt-2 text-[10px] text-amber-800">{missingCosts} voce/i di costo non ancora valorizzate.</p>}
                       {usedPercent != null && usedPercent > 100 && <p className="mt-2 text-[10px] font-semibold text-red-700">Costi superiori al preventivo di {(usedPercent - 100).toLocaleString('it-IT', { maximumFractionDigits: 1 })}%.</p>}
                     </div>
@@ -1625,6 +1717,8 @@ function normalizeCatalogValue(value: string): string {
 
 function AdminReportCostEditor({
   reportId,
+  linkedSiteId,
+  siteMarkupPercent,
   workers,
   materials,
   allReports,
@@ -1637,6 +1731,8 @@ function AdminReportCostEditor({
   onCostsSaved,
 }: {
   reportId: string;
+  linkedSiteId: string | null;
+  siteMarkupPercent: number | null;
   workers: WorkReportWorker[];
   materials: WorkReportMaterial[];
   allReports: WorkReport[];
@@ -1706,13 +1802,15 @@ function AdminReportCostEditor({
 
         setMaterialPrices(nextMaterialPrices);
         setWorkerRates(nextWorkerRates);
-        setMaterialMarkupPercent(String(adminSummary?.material_markup_percent ?? 0));
+        setMaterialMarkupPercent(String(linkedSiteId ? siteMarkupPercent ?? 0 : adminSummary?.material_markup_percent ?? 0));
 
         const otherReportIds = new Set(
           allReports
-            .filter((report) => linkedQuoteRequestId
-              ? report.quote_request_id === linkedQuoteRequestId && report.id !== reportId
-              : false)
+            .filter((report) => {
+              if (report.id === reportId) return false;
+              if (linkedSiteId) return report.site_id === linkedSiteId;
+              return linkedQuoteRequestId ? report.quote_request_id === linkedQuoteRequestId : false;
+            })
             .map((report) => report.id),
         );
 
@@ -1774,7 +1872,7 @@ function AdminReportCostEditor({
     };
     void loadCosts();
     return () => { active = false; };
-  }, [reportId, linkedQuoteRequestId, materials, workers, allReports, allWorkers, allMaterials, materialCatalog, workerCatalog]);
+  }, [reportId, linkedSiteId, siteMarkupPercent, linkedQuoteRequestId, materials, workers, allReports, allWorkers, allMaterials, materialCatalog, workerCatalog]);
 
   const laborTotal = workers.reduce((sum, worker) => {
     const rate = Number(workerRates[worker.id]);
@@ -1794,6 +1892,7 @@ function AdminReportCostEditor({
   const totalMissingCosts = otherPlantMissingCosts + currentMissingCosts;
   const jobLaborCost = otherPlantLaborCost + laborTotal;
   const jobMaterialCost = otherPlantMaterialCost + materialsTotal;
+  const jobMarkedMaterialValue = jobMaterialCost * (1 + safeMarkupPercent / 100);
   const jobCostToDate = jobLaborCost + jobMaterialCost;
   const selectedQuote = quoteOptions.find((quote) => quote.id === linkedQuoteRequestId) ?? null;
   const quoteValue = selectedQuote?.value_ex_vat == null ? null : Number(selectedQuote.value_ex_vat);
@@ -1825,7 +1924,9 @@ function AdminReportCostEditor({
         throw new Error('La percentuale di ricarico deve essere compresa tra -100% e 1000%.');
       }
       await Promise.all([
-        setWorkReportMaterialMarkup(reportId, safeMarkupPercent),
+        linkedSiteId
+          ? setWorkSiteMaterialMarkup(linkedSiteId, safeMarkupPercent)
+          : setWorkReportMaterialMarkup(reportId, safeMarkupPercent),
         ...workers
           .filter((worker) => workerRates[worker.id] !== '' && Number(workerRates[worker.id]) >= 0)
           .map((worker) => setWorkReportWorkerCost(worker.id, Number(workerRates[worker.id]))),
@@ -1881,7 +1982,7 @@ function AdminReportCostEditor({
                   {jobCostToDate.toLocaleString('it-IT', { style: 'currency', currency: 'EUR' })}
                 </div>
                 <div className="mt-1 text-[10px] text-slate-400">
-                  Manodopera {jobLaborCost.toLocaleString('it-IT', { style: 'currency', currency: 'EUR' })} · Materiali {jobMaterialCost.toLocaleString('it-IT', { style: 'currency', currency: 'EUR' })}
+                  Manodopera {jobLaborCost.toLocaleString('it-IT', { style: 'currency', currency: 'EUR' })} · Materiali {jobMaterialCost.toLocaleString('it-IT', { style: 'currency', currency: 'EUR' })} · Materiali rincarati {jobMarkedMaterialValue.toLocaleString('it-IT', { style: 'currency', currency: 'EUR' })}
                 </div>
               </div>
               <div className="rounded-xl bg-white p-3">
@@ -1961,7 +2062,9 @@ function AdminReportCostEditor({
             <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
               <div>
                 <h5 className="text-sm font-bold uppercase tracking-wide text-slate-800">Materiale</h5>
-                <p className="mt-0.5 text-[11px] text-slate-500">Costo aziendale, ricarico e valore ricaricato vengono calcolati riga per riga.</p>
+                <p className="mt-0.5 text-[11px] text-slate-500">
+                  Costo aziendale, ricarico e valore ricaricato vengono calcolati riga per riga. Il ricarico salvato resta valido per tutti i rapportini del cantiere.
+                </p>
               </div>
               <label className="text-[11px] font-semibold text-slate-600">
                 Ricarico %
@@ -2065,7 +2168,13 @@ function AdminReportCostEditor({
           </button>
         </div>
       )}
-      {saved && <p className="mt-2 text-xs font-semibold text-emerald-700">Costi salvati e impostati come valori predefiniti per i prossimi rapportini.</p>}
+      {saved && (
+        <p className="mt-2 text-xs font-semibold text-emerald-700">
+          {linkedSiteId
+            ? 'Costi salvati. Il ricarico è memorizzato sul cantiere e verrà applicato ai materiali dei rapportini successivi.'
+            : 'Costi salvati e impostati come valori predefiniti per i prossimi rapportini.'}
+        </p>
+      )}
       {costError && <p className="mt-2 rounded-lg bg-red-50 p-2 text-xs text-red-700">{costError}</p>}
     </div>
   );
