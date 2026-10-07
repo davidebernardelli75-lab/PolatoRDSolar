@@ -166,13 +166,13 @@ export function TrainingDashboard() {
         </div>
       )}
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <label className="relative min-w-[190px] flex-1">
+        <label className="relative w-full min-w-0 sm:min-w-[190px] sm:flex-1">
           <Search size={16} className="absolute left-3 top-3 text-slate-400" />
           <input aria-label="Cerca dipendenti" className={inputClass + ' pl-9'} value={search}
             onChange={(e) => setSearch(e.target.value)} placeholder="Cerca dipendente o mansione" />
         </label>
         <button onClick={() => setEditing('new')}
-          className="inline-flex items-center gap-2 rounded-lg bg-blue-900 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-800">
+          className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-blue-900 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-800 sm:w-auto">
           <Plus size={16} /> Aggiungi dipendente
         </button>
       </div>
