@@ -82,7 +82,7 @@ import {
   rememberWorkSiteOption,
 } from '@/lib/api';
 import { MaterialScannerModal } from '@/components/work-reports/MaterialScannerModal';
-import { generateWorkSitePdf } from '@/lib/pdf';
+import { generateWorkReportPdf, generateWorkSitePdf } from '@/lib/pdf';
 import { saveAs } from 'file-saver';
 
 interface WorkReportDashboardProps {
@@ -139,6 +139,7 @@ export function WorkReportDashboard({ isAdmin }: WorkReportDashboardProps) {
   const [statusFilter, setStatusFilter] = useState<'TUTTI' | WorkReportStatus>('TUTTI');
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [exportingReportId, setExportingReportId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async (showInitialLoader = false) => {
@@ -347,6 +348,74 @@ export function WorkReportDashboard({ isAdmin }: WorkReportDashboardProps) {
     }
   };
 
+  const exportSingleReportPdf = async (report: WorkReport) => {
+    if (!isAdmin) return;
+
+    setExportingReportId(report.id);
+    setError(null);
+    try {
+      const reportWorkers = workers
+        .filter((worker) => worker.report_id === report.id)
+        .map((worker) => {
+          let hourlyRate = workerCostByRow.get(worker.id);
+          if (hourlyRate == null) {
+            const catalog = workerCatalogByName.get(normalizeCatalogValue(worker.worker_name));
+            const key = catalog ? `${catalog.id}::${normalizeCatalogValue(worker.rate_type || 'ORDINARIA')}` : '';
+            hourlyRate = key ? laborDefaultByKey.get(key) : undefined;
+          }
+          return {
+            worker,
+            hourly_rate: hourlyRate == null || !Number.isFinite(hourlyRate) ? null : hourlyRate,
+          };
+        });
+
+      const reportMaterials = materials
+        .filter((material) => material.report_id === report.id)
+        .map((material) => {
+          let unitPrice = materialCostByRow.get(material.id);
+          if (unitPrice == null) {
+            const catalog = materialCatalogByDescription.get(normalizeCatalogValue(material.description));
+            unitPrice = catalog ? materialDefaultByCatalog.get(catalog.id) : undefined;
+          }
+          return {
+            material,
+            unit_price: unitPrice == null || !Number.isFinite(unitPrice) ? null : unitPrice,
+          };
+        });
+
+      const site = report.site_id ? sites.find((row) => row.id === report.site_id) ?? null : null;
+      const plant = report.plant_id ? plantById.get(report.plant_id) ?? null : null;
+      const quoteId = report.quote_request_id ?? site?.quote_request_id ?? null;
+      const quote = quoteId ? quoteById.get(quoteId) ?? null : null;
+
+      let materialMarkupPercent = Number(site?.material_markup_percent ?? 0);
+      if (!site) {
+        const adminSummary = await fetchWorkReportAdminSummary(report.id);
+        materialMarkupPercent = Number(adminSummary?.material_markup_percent ?? 0);
+      }
+      if (!Number.isFinite(materialMarkupPercent)) materialMarkupPercent = 0;
+
+      const blob = await generateWorkReportPdf({
+        report,
+        workers: reportWorkers,
+        materials: reportMaterials,
+        site,
+        plant,
+        quote,
+        materialMarkupPercent,
+      });
+
+      saveAs(
+        blob,
+        `Rapportino_${report.report_date}_${sanitizeFileName(report.client_reference)}.pdf`,
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Generazione PDF rapportino non riuscita.');
+    } finally {
+      setExportingReportId(null);
+    }
+  };
+
   const removeGroup = async (
     groupKey: string,
     quoteRequestId: string | null,
@@ -416,6 +485,19 @@ export function WorkReportDashboard({ isAdmin }: WorkReportDashboardProps) {
           </div>
 
           <div className="flex flex-wrap items-center justify-end gap-1">
+            {isAdmin && (
+              <button
+                type="button"
+                onClick={() => void exportSingleReportPdf(report)}
+                disabled={exportingReportId === report.id}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-900 hover:bg-blue-100 disabled:opacity-50"
+                aria-label="Crea PDF del rapportino"
+                title="Crea PDF del rapportino"
+              >
+                {exportingReportId === report.id ? <Loader2 size={14} className="animate-spin" /> : <FileDown size={14} />}
+                {exportingReportId === report.id ? 'PDF…' : 'PDF'}
+              </button>
+            )}
             {isAdmin && !expanded && (
               <button
                 onClick={() => setExpandedId(report.id)}
