@@ -41,7 +41,7 @@ export function Login({ signedIn = false, canAdmin = true, onSignedIn, onSelectA
     setRecovering(true); setError(null); setMessage(null);
     try {
       const { error: resetError } = await supabase.auth.resetPasswordForEmail(email.trim().toLowerCase(), {
-        redirectTo: 'https://polatordsolar.davidebernardelli75.workers.dev/?auth=recovery',
+        redirectTo: `${window.location.origin}/?auth=recovery`,
       });
       if (resetError) setError(resetError.status === 429 ? 'Troppe richieste. Attendi prima di riprovare.' : 'Recupero non riuscito. Riprova più tardi.');
       else setMessage('Se l’indirizzo è registrato, riceverai un’email con il link per impostare una nuova password. Controlla anche lo spam.');
