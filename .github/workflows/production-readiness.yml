@@ -72,6 +72,12 @@ jobs:
             exit 1
           fi
 
+      - name: Generate production audit-fix candidate
+        shell: bash
+        run: |
+          npm audit fix --package-lock-only --omit=dev
+          git diff -- package-lock.json
+
       - name: Audit production dependencies
         run: npm audit --omit=dev --audit-level=high
 
