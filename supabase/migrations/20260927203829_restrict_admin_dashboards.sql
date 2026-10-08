@@ -1,6 +1,7 @@
 -- STEP 3 / 3: enforce administration-only access to vehicles and insurances.
--- Run ONLY after app_user_roles has an explicit admin row for an existing user.
--- Run after creating the training tables in 20260926110000.
+-- On populated environments, run only after app_user_roles has an explicit admin
+-- row for an existing user. Fresh/shadow databases may have no auth users yet.
+-- Run after creating the training tables in 20260927203825.
 -- DOES NOT TOUCH plants, panels, photos, storage or roadmap (FV remains open
 -- to ALL authenticated app users under the existing plant-specific RLS rules).
 -- Changes existing policies on vehicles and insurances intentionally; inspect
@@ -10,13 +11,14 @@ BEGIN;
 DO $$
 BEGIN
   IF to_regclass('public.app_user_roles') IS NULL THEN
-    RAISE EXCEPTION 'First apply 20260926100000_app_admin_roles.sql';
+    RAISE EXCEPTION 'First apply 20260927203803_app_admin_roles.sql';
   END IF;
-  IF NOT EXISTS (
-    SELECT 1 FROM public.app_user_roles AS r
-    JOIN auth.users AS u ON u.id = r.user_id
-    WHERE r.role = 'admin'
-  ) THEN
+  IF EXISTS (SELECT 1 FROM auth.users)
+    AND NOT EXISTS (
+      SELECT 1 FROM public.app_user_roles AS r
+      JOIN auth.users AS u ON u.id = r.user_id
+      WHERE r.role = 'admin'
+    ) THEN
     RAISE EXCEPTION 'BLOCKED: assign at least one existing admin account before restricting production';
   END IF;
   IF to_regclass('public.vehicles') IS NULL OR to_regclass('public.insurances') IS NULL THEN
@@ -25,7 +27,7 @@ BEGIN
   IF to_regclass('public.employees') IS NULL
     OR to_regclass('public.employee_courses') IS NULL
     OR to_regclass('public.training_custom_courses') IS NULL THEN
-    RAISE EXCEPTION 'First apply 20260926110000_personnel_training.sql';
+    RAISE EXCEPTION 'First apply 20260927203825_personnel_training.sql';
   END IF;
 END $$;
 
