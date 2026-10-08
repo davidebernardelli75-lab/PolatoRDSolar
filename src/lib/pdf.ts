@@ -912,3 +912,149 @@ export async function generateWorkSitePdf(data: WorkSitePdfData): Promise<Blob> 
   addFooters(doc);
   return doc.output('blob');
 }
+
+
+export interface WorkReportPdfData {
+  report: WorkReport;
+  workers: WorkSitePdfWorkerRow[];
+  materials: WorkSitePdfMaterialRow[];
+  site: WorkSite | null;
+  plant: Plant | null;
+  quote: QuoteRequest | null;
+  materialMarkupPercent: number;
+}
+
+export async function generateWorkReportPdf(data: WorkReportPdfData): Promise<Blob> {
+  const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+  const logoDataUrl = await loadLogoDataUrl();
+  let y = addWorkSiteHeader(doc, logoDataUrl, 'RAPPORTINO DI LAVORO');
+
+  const markup = Number.isFinite(data.materialMarkupPercent) ? data.materialMarkupPercent : 0;
+  let totalHours = 0;
+  let totalLabor = 0;
+  let totalMaterial = 0;
+  let totalMarkedMaterial = 0;
+  let missingCosts = 0;
+
+  data.workers.forEach(({ worker, hourly_rate }) => {
+    totalHours += Number(worker.hours || 0);
+    if (hourly_rate == null || !Number.isFinite(hourly_rate)) {
+      missingCosts += 1;
+      return;
+    }
+    totalLabor += Number(worker.hours || 0) * hourly_rate;
+  });
+
+  data.materials.forEach(({ material, unit_price }) => {
+    if (unit_price == null || !Number.isFinite(unit_price)) {
+      missingCosts += 1;
+      return;
+    }
+    const rawTotal = Number(material.quantity || 0) * unit_price;
+    totalMaterial += rawTotal;
+    totalMarkedMaterial += rawTotal * (1 + markup / 100);
+  });
+
+  const totalCost = totalLabor + totalMaterial;
+
+  y = addSectionTitle(doc, 'DATI RAPPORTINO', y);
+  y = addRows(doc, [
+    ['Data', formatDate(data.report.report_date)],
+    ['Cliente / riferimento', data.report.client_reference],
+    ['Cantiere', data.site ? data.site.name : 'Non associato'],
+    ['Località cantiere', data.site ? sanitizePdfText(data.site.location) : 'N/D'],
+    ['Impianto FV', data.plant ? `${data.plant.owner_name} · ${data.plant.address}` : 'Nessuno'],
+    ['Squadra', sanitizePdfText(data.report.team_name)],
+    ['Stato', data.report.status.replace(/_/g, ' ')],
+    ['Lavorazione eseguita', sanitizePdfText(data.report.work_description)],
+    ['Note', sanitizePdfText(data.report.notes)],
+  ], y);
+
+  if (data.quote) {
+    y = ensureWorkSiteSpace(doc, logoDataUrl, y + 3, 25, 'RAPPORTINO DI LAVORO');
+    y = addSectionTitle(doc, 'RIFERIMENTO ECONOMICO', y + 3);
+    y = addRows(doc, [
+      ['Preventivo', `${data.quote.progressive_number}/${data.quote.series} · ${data.quote.client}`],
+      ['Valore preventivo senza IVA', formatCurrency(data.quote.value_ex_vat == null ? null : Number(data.quote.value_ex_vat))],
+      ['Ricarico materiali cantiere', `${markup.toLocaleString('it-IT', { maximumFractionDigits: 2 })}%`],
+    ], y);
+  } else {
+    y = ensureWorkSiteSpace(doc, logoDataUrl, y + 3, 18, 'RAPPORTINO DI LAVORO');
+    y = addSectionTitle(doc, 'RIFERIMENTO ECONOMICO', y + 3);
+    y = addRows(doc, [
+      ['Preventivo', 'N/D'],
+      ['Ricarico materiali', `${markup.toLocaleString('it-IT', { maximumFractionDigits: 2 })}%`],
+    ], y);
+  }
+
+  y = ensureWorkSiteSpace(doc, logoDataUrl, y + 3, 35, 'RAPPORTINO DI LAVORO');
+  y = addSectionTitle(doc, 'RIEPILOGO RAPPORTINO', y + 3);
+  y = addRows(doc, [
+    ['Ore registrate', `${totalHours.toLocaleString('it-IT', { maximumFractionDigits: 2 })} h`],
+    ['Costo manodopera', formatCurrency(totalLabor)],
+    ['Costo materiali', formatCurrency(totalMaterial)],
+    ['Valore materiali con ricarico', formatCurrency(totalMarkedMaterial)],
+    ['Costo totale sostenuto', formatCurrency(totalCost)],
+    ['Costi mancanti/non valorizzati', String(missingCosts)],
+  ], y);
+
+  if (data.workers.length > 0) {
+    y = ensureWorkSiteSpace(doc, logoDataUrl, y + 5, 20, 'RAPPORTINO · MANODOPERA');
+    y = addSectionTitle(doc, 'MANODOPERA', y + 5);
+    const workerCols = [
+      { label: 'Operatore', x: MARGIN, width: 65 },
+      { label: 'Ore', x: MARGIN + 65, width: 20, align: 'right' as const },
+      { label: 'Tipo', x: MARGIN + 85, width: 35 },
+      { label: 'Costo/h', x: MARGIN + 120, width: 28, align: 'right' as const },
+      { label: 'Totale', x: MARGIN + 148, width: 32, align: 'right' as const },
+    ];
+    y = addWorkSiteTableHeader(doc, y, workerCols);
+
+    data.workers.forEach(({ worker, hourly_rate }, index) => {
+      y = ensureWorkSiteSpace(doc, logoDataUrl, y, 12, 'RAPPORTINO · MANODOPERA');
+      if (y < 35) y = addWorkSiteTableHeader(doc, y, workerCols);
+      const lineTotal = hourly_rate == null ? null : Number(worker.hours) * hourly_rate;
+      y = addWorkSiteTableRow(doc, y, [
+        { value: worker.worker_name, x: MARGIN, width: 65 },
+        { value: Number(worker.hours).toLocaleString('it-IT'), x: MARGIN + 65, width: 20, align: 'right' },
+        { value: worker.rate_type || 'ORDINARIA', x: MARGIN + 85, width: 35 },
+        { value: formatCurrency(hourly_rate), x: MARGIN + 120, width: 28, align: 'right' },
+        { value: formatCurrency(lineTotal), x: MARGIN + 148, width: 32, align: 'right' },
+      ], index % 2 === 0);
+    });
+  }
+
+  if (data.materials.length > 0) {
+    y = ensureWorkSiteSpace(doc, logoDataUrl, y + 5, 20, 'RAPPORTINO · MATERIALI');
+    y = addSectionTitle(doc, 'MATERIALI', y + 5);
+    const materialCols = [
+      { label: 'Materiale', x: MARGIN, width: 60 },
+      { label: 'Q.tà', x: MARGIN + 60, width: 22, align: 'right' as const },
+      { label: 'Costo/u', x: MARGIN + 82, width: 30, align: 'right' as const },
+      { label: 'Rincar./u', x: MARGIN + 112, width: 32, align: 'right' as const },
+      { label: 'Totale costo', x: MARGIN + 144, width: 36, align: 'right' as const },
+    ];
+    y = addWorkSiteTableHeader(doc, y, materialCols);
+
+    data.materials.forEach(({ material, unit_price }, index) => {
+      y = ensureWorkSiteSpace(doc, logoDataUrl, y, 12, 'RAPPORTINO · MATERIALI');
+      if (y < 35) y = addWorkSiteTableHeader(doc, y, materialCols);
+      const markedUnit = unit_price == null ? null : unit_price * (1 + markup / 100);
+      const rawTotal = unit_price == null ? null : Number(material.quantity) * unit_price;
+      const description = material.item_code
+        ? `${material.description} · ${material.item_code}`
+        : material.description;
+
+      y = addWorkSiteTableRow(doc, y, [
+        { value: description, x: MARGIN, width: 60 },
+        { value: `${Number(material.quantity).toLocaleString('it-IT')} ${material.unit}`, x: MARGIN + 60, width: 22, align: 'right' },
+        { value: formatCurrency(unit_price), x: MARGIN + 82, width: 30, align: 'right' },
+        { value: formatCurrency(markedUnit), x: MARGIN + 112, width: 32, align: 'right' },
+        { value: formatCurrency(rawTotal), x: MARGIN + 144, width: 36, align: 'right' },
+      ], index % 2 === 0);
+    });
+  }
+
+  addFooters(doc);
+  return doc.output('blob');
+}
