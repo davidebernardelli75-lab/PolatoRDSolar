@@ -797,6 +797,25 @@ function workSiteStatusClass(status: string): string {
   return 'bg-violet-100 text-violet-800';
 }
 
+function workSiteProgressColorClass(scopes: WorkSiteOption[], linkedPlants: Plant[]): string {
+  const normalizedScopes = new Set(scopes.map((scope) => normalizeCatalogValue(scope.label)));
+  const has = (label: string) => normalizedScopes.has(normalizeCatalogValue(label));
+
+  // FV has priority: new FV systems and upgrades with storage / EV charger stay green.
+  if (has('FOTOVOLTAICO')) return 'bg-emerald-600';
+  if (linkedPlants.length > 0 && (has('ACCUMULO') || has('COLONNINA EV'))) return 'bg-emerald-600';
+
+  if (has('IMPIANTO ELETTRICO')) return 'bg-blue-900';
+  if (has('ACCUMULO')) return 'bg-teal-600';
+  if (has('COLONNINA EV')) return 'bg-indigo-600';
+  if (has('DOMOTICA / AUTOMAZIONE')) return 'bg-violet-600';
+  if (has('RETE DATI')) return 'bg-cyan-700';
+  if (has('ALLARME / SICUREZZA')) return 'bg-red-600';
+  if (has('MANUTENZIONE')) return 'bg-amber-600';
+
+  return 'bg-slate-600';
+}
+
 function WorkSiteRegister({
   sites,
   phases,
@@ -1065,7 +1084,12 @@ function WorkSiteRegister({
               <section key={site.id} className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
                 <div className="p-4 sm:p-5">
                   <div className="flex flex-wrap items-start gap-4">
-                    <div className="rounded-xl bg-blue-900 px-3 py-2 text-center text-white">
+                    <div
+                      className={`rounded-xl px-3 py-2 text-center text-white ${workSiteProgressColorClass(currentScopes, linkedPlants)}`}
+                      title={currentScopes.length > 0
+                        ? `Tipologia: ${currentScopes.map((scope) => scope.label).join(' · ')}`
+                        : 'Tipologia cantiere non ancora definita'}
+                    >
                       <div className="text-[9px] font-bold uppercase tracking-wide">{site.category}</div>
                       <div className="mt-0.5 text-sm font-bold">{Math.round(progressPercent)}%</div>
                     </div>
