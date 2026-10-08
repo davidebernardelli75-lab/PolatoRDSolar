@@ -1,6 +1,13 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { clearLocalSupabaseAuth, supabase } from '@/lib/supabase';
+
+function isPasswordRecoveryUrl(): boolean {
+  if (typeof window === 'undefined') return false;
+  const query = new URLSearchParams(window.location.search);
+  const hash = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+  return query.get('auth') === 'recovery' || hash.get('type') === 'recovery';
+}
 import { fetchAppRole, type AppRole } from '@/lib/access';
 import type { Plant } from '@/lib/types';
 import { fetchPlants, deletePlant, fetchAllRoadmapProgress, updatePlant } from '@/lib/api';
@@ -34,7 +41,7 @@ export type View =
 export default function App() {
   const [session, setSession] = useState<Session | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
-  const [passwordRecovery, setPasswordRecovery] = useState(false);
+  const [passwordRecovery, setPasswordRecovery] = useState(() => isPasswordRecoveryUrl());
   const [area, setArea] = useState<'home' | 'admin' | 'fv'>('home');
   const [access, setAccess] = useState<{ userId: string; role: AppRole } | null>(null);
   const [accessError, setAccessError] = useState<string | null>(null);
@@ -63,6 +70,7 @@ export default function App() {
     supabase.auth.getSession().then(({ data }) => {
       setAccess(null);
       setSession(data.session);
+      if (isPasswordRecoveryUrl()) setPasswordRecovery(true);
       setAuthLoading(false);
     });
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, nextSession) => {
@@ -111,7 +119,12 @@ export default function App() {
   if (passwordRecovery) return (
     <PasswordRecovery onComplete={() => {
       setPasswordRecovery(false);
+      setAccess(null);
+      setSession(null);
+      setArea('home');
       setView({ name: 'launcher' });
+      setPlants([]);
+      setRoadmapProgress({});
       window.history.replaceState(null, '', window.location.pathname);
     }} />
   );
