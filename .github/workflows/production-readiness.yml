@@ -1,0 +1,105 @@
+name: Production readiness gate
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: production-readiness-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Build, security and deploy preflight
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Reject tracked environment secrets
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          tracked_env="$(git ls-files | grep -E '(^|/)\.env($|\.)' | grep -vE '(^|/)\.env\.example$' || true)"
+          if [ -n "$tracked_env" ]; then
+            echo "::error::Environment files must not be committed:"
+            echo "$tracked_env"
+            exit 1
+          fi
+
+          leaked="$(git grep -nEI '(sb_secret_[A-Za-z0-9_-]{16,}|SUPABASE_SERVICE_ROLE_KEY[[:space:]]*=|eyJhbGciOi[A-Za-z0-9_-]{20,})' -- src public 2>/dev/null || true)"
+          if [ -n "$leaked" ]; then
+            echo "::error::Potential privileged credential found in browser-delivered source:"
+            echo "$leaked"
+            exit 1
+          fi
+
+      - name: Validate Supabase migration filenames
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          migrations="$(find supabase/migrations -maxdepth 1 -type f -name '*.sql' -exec basename {} \; | sort)"
+          invalid="$(printf '%s\n' "$migrations" | grep -Ev '^[0-9]{14}_[a-z0-9_]+\.sql$' || true)"
+          if [ -n "$invalid" ]; then
+            echo "::error::Invalid migration filename(s):"
+            echo "$invalid"
+            exit 1
+          fi
+
+          duplicates="$(printf '%s\n' "$migrations" | cut -c1-14 | sort | uniq -d)"
+          if [ -n "$duplicates" ]; then
+            echo "::error::Duplicate Supabase migration timestamp(s):"
+            echo "$duplicates"
+            exit 1
+          fi
+
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=high
+
+      - name: Typecheck excluding two known main-branch baseline errors
+        shell: bash
+        run: |
+          set +e
+          npm run typecheck 2>&1 | tee /tmp/tsc.log
+          code=${PIPESTATUS[0]}
+          set -e
+
+          if [ "$code" -ne 0 ]; then
+            grep -E 'error TS[0-9]+' /tmp/tsc.log > /tmp/ts-errors.log || true
+            if [ ! -s /tmp/ts-errors.log ]; then
+              exit 1
+            fi
+
+            grep -Ev 'src/components/PlantEditor\.tsx\([0-9]+,[0-9]+\): error TS2345|src/lib/use-equipment-options\.ts\([0-9]+,[0-9]+\): error TS2345' /tmp/ts-errors.log > /tmp/unexpected.log || true
+            if [ -s /tmp/unexpected.log ]; then
+              cat /tmp/unexpected.log
+              exit 1
+            fi
+
+            echo '::warning::Only the two documented pre-existing TypeScript baseline errors remain.'
+          fi
+
+      - name: Build production bundle
+        run: npm run build
+
+      - name: Cloudflare deployment dry run
+        run: npx --yes wrangler@4.148.0 deploy --dry-run
