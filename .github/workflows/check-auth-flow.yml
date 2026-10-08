@@ -5,7 +5,9 @@ on:
       - 'src/App.tsx'
       - 'src/components/Login.tsx'
       - 'src/components/PasswordRecovery.tsx'
+      - 'src/lib/access.ts'
       - 'src/lib/supabase.ts'
+      - 'supabase/migrations/**'
       - '.github/workflows/check-auth-flow.yml'
 jobs:
   check:
