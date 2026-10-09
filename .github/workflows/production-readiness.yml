@@ -106,6 +106,14 @@ jobs:
       - name: Build production bundle
         run: npm run build
 
+      - name: Verify Cloudflare static asset headers file
+        shell: bash
+        run: |
+          test -f dist/_headers
+          grep -Fq 'Content-Security-Policy:' dist/_headers
+          grep -Fq 'Strict-Transport-Security:' dist/_headers
+          grep -Fq 'X-Frame-Options: DENY' dist/_headers
+
       - name: Enforce JavaScript chunk budget
         shell: bash
         run: |
