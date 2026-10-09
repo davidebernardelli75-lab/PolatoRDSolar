@@ -16,21 +16,27 @@ Lo script `scripts/polato-backup.sh` crea una sottocartella datata senza sovrasc
 
 1. ruoli database;
 2. schema applicativo;
-3. dati applicativi;
-4. storico migration Supabase;
-5. contenuto dei bucket privati `solar-archive` e `quote-files`;
-6. manifest del backup;
-7. checksum SHA-256 verificati immediatamente.
+3. dump dati completo `data.sql`, che include anche i dati Auth e i metadati Storage;
+4. dump Auth esplicito `auth_data.sql` per recovery selettivo;
+5. dump metadati Storage esplicito `storage_metadata.sql`;
+6. storico migration Supabase;
+7. contenuto fisico dei bucket privati `solar-archive` e `quote-files`;
+8. manifest del backup;
+9. checksum SHA-256 verificati immediatamente.
 
 I file di backup contengono dati aziendali e devono restare fuori dal repository Git.
 
 ## Auth e managed schemas
 
-Il comando `supabase db dump` filtra gli schemi gestiti Supabase come `auth` e `storage`. Per un disaster recovery completo degli account Auth e dei metadati managed, lo script supporta un dump addizionale `full-critical.sql` quando viene fornita localmente la variabile `POLATO_DB_URL` e sul Mac è disponibile `pg_dump`.
+La CLI Supabase tratta in modo diverso schema e dati:
 
-La connection string deve rimanere solo sul Mac e non deve essere salvata nel repository.
+- il dump **schema** standard esclude gli schemi managed come `auth` e `storage`, perché un nuovo progetto Supabase li crea già;
+- il dump **dati** può includere `auth` e `storage`;
+- lo script crea inoltre due export espliciti: `auth_data.sql` e `storage_metadata.sql`.
 
-Senza `full-critical.sql`, i dati applicativi e i file Storage sono protetti, ma in un recovery totale gli account Auth potrebbero dover essere ricreati e le password reimpostate.
+Questo consente di preservare utenti, identità e dati Auth senza salvare connection string o password DB nel repository. Lo script verifica anche che il dump Auth contenga `auth.users` e che il dump Storage contenga `storage.buckets` e `storage.objects`.
+
+In un nuovo progetto Supabase gli account possono essere recuperati dai dati Auth. Le API key/JWT del nuovo progetto saranno comunque diverse: le sessioni/token già emessi non vanno considerati riutilizzabili e gli utenti possono dover effettuare nuovamente il login.
 
 ## Esecuzione ordinaria
 
@@ -100,10 +106,11 @@ Sequenza:
 4. ripristinare lo storico migration;
 5. ricreare/caricare i bucket Storage;
 6. copiare i file Storage nel nuovo progetto;
-7. se disponibile, usare `full-critical.sql` per il recupero selettivo di Auth/Storage managed data;
-8. configurare nuove API key, Auth redirect, SMTP e altre impostazioni non contenute nel database;
-9. verificare RLS, login amministrazione/operatori e conteggi dati;
-10. solo dopo i test, spostare il traffico/app sul progetto recuperato.
+7. ripristinare i dati Auth usando il dump completo oppure `auth_data.sql`, evitando di caricarli due volte;
+8. usare `storage_metadata.sql` solo quando necessario per il recovery dei metadati; i file fisici vanno comunque caricati tramite Storage API/CLI;
+9. configurare nuove API key, Auth redirect, SMTP e altre impostazioni non contenute nel database;
+10. verificare RLS, login amministrazione/operatori e conteggi dati;
+11. solo dopo i test, spostare il traffico/app sul progetto recuperato.
 
 ### Storage
 
@@ -143,6 +150,9 @@ Inventario verificato in produzione:
 - 38 tabelle `public`;
 - circa 857 righe applicative;
 - 2 utenti Auth;
+- 2 identità Auth;
+- 7 sessioni Auth;
+- 9 refresh token Auth;
 - 12 oggetti Storage;
 - circa 6,7 MB di Storage;
 - bucket privati: `solar-archive`, `quote-files`.
