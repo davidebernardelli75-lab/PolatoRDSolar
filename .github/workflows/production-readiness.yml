@@ -102,6 +102,7 @@ jobs:
         run: |
           bash -n scripts/polato-backup.sh
           bash -n scripts/polato-verify-production.sh
+          bash -n scripts/polato-deploy-production.sh
 
       - name: Build production bundle
         run: npm run build
@@ -133,7 +134,7 @@ jobs:
         shell: bash
         run: |
           grep -Fq 'not_found_handling = "single-page-application"' wrangler.toml
-          grep -Fq 'run_worker_first = [ "/api/*" ]' wrangler.toml
+          grep -Fq 'run_worker_first = true' wrangler.toml
           test -f public/_headers
           grep -Fq 'Content-Security-Policy:' public/_headers
           grep -Fq 'Strict-Transport-Security:' public/_headers
@@ -185,6 +186,7 @@ jobs:
           assert(page.headers.get('x-content-type-options') === 'nosniff', 'nosniff missing');
           assert(page.headers.get('referrer-policy') === 'strict-origin-when-cross-origin', 'Referrer-Policy missing');
           assert(page.headers.get('permissions-policy')?.includes('camera=(self)'), 'Camera permission policy missing');
+          assert(page.headers.get('x-polato-security-layer') === 'worker', 'Worker security marker missing');
           assert(page.headers.get('access-control-allow-origin') === null, 'Worker must not expose wildcard CORS');
 
           const crossOrigin = await worker.fetch(

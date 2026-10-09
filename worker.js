@@ -29,6 +29,7 @@ const SECURITY_HEADERS = {
   'cross-origin-opener-policy': 'same-origin',
   'cross-origin-resource-policy': 'same-origin',
   'x-permitted-cross-domain-policies': 'none',
+  'x-polato-security-layer': 'worker',
 };
 
 const JSON_HEADERS = {
