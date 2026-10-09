@@ -32,8 +32,24 @@ supabase db dump --linked -f "$DEST/db/roles.sql" --role-only
 info "Backup schema applicativo"
 supabase db dump --linked -f "$DEST/db/schema.sql"
 
-info "Backup dati applicativi"
-supabase db dump --linked -f "$DEST/db/data.sql" --use-copy --data-only   -x "storage.buckets_vectors"   -x "storage.vector_indexes"
+info "Backup dati completi DB"
+supabase db dump --linked -f "$DEST/db/data.sql" --use-copy --data-only \
+  -x "storage.buckets_vectors" \
+  -x "storage.vector_indexes"
+
+info "Backup Auth esplicito"
+supabase db dump --linked -f "$DEST/db/auth_data.sql" --use-copy --data-only --schema auth
+grep -q 'COPY "auth"."users"' "$DEST/db/auth_data.sql" \
+  || fail "Il dump Auth non contiene auth.users."
+
+info "Backup metadati Storage esplicito"
+supabase db dump --linked -f "$DEST/db/storage_metadata.sql" --use-copy --data-only --schema storage \
+  -x "storage.buckets_vectors" \
+  -x "storage.vector_indexes"
+grep -q 'COPY "storage"."buckets"' "$DEST/db/storage_metadata.sql" \
+  || fail "Il dump Storage non contiene storage.buckets."
+grep -q 'COPY "storage"."objects"' "$DEST/db/storage_metadata.sql" \
+  || fail "Il dump Storage non contiene storage.objects."
 
 info "Backup storico migration Supabase"
 supabase db dump --linked -f "$DEST/db/history_schema.sql" --schema supabase_migrations
@@ -49,15 +65,6 @@ supabase storage cp -r ss:///quote-files "$DEST/storage/quote-files" \
   --experimental \
   --project-ref "$PROJECT_REF"
 
-if [ -n "${POLATO_DB_URL:-}" ]; then
-  if command -v pg_dump >/dev/null 2>&1; then
-    info "Backup completo critico public/auth/storage"
-    pg_dump "$POLATO_DB_URL"       --no-owner       --no-privileges       --schema=public       --schema=auth       --schema=storage       --schema=supabase_migrations       --file="$DEST/db/full-critical.sql"
-  else
-    echo "AVVISO: POLATO_DB_URL è impostata ma pg_dump non è installato; full-critical.sql non creato." >&2
-  fi
-fi
-
 info "Creazione manifest"
 {
   echo "project_ref=$PROJECT_REF"
@@ -67,11 +74,8 @@ info "Creazione manifest"
   echo "supabase_cli=$(supabase --version 2>/dev/null || echo unknown)"
   echo "storage_solar_archive_files=$(find "$DEST/storage/solar-archive" -type f | wc -l | tr -d ' ')"
   echo "storage_quote_files_files=$(find "$DEST/storage/quote-files" -type f | wc -l | tr -d ' ')"
-  if [ -f "$DEST/db/full-critical.sql" ]; then
-    echo "full_critical_dump=yes"
-  else
-    echo "full_critical_dump=no"
-  fi
+  echo "auth_selective_dump=yes"
+  echo "storage_metadata_dump=yes"
 } > "$DEST/meta/manifest.txt"
 
 info "Calcolo checksum SHA-256"
@@ -88,4 +92,5 @@ echo "BACKUP COMPLETATO"
 echo "Percorso: $DEST"
 echo "Verifica: OK"
 echo
-echo "Nota: full-critical.sql viene creato solo se POLATO_DB_URL è impostata e pg_dump è disponibile."
+echo "Auth: incluso e verificato"
+echo "Storage metadata: incluso e verificato"
