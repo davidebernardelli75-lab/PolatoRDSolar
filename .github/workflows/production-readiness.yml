@@ -104,7 +104,7 @@ jobs:
       - name: Build production bundle
         run: npm run build
 
-      - name: Test Cloudflare health endpoint
+      - name: Test Cloudflare health and security headers
         shell: bash
         run: |
           node --input-type=module <<'EOF'
@@ -118,16 +118,71 @@ jobs:
             },
           };
 
-          const response = await worker.fetch(
+          const assert = (condition, message) => {
+            if (!condition) {
+              console.error(message);
+              process.exit(1);
+            }
+          };
+
+          const health = await worker.fetch(
             new Request('https://health.test/api/health'),
             env,
           );
-          const body = await response.json();
+          const healthBody = await health.json();
 
-          if (response.status !== 200 || body.status !== 'ok' || body.assets !== 'ok') {
-            console.error({ status: response.status, body });
-            process.exit(1);
-          }
+          assert(
+            health.status === 200 && healthBody.status === 'ok' && healthBody.assets === 'ok',
+            JSON.stringify({ status: health.status, body: healthBody }),
+          );
+
+          const page = await worker.fetch(
+            new Request('https://health.test/'),
+            env,
+          );
+
+          const csp = page.headers.get('content-security-policy') || '';
+          assert(csp.includes("default-src 'self'"), 'Missing default-src CSP');
+          assert(csp.includes("frame-ancestors 'none'"), 'Missing frame-ancestors CSP');
+          assert(csp.includes("script-src 'self' 'wasm-unsafe-eval'"), 'WASM CSP not allowed safely');
+          assert(!csp.includes("'unsafe-eval'"), 'Unsafe JavaScript eval must remain blocked');
+          assert(csp.includes('https://fjmrfxjvqsdrwjucgzla.supabase.co'), 'Supabase HTTPS origin missing from CSP');
+          assert(csp.includes('wss://fjmrfxjvqsdrwjucgzla.supabase.co'), 'Supabase Realtime origin missing from CSP');
+          assert(page.headers.get('strict-transport-security')?.includes('max-age=31536000'), 'HSTS missing');
+          assert(page.headers.get('x-frame-options') === 'DENY', 'X-Frame-Options missing');
+          assert(page.headers.get('x-content-type-options') === 'nosniff', 'nosniff missing');
+          assert(page.headers.get('referrer-policy') === 'strict-origin-when-cross-origin', 'Referrer-Policy missing');
+          assert(page.headers.get('permissions-policy')?.includes('camera=(self)'), 'Camera permission policy missing');
+          assert(page.headers.get('access-control-allow-origin') === null, 'Worker must not expose wildcard CORS');
+
+          const crossOrigin = await worker.fetch(
+            new Request('https://health.test/api/client-error', {
+              method: 'POST',
+              headers: {
+                origin: 'https://evil.example',
+                'sec-fetch-site': 'cross-site',
+                'content-type': 'application/json',
+              },
+              body: JSON.stringify({ kind: 'test', message: 'test' }),
+            }),
+            env,
+          );
+          assert(crossOrigin.status === 403, 'Cross-origin API request must be rejected');
+          assert(crossOrigin.headers.get('access-control-allow-origin') === null, 'Forbidden response must not enable CORS');
+
+          const sameOrigin = await worker.fetch(
+            new Request('https://health.test/api/client-error', {
+              method: 'POST',
+              headers: {
+                origin: 'https://health.test',
+                'sec-fetch-site': 'same-origin',
+                'content-type': 'application/json',
+              },
+              body: JSON.stringify({ kind: 'test', message: 'test', path: '/' }),
+            }),
+            env,
+          );
+          assert(sameOrigin.status === 204, 'Same-origin client error report must remain available');
           EOF
 
       - name: Cloudflare deployment dry run

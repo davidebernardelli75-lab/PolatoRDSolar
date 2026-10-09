@@ -1,8 +1,59 @@
+const SUPABASE_ORIGIN = 'https://fjmrfxjvqsdrwjucgzla.supabase.co';
+const SUPABASE_WS_ORIGIN = 'wss://fjmrfxjvqsdrwjucgzla.supabase.co';
+
+const CONTENT_SECURITY_POLICY = [
+  "default-src 'self'",
+  "base-uri 'self'",
+  "object-src 'none'",
+  "frame-ancestors 'none'",
+  "form-action 'self'",
+  "script-src 'self' 'wasm-unsafe-eval'",
+  "style-src 'self' 'unsafe-inline'",
+  `connect-src 'self' ${SUPABASE_ORIGIN} ${SUPABASE_WS_ORIGIN}`,
+  `img-src 'self' data: blob: ${SUPABASE_ORIGIN}`,
+  "media-src 'self' blob:",
+  "font-src 'self' data:",
+  "worker-src 'self' blob:",
+  "manifest-src 'self'",
+  "frame-src 'none'",
+  'upgrade-insecure-requests',
+].join('; ');
+
+const SECURITY_HEADERS = {
+  'content-security-policy': CONTENT_SECURITY_POLICY,
+  'strict-transport-security': 'max-age=31536000; includeSubDomains',
+  'x-frame-options': 'DENY',
+  'x-content-type-options': 'nosniff',
+  'referrer-policy': 'strict-origin-when-cross-origin',
+  'permissions-policy': 'camera=(self), microphone=(), geolocation=(), payment=(), usb=(), serial=(), browsing-topics=()',
+  'cross-origin-opener-policy': 'same-origin',
+  'cross-origin-resource-policy': 'same-origin',
+  'x-permitted-cross-domain-policies': 'none',
+};
+
 const JSON_HEADERS = {
   'content-type': 'application/json; charset=utf-8',
   'cache-control': 'no-store, max-age=0',
-  'x-content-type-options': 'nosniff',
 };
+
+function withSecurityHeaders(response) {
+  const secured = new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers: response.headers,
+  });
+
+  for (const [name, value] of Object.entries(SECURITY_HEADERS)) {
+    secured.headers.set(name, value);
+  }
+
+  // The application has no cross-origin Worker API. Supabase requests go
+  // directly to the hosted Supabase origin and are protected by API key + RLS.
+  secured.headers.delete('access-control-allow-origin');
+  secured.headers.delete('access-control-allow-credentials');
+
+  return secured;
+}
 
 function jsonResponse(payload, status = 200) {
   return new Response(JSON.stringify(payload), {
@@ -26,7 +77,7 @@ function safePath(value) {
   return value.split('?')[0].split('#')[0].slice(0, 160);
 }
 
-function acceptsBrowserReport(request) {
+function acceptsBrowserRequest(request) {
   const url = new URL(request.url);
   const origin = request.headers.get('origin');
   const fetchSite = request.headers.get('sec-fetch-site');
@@ -65,10 +116,6 @@ async function handleHealth(request, env) {
 }
 
 async function handleClientError(request) {
-  if (!acceptsBrowserReport(request)) {
-    return jsonResponse({ error: 'forbidden' }, 403);
-  }
-
   const contentLength = Number(request.headers.get('content-length') || '0');
   if (contentLength > 8192) {
     return jsonResponse({ error: 'payload_too_large' }, 413);
@@ -90,29 +137,37 @@ async function handleClientError(request) {
   return new Response(null, { status: 204 });
 }
 
+async function routeRequest(request, env) {
+  const url = new URL(request.url);
+
+  if (url.pathname.startsWith('/api/') && !acceptsBrowserRequest(request)) {
+    return jsonResponse({ error: 'forbidden' }, 403);
+  }
+
+  if (url.pathname === '/api/health') {
+    if (!['GET', 'HEAD'].includes(request.method)) {
+      return jsonResponse({ error: 'method_not_allowed' }, 405);
+    }
+    return await handleHealth(request, env);
+  }
+
+  if (url.pathname === '/api/client-error') {
+    if (request.method !== 'POST') {
+      return jsonResponse({ error: 'method_not_allowed' }, 405);
+    }
+    return await handleClientError(request);
+  }
+
+  return await env.ASSETS.fetch(request);
+}
+
 export default {
   async fetch(request, env) {
-    const url = new URL(request.url);
-
     try {
-      if (url.pathname === '/api/health') {
-        if (!['GET', 'HEAD'].includes(request.method)) {
-          return jsonResponse({ error: 'method_not_allowed' }, 405);
-        }
-        return await handleHealth(request, env);
-      }
-
-      if (url.pathname === '/api/client-error') {
-        if (request.method !== 'POST') {
-          return jsonResponse({ error: 'method_not_allowed' }, 405);
-        }
-        return await handleClientError(request);
-      }
-
-      return await env.ASSETS.fetch(request);
+      return withSecurityHeaders(await routeRequest(request, env));
     } catch (error) {
       console.error(error);
-      return jsonResponse({ status: 'error', service: 'polatordsolar' }, 503);
+      return withSecurityHeaders(jsonResponse({ status: 'error', service: 'polatordsolar' }, 503));
     }
   },
 };
