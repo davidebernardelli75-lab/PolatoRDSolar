@@ -98,6 +98,9 @@ jobs:
             echo '::warning::Only the two documented pre-existing TypeScript baseline errors remain.'
           fi
 
+      - name: Validate backup script syntax
+        run: bash -n scripts/polato-backup.sh
+
       - name: Build production bundle
         run: npm run build
 
