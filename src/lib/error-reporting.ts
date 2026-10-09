@@ -28,7 +28,7 @@ function normalizeError(error: unknown): { name: string; message: string } {
 }
 
 export function reportClientError(kind: ErrorKind, error: unknown): void {
-  if (reporting || typeof window === 'undefined') return;
+  if (!import.meta.env.PROD || reporting || typeof window === 'undefined') return;
 
   const normalized = normalizeError(error);
   const path = window.location.pathname.slice(0, 160) || '/';
@@ -59,7 +59,7 @@ export function reportClientError(kind: ErrorKind, error: unknown): void {
 }
 
 export function installGlobalErrorReporting(): void {
-  if (typeof window === 'undefined') return;
+  if (!import.meta.env.PROD || typeof window === 'undefined') return;
 
   window.addEventListener('error', (event) => {
     if (event.error) reportClientError('window', event.error);
