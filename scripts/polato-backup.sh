@@ -42,13 +42,13 @@ supabase db dump --linked -f "$DEST/db/history_data.sql" --use-copy --data-only 
 info "Backup Storage: solar-archive"
 (
   cd "$DEST/storage/solar-archive"
-  supabase storage cp -r ss://solar-archive . --experimental --linked
+  supabase storage cp -r ss:///solar-archive . --experimental --project-ref "$PROJECT_REF"
 )
 
 info "Backup Storage: quote-files"
 (
   cd "$DEST/storage/quote-files"
-  supabase storage cp -r ss://quote-files . --experimental --linked
+  supabase storage cp -r ss:///quote-files . --experimental --project-ref "$PROJECT_REF"
 )
 
 if [ -n "${POLATO_DB_URL:-}" ]; then
