@@ -1,7 +1,11 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App.tsx';
+import { AppErrorBoundary } from '@/components/AppErrorBoundary';
+import { installGlobalErrorReporting } from '@/lib/error-reporting';
 import './index.css';
+
+installGlobalErrorReporting();
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
@@ -28,6 +32,8 @@ if ('serviceWorker' in navigator) {
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <App />
+    <AppErrorBoundary>
+      <App />
+    </AppErrorBoundary>
   </StrictMode>
 );

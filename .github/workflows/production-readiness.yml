@@ -101,5 +101,31 @@ jobs:
       - name: Build production bundle
         run: npm run build
 
+      - name: Test Cloudflare health endpoint
+        shell: bash
+        run: |
+          node --input-type=module <<'EOF'
+          const { default: worker } = await import('./worker.js');
+          const env = {
+            ASSETS: {
+              fetch: async () => new Response('<!doctype html>', {
+                status: 200,
+                headers: { 'content-type': 'text/html' },
+              }),
+            },
+          };
+
+          const response = await worker.fetch(
+            new Request('https://health.test/api/health'),
+            env,
+          );
+          const body = await response.json();
+
+          if (response.status !== 200 || body.status !== 'ok' || body.assets !== 'ok') {
+            console.error({ status: response.status, body });
+            process.exit(1);
+          }
+          EOF
+
       - name: Cloudflare deployment dry run
         run: npx --yes wrangler@4.148.0 deploy --dry-run
