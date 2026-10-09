@@ -124,6 +124,10 @@ jobs:
       - name: Test Cloudflare health and security headers
         shell: bash
         run: |
+          grep -Fq '"/api/*"' wrangler.toml
+          grep -Fq '"/"' wrangler.toml
+          grep -Fq '"/*.html"' wrangler.toml
+
           node --input-type=module <<'EOF'
           const { default: worker } = await import('./worker.js');
           const env = {
