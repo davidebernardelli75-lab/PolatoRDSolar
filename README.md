@@ -15,7 +15,7 @@ Dashboard web per la gestione di impianti fotovoltaici, pannelli, inverter, accu
 
 ## Prerequisiti
 
-- Node.js 20+
+- Node.js 22+
 - npm
 
 ## Ambiente di sviluppo locale
@@ -29,7 +29,7 @@ Il dev server si avvia su `http://localhost:5173`.
 
 ## Variabili d'ambiente
 
-Le variabili vanno definite in un file `.env` alla radice del progetto (già presente in produzione). Sono lette tramite `import.meta.env` e usate solo nel codice frontend (prefisso `VITE_`).
+Usare `.env.example` come modello e mantenere i valori reali in `.env.local`, che è escluso da Git. Le variabili sono lette tramite `import.meta.env` e usate solo nel codice frontend (prefisso `VITE_`).
 
 | Variabile | Descrizione | Dove reperirla |
 |---|---|---|
@@ -60,7 +60,7 @@ equipment_catalog (marche/modelli)   — tabella autonoma, catalogo condiviso
 app_members                          — tabella di autorizzazione: mappa user_id → membri autorizzati
 ```
 
-Tutte le tabelle hanno **Row Level Security (RLS)** abilitata. L'accesso è consentito solo agli utenti autenticati presenti nella tabella `app_members` (policy `USING (EXISTS (SELECT 1 FROM app_members WHERE user_id = auth.uid()))`).
+Tutte le tabelle `public` hanno **Row Level Security (RLS)** abilitata. Il modello distingue amministrazione e operatori: l'amministrazione accede alle funzioni gestionali complete, mentre gli operatori ricevono solo i dati operativi necessari. Le funzioni privilegiate e le policy RLS sono il confine di sicurezza reale; la UI non sostituisce l'autorizzazione DB.
 
 Lo storage bucket `solar-archive` è privato e contiene le foto degli impianti (max 10 MB, formati JPEG/PNG/WebP/HEIC).
 
@@ -76,24 +76,22 @@ Produce la cartella `dist/` con i file statici ottimizzati.
 
 ### Deploy su Cloudflare Workers
 
-Il progetto usa Cloudflare Workers con la direttiva `[assets]` in `wrangler.toml`:
+Il progetto usa Cloudflare Workers con `worker.js`, static assets, health endpoint, observability e security headers.
 
-```toml
-name = "polatordsolar"
-compatibility_date = "2024-09-04"
-
-[assets]
-directory = "./dist"
-```
-
-Per il deploy:
+Il flusso operativo normale sul Mac è:
 
 ```bash
-npm run build
-npx wrangler deploy
+cd ~/Documents/"Polato RD Solar Archive PWA"
+polato-update
 ```
 
-Richiede un account Cloudflare con accesso al Worker `polatordsolar`.
+Per una verifica post-deploy:
+
+```bash
+bash scripts/polato-verify-production.sh
+```
+
+Il comando Wrangler diretto va usato solo per diagnostica o operazioni controllate. Il CI esegue il preflight con Wrangler 4.148.0 e Node 22.
 
 ### netlify.toml
 
@@ -120,3 +118,17 @@ Controlli rapidi da fare periodicamente per verificare che tutto funzioni:
 5. **Storage foto**: carica una foto di test in un impianto e verifica che appaia nella galleria.
 6. **Export**: prova a scaricare l'archivio ZIP e il report PDF di un impianto.
 7. **Parco automezzi**: apri la sezione veicoli e verifica che la lista carichi con gli alert di scadenza.
+
+
+## Operations e disaster recovery
+
+La procedura operativa ufficiale è:
+
+- `docs/OPERATIONS_RUNBOOK.md` — deploy, verifiche, incident response, rollback, sicurezza e manutenzione;
+- `docs/BACKUP_DISASTER_RECOVERY.md` — backup, checksum e recovery Supabase.
+
+L'endpoint di health produzione è:
+
+```text
+https://polatordsolar.davidebernardelli75.workers.dev/api/health
+```
