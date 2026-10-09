@@ -40,16 +40,14 @@ supabase db dump --linked -f "$DEST/db/history_schema.sql" --schema supabase_mig
 supabase db dump --linked -f "$DEST/db/history_data.sql" --use-copy --data-only --schema supabase_migrations
 
 info "Backup Storage: solar-archive"
-(
-  cd "$DEST/storage/solar-archive"
-  supabase storage cp -r ss:///solar-archive . --experimental --project-ref "$PROJECT_REF"
-)
+supabase storage cp -r ss:///solar-archive "$DEST/storage/solar-archive" \
+  --experimental \
+  --project-ref "$PROJECT_REF"
 
 info "Backup Storage: quote-files"
-(
-  cd "$DEST/storage/quote-files"
-  supabase storage cp -r ss:///quote-files . --experimental --project-ref "$PROJECT_REF"
-)
+supabase storage cp -r ss:///quote-files "$DEST/storage/quote-files" \
+  --experimental \
+  --project-ref "$PROJECT_REF"
 
 if [ -n "${POLATO_DB_URL:-}" ]; then
   if command -v pg_dump >/dev/null 2>&1; then
