@@ -147,7 +147,7 @@ Per ridurre l'RPO sotto le 24 ore è necessario aumentare la frequenza di backup
 
 Inventario verificato in produzione:
 
-- 38 tabelle `public`;
+- 39 tabelle `public`;
 - circa 857 righe applicative;
 - 2 utenti Auth;
 - 2 identità Auth;
