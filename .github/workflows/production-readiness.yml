@@ -125,8 +125,11 @@ jobs:
         shell: bash
         run: |
           grep -Fq 'not_found_handling = "single-page-application"' wrangler.toml
-          grep -Fq '"/*"' wrangler.toml
-          grep -Fq '"!/assets/*"' wrangler.toml
+          grep -Fq 'run_worker_first = [ "/api/*" ]' wrangler.toml
+          test -f public/_headers
+          grep -Fq 'Content-Security-Policy:' public/_headers
+          grep -Fq 'Strict-Transport-Security:' public/_headers
+          grep -Fq 'X-Frame-Options: DENY' public/_headers
 
           node --input-type=module <<'EOF'
           const { default: worker } = await import('./worker.js');
