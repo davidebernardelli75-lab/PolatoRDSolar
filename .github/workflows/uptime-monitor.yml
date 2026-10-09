@@ -1,0 +1,73 @@
+name: Production uptime monitor
+
+on:
+  schedule:
+    - cron: '*/30 * * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: production-uptime-monitor
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  health:
+    name: Check production health
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      HEALTH_URL: https://polatordsolar.davidebernardelli75.workers.dev/api/health
+      INCIDENT_TITLE: "🚨 Production health check failed"
+
+    steps:
+      - name: Probe production
+        id: probe
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          body="$(curl --silent --show-error --fail             --max-time 20             --retry 2             --retry-delay 3             --header 'accept: application/json'             "$HEALTH_URL")"
+          echo "$body"
+          printf '%s' "$body" | jq -e '
+            .status == "ok" and
+            .edge == "ok" and
+            .assets == "ok"
+          ' >/dev/null
+
+      - name: Open incident on failure
+        if: steps.probe.outcome == 'failure'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          issue="$(gh issue list --state open --limit 100 --json number,title             --jq ".[] | select(.title == \"$INCIDENT_TITLE\") | .number" | head -n 1)"
+
+          if [ -z "$issue" ]; then
+            gh issue create               --title "$INCIDENT_TITLE"               --assignee "${{ github.repository_owner }}"               --body "Il controllo automatico non riesce a ottenere uno stato healthy da `$HEALTH_URL`.
+
+          Controllare il deployment Cloudflare Workers e, se necessario, Supabase.
+
+          Workflow: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          fi
+
+          exit 1
+
+      - name: Close incident after recovery
+        if: steps.probe.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          issue="$(gh issue list --state open --limit 100 --json number,title             --jq ".[] | select(.title == \"$INCIDENT_TITLE\") | .number" | head -n 1)"
+
+          if [ -n "$issue" ]; then
+            gh issue comment "$issue" --body "Health check tornato regolare. Chiusura automatica dell'incidente."
+            gh issue close "$issue"
+          fi
