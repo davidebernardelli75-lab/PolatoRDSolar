@@ -104,6 +104,21 @@ jobs:
       - name: Build production bundle
         run: npm run build
 
+      - name: Enforce JavaScript chunk budget
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          oversized="$(find dist/assets -maxdepth 1 -type f -name '*.js' -size +500k -print || true)"
+          if [ -n "$oversized" ]; then
+            echo "::error::JavaScript chunk budget exceeded (500 kB):"
+            while IFS= read -r file; do
+              bytes="$(wc -c < "$file" | tr -d ' ')"
+              echo "$file — ${bytes} bytes"
+            done <<< "$oversized"
+            exit 1
+          fi
+
       - name: Test Cloudflare health and security headers
         shell: bash
         run: |

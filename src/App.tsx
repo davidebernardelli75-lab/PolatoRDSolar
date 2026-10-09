@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { lazy, Suspense, useState, useEffect, useCallback } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { clearLocalSupabaseAuth, supabase } from '@/lib/supabase';
 
@@ -14,16 +14,39 @@ import { fetchPlants, deletePlant, fetchAllRoadmapProgress, updatePlant } from '
 import { Sidebar } from '@/components/Sidebar';
 import { Dashboard } from '@/components/Dashboard';
 import { PlantEditor } from '@/components/PlantEditor';
-import { PlantDetail } from '@/components/PlantDetail';
 import { Login } from '@/components/Login';
 import { PasswordRecovery } from '@/components/PasswordRecovery';
-import { VehicleDashboard } from '@/components/VehicleDashboard';
-import { InsuranceDashboard } from '@/components/InsuranceDashboard';
-import { TrainingDashboard } from '@/components/TrainingDashboard';
-import { QuoteDashboard } from '@/components/QuoteDashboard';
-import { WorkReportDashboard } from '@/components/WorkReportDashboard';
-import { CalendarDashboard } from '@/components/CalendarDashboard';
 import { ModuleLauncher } from '@/components/ModuleLauncher';
+
+const PlantDetail = lazy(() =>
+  import('@/components/PlantDetail').then((module) => ({ default: module.PlantDetail }))
+);
+const WorkReportDashboard = lazy(() =>
+  import('@/components/WorkReportDashboard').then((module) => ({ default: module.WorkReportDashboard }))
+);
+const VehicleDashboard = lazy(() =>
+  import('@/components/VehicleDashboard').then((module) => ({ default: module.VehicleDashboard }))
+);
+const InsuranceDashboard = lazy(() =>
+  import('@/components/InsuranceDashboard').then((module) => ({ default: module.InsuranceDashboard }))
+);
+const TrainingDashboard = lazy(() =>
+  import('@/components/TrainingDashboard').then((module) => ({ default: module.TrainingDashboard }))
+);
+const QuoteDashboard = lazy(() =>
+  import('@/components/QuoteDashboard').then((module) => ({ default: module.QuoteDashboard }))
+);
+const CalendarDashboard = lazy(() =>
+  import('@/components/CalendarDashboard').then((module) => ({ default: module.CalendarDashboard }))
+);
+
+function ViewLoading() {
+  return (
+    <div className="flex min-h-[40vh] items-center justify-center text-sm text-slate-500">
+      Caricamento…
+    </div>
+  );
+}
 
 export type View =
   | { name: 'launcher' }
@@ -236,6 +259,7 @@ export default function App() {
               {accessError && <p>{accessError}</p>}
             </div>
           )}
+          <Suspense fallback={<ViewLoading />}>
           {currentView.name === 'launcher' && (
             <ModuleLauncher isAdmin={adminArea} onNavigate={navigate} />
           )}
@@ -301,6 +325,7 @@ export default function App() {
           {adminArea && currentView.name === 'calendar' && (
             <CalendarDashboard />
           )}
+          </Suspense>
         </main>
       </div>
     </div>
